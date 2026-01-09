@@ -1,12 +1,12 @@
 # Project File Checklist
-*Last updated: ven. 09 janv. 2026 06:56:31 WAT*
+*Last updated: ven. 09 janv. 2026 07:21:09 WAT*
 
 ## Previously Checked Files
 
 ## Other Files
 1. config/fuzzy.php [ ]
 2. config/fuzzy.php.bak [ ]
-3. database/migrations/create_fuzzy_index_table.php [ ]
+3. database/migrations/2024_01_01_000000_create_fuzzy_index_table.php [ ]
 4. src/Commands/ClearIndexCommand.php [ ]
 5. src/Commands/IndexSearchCommand.php [ ]
 6. src/Commands/StatsIndexCommand.php [ ]
