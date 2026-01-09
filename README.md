@@ -21,7 +21,7 @@
 ## 📦 Installation
 
 ```bash
-composer require laravel-fuzzy/fuzzy-search
+composer require andydefer/laravel-fuzzy
 ```
 
 Publiez les fichiers de configuration et de migration :
@@ -530,7 +530,7 @@ Les contributions sont les bienvenues ! Veuillez suivre ces étapes :
 
 ```bash
 # Cloner le projet
-git clone https://github.com/laravel-fuzzy/fuzzy-search.git
+git clone https://github.com/andydefer/laravel-fuzzy.git
 
 # Installer les dépendances
 composer install
@@ -551,7 +551,7 @@ Ce package est open-source et disponible sous la licence [MIT](LICENSE).
 - [Documentation complète](docs/)
 - [Guide de migration](docs/migration.md)
 - [Changelog](CHANGELOG.md)
-- [Issues](https://github.com/laravel-fuzzy/fuzzy-search/issues)
+- [Issues](https://github.com/andydefer/laravel-fuzzy/issues)
 
 ---
 
