@@ -1,5 +1,5 @@
 # Pint Formatting Test Report
-*Generated: ven. 09 janv. 2026 14:41:31 WAT*
+*Generated: ven. 09 janv. 2026 14:50:48 WAT*
 
 
   ⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯...⨯⨯⨯.⨯⨯.⨯⨯⨯⨯...⨯⨯⨯⨯⨯..⨯.
@@ -31,7 +31,7 @@
   ⨯ tests/Fixtures/Product.php                                                                                                                                         ordered_imports  
   ⨯ tests/Fixtures/User.php                                                                                                                                            ordered_imports  
   ⨯ tests/TestCase.php                                                                                                      class_attributes_separation, concat_space, ordered_imports  
-  ⨯ tests/Unit/FuzzySearchServiceTest.php                                              single_quote, concat_space, trailing_comma_in_multiline, statement_indentation, ordered_imports  
+  ⨯ tests/Unit/FuzzySearchServiceTest.php                 class_attributes_separation, single_quote, concat_space, trailing_comma_in_multiline, statement_indentation, ordered_imports  
   ⨯ tests/Unit/Stages/NonConsecutivePenaltyTest.php single_quote, concat_space, trailing_comma_in_multiline, not_operator_with_successor_space, blank_line_before_statement, ordered_…  
   ⨯ tests/Unit/Stages/SimilarityBonusStageTest.php class_attributes_separation, new_with_parentheses, concat_space, trailing_comma_in_multiline, not_operator_with_successor_space, o…  
 

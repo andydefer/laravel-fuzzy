@@ -21,46 +21,63 @@ class SimilarityCalculator
             return 1.0;
         }
 
-        // 2. La requête est contenue dans la cible (AMÉLIORÉ)
+        // 2. La requête est contenue dans la cible
         if (str_contains($targetWord, $queryWord)) {
             $ratio = strlen($queryWord) / strlen($targetWord);
-            // Score plus élevé pour les contenances exactes
+            // Score encore plus élevé
             if ($ratio >= 0.8) {
-                return 0.95; // Presque parfait pour les contenances fortes
+                return 0.98; // Presque parfait
             }
-            return min(0.9, 0.75 + ($ratio * 0.2)); // Entre 0.75 et 0.9
+            return min(0.95, 0.8 + ($ratio * 0.2)); // Entre 0.8 et 0.95
         }
 
-        // 3. La cible est contenue dans la requête (AMÉLIORÉ)
+        // 3. La cible est contenue dans la requête (CAS CRITIQUE : "mannte" contient "mante")
         if (str_contains($queryWord, $targetWord)) {
             $ratio = strlen($targetWord) / strlen($queryWord);
-            return min(0.88, 0.65 + ($ratio * 0.3)); // Entre 0.65 et 0.88
+            // Bonus IMPORTANT pour ce cas
+            if ($ratio >= 0.8) {
+                return 0.95; // "mante" dans "mannte" : 5/6 = 0.83 → 0.95
+            }
+            return min(0.9, 0.7 + ($ratio * 0.25)); // Entre 0.7 et 0.9
         }
 
-        // 4. Vérifier les différences d'une seule lettre (typos courantes)
+        // 4. Vérifier si la cible est PRESQUE contenue dans la requête (1-2 lettres de différence)
         $lengthDiff = abs(strlen($queryWord) - strlen($targetWord));
-        if ($lengthDiff <= 1 && min(strlen($queryWord), strlen($targetWord)) >= 4) {
-            $lcsLength = $this->longestCommonSubstringLength($queryWord, $targetWord);
-            $minLength = min(strlen($queryWord), strlen($targetWord));
+        if ($lengthDiff <= 2 && min(strlen($queryWord), strlen($targetWord)) >= 4) {
+            // Chercher la cible dans la requête avec tolérance d'une lettre
+            if ($this->isAlmostContained($targetWord, $queryWord, 1)) {
+                $ratio = strlen($targetWord) / strlen($queryWord);
+                return min(0.9, 0.75 + ($ratio * 0.2)); // Bonus important
+            }
 
-            // Si la LCS représente au moins 80% du mot le plus court
-            if ($lcsLength >= $minLength - 1) {
-                $baseScore = $lcsLength / max(strlen($queryWord), strlen($targetWord));
-                return min(0.92, $baseScore * 1.15); // Bonus de 15%
+            // Chercher la requête dans la cible avec tolérance d'une lettre
+            if ($this->isAlmostContained($queryWord, $targetWord, 1)) {
+                $ratio = strlen($queryWord) / strlen($targetWord);
+                return min(0.9, 0.75 + ($ratio * 0.2)); // Bonus important
             }
         }
 
         // 5. Calculer la plus longue sous-chaîne commune
         $lcsLength = $this->longestCommonSubstringLength($queryWord, $targetWord);
 
-        // CAS SPÉCIAL : La LCS est presque toute la requête (ex: "feney" vs "feeney")
-        if ($lcsLength >= strlen($queryWord) - 1 && strlen($queryWord) >= 4) {
-            $ratio = $lcsLength / max(strlen($queryWord), strlen($targetWord));
+        // CAS SPÉCIAL : La LCS est presque toute la requête ou presque toute la cible
+        $queryLength = strlen($queryWord);
+        $targetLength = strlen($targetWord);
+
+        if ($lcsLength >= $queryLength - 1 && $queryLength >= 4) {
+            // LCS presque toute la requête (ex: "mannte" vs "mante" : LCS="mant")
+            $ratio = $lcsLength / max($queryLength, $targetLength);
+            return min(0.85, 0.7 + ($ratio * 0.2));
+        }
+
+        if ($lcsLength >= $targetLength - 1 && $targetLength >= 4) {
+            // LCS presque toute la cible
+            $ratio = $lcsLength / max($queryLength, $targetLength);
             return min(0.85, 0.7 + ($ratio * 0.2));
         }
 
         if ($lcsLength >= 3) {
-            $maxLength = max(strlen($queryWord), strlen($targetWord));
+            $maxLength = max($queryLength, $targetLength);
             $lcsRatio = $lcsLength / $maxLength;
 
             // Bonus pour les sous-chaînes relativement longues
@@ -74,7 +91,7 @@ class SimilarityCalculator
         }
 
         // 6. Distance de Levenshtein pour les mots courts
-        if (strlen($queryWord) <= 6 || strlen($targetWord) <= 6) {
+        if ($queryLength <= 6 || $targetLength <= 6) {
             $levenshteinScore = $this->normalizedLevenshtein($queryWord, $targetWord);
             if ($levenshteinScore >= 0.6) {
                 return $levenshteinScore;
@@ -84,12 +101,46 @@ class SimilarityCalculator
         // 7. Similarité Jaro-Winkler pour les fautes de frappe
         $jaroWinklerScore = $this->jaroWinklerSimilarity($queryWord, $targetWord);
 
-        // RÉDUIT le seuil pour Jaro-Winkler pour capturer plus de correspondances
-        if ($jaroWinklerScore >= 0.65) { // Réduit de 0.7 à 0.65
+        if ($jaroWinklerScore >= 0.65) {
             return $jaroWinklerScore;
         }
 
         return 0.0;
+    }
+
+    /**
+     * Vérifie si une chaîne est presque contenue dans une autre avec une tolérance d'erreur
+     */
+    private function isAlmostContained(string $needle, string $haystack, int $maxErrors = 1): bool
+    {
+        $needleLen = strlen($needle);
+        $haystackLen = strlen($haystack);
+
+        if ($needleLen > $haystackLen + $maxErrors) {
+            return false;
+        }
+
+        // Chercher avec tolérance d'erreur
+        for ($i = 0; $i <= $haystackLen - $needleLen + $maxErrors; $i++) {
+            $errors = 0;
+
+            for ($j = 0; $j < $needleLen; $j++) {
+                $haystackPos = $i + $j;
+
+                if ($haystackPos >= $haystackLen || $haystack[$haystackPos] !== $needle[$j]) {
+                    $errors++;
+                    if ($errors > $maxErrors) {
+                        break 2; // Trop d'erreurs, passer à la position suivante
+                    }
+                }
+            }
+
+            if ($errors <= $maxErrors) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function longestCommonSubstringLength(string $str1, string $str2): int
