@@ -23,9 +23,8 @@ class WordMatchStage
                         continue;
                     }
 
-                    $score = 0.9 * $match['weight']; // Slightly less than exact match
+                    $score = 0.9 * $match['weight']; // Score élevé pour correspondance exacte de mot
 
-                    // NE PAS filtrer par minScore ici - laisser SortAndLimitStage le faire
                     $model = $context->getModelInstance($resultKey);
                     if ($model) {
                         $context->results[$resultKey] = new SearchResultData(

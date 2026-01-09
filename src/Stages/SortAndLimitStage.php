@@ -11,18 +11,21 @@ class SortAndLimitStage
 {
     public function handle(SearchContext $context, Closure $next)
     {
-        // Filter by minScore first, en s'assurant que le résultat n'est pas null
-        $filteredResults = $context->finalResults
+        // Convertir les résultats en collection pour le tri
+        $resultsCollection = collect($context->results)
             ->filter(function ($result) use ($context) {
                 return $result !== null && $result->score >= $context->options->minScore;
             });
 
-        // Then sort by score descending
-        $sortedResults = $filteredResults->sortByDesc('score')->values();
+        // Trier par score décroissant
+        $sortedResults = $resultsCollection->sortByDesc('score');
 
-        // Finally limit to maxResults
-        $context->finalResults = $sortedResults->take($context->options->maxResults);
+        // Limiter au nombre maximum de résultats
+        $limitedResults = $sortedResults->take($context->options->maxResults);
 
-        return $context->finalResults;
+        // Réinitialiser les clés
+        $context->results = $limitedResults->values()->all();
+
+        return $context->results;
     }
 }

@@ -11,8 +11,8 @@ use Closure;
 class ScoreAggregationStage
 {
     private const FIELD_WEIGHTS = [
-        'name' => 1.2,
-        'title' => 1.1,
+        'name' => 1.3,
+        'title' => 1.2,
         'email' => 1.0,
         'description' => 0.8,
         'content' => 0.7,
@@ -20,22 +20,10 @@ class ScoreAggregationStage
     ];
 
     private const CONSECUTIVE_BONUS = [
-        2 => 1.1,   // +10%
-        3 => 1.3,   // +30%
-        4 => 1.6,   // +60%
-        5 => 2.0,   // +100%
-    ];
-
-    private const POSITION_BONUS = [
-        'start' => 1.3,
-        'middle' => 1.0,
-        'end' => 1.2,
-    ];
-
-    private const MULTI_WORD_PENALTY = [
-        'single_word' => 1.0,
-        'multi_word_partial' => 0.8,
-        'multi_word_dispersed' => 0.5,
+        2 => 1.05,  // +5%
+        3 => 1.15,  // +15%
+        4 => 1.30,  // +30%
+        5 => 1.50,  // +50%
     ];
 
     public function handle(SearchContext $context, Closure $next)
@@ -95,20 +83,27 @@ class ScoreAggregationStage
             return 0.0;
         }
 
-        $wordScores = [];
-        $hasMultiWordQuery = $totalWords > 1;
-        $exactPhraseMatch = false;
-
         // 1. Vérifier la correspondance exacte de phrase
         $normalizedMatched = $context->normalizer->normalize($matchedValue);
         $normalizedQuery = $context->normalizedQuery;
 
         if ($normalizedMatched === $normalizedQuery) {
-            return 1.0; // Correspondance parfaite de phrase
+            return 1.0;
         }
 
-        // 2. Calculer les scores par mot
+        // 2. Vérifier si la requête est contenue dans la valeur
+        if (str_contains($normalizedMatched, $normalizedQuery)) {
+            return min(0.95, 0.8 + (strlen($normalizedQuery) / strlen($normalizedMatched)) * 0.2);
+        }
+
+        // 3. Calculer les scores par mot
+        $wordScores = [];
+
         foreach ($queryWords as $queryWord) {
+            if (strlen($queryWord) < 2) {
+                continue;
+            }
+
             $bestWordScore = 0.0;
             $bestFieldWeight = self::FIELD_WEIGHTS['default'];
 
@@ -118,17 +113,21 @@ class ScoreAggregationStage
                 foreach ($entry['normalized_words'] as $targetWord) {
                     $targetWord = (string) $targetWord;
 
-                    // Calculer la similarité de base
+                    if (strlen($targetWord) < 2) {
+                        continue;
+                    }
+
+                    // Calculer la similarité avancée
                     $similarity = $context->similarityCalculator->calculateWordSimilarity($queryWord, $targetWord);
 
                     if ($similarity > 0) {
-                        // Appliquer les bonus/pénalités
+                        // Appliquer les bonus
                         $enhancedScore = $this->enhanceWordScore(
                             $queryWord,
                             $targetWord,
                             $similarity,
                             $entry['field'],
-                            $matchedValue
+                            $entry['original_value'] ?? $matchedValue
                         );
 
                         $weightedScore = $enhancedScore * $fieldWeight;
@@ -141,23 +140,22 @@ class ScoreAggregationStage
                 }
             }
 
-            $wordScores[] = [
-                'score' => $bestWordScore,
-                'weight' => $bestFieldWeight,
-                'word' => $queryWord,
-            ];
+            if ($bestWordScore > 0) {
+                $wordScores[] = [
+                    'score' => $bestWordScore,
+                    'weight' => $bestFieldWeight,
+                    'word' => $queryWord,
+                ];
+            }
         }
 
-        // 3. Agréger les scores des mots
-        $aggregatedScore = $this->aggregateWordScores($wordScores, $hasMultiWordQuery, $matchedValue);
-
-        // 4. Appliquer les pénalités multi-mots si nécessaire
-        if ($hasMultiWordQuery) {
-            $multiWordPenalty = $this->calculateMultiWordPenalty($queryWords, $matchedValue);
-            $aggregatedScore *= $multiWordPenalty;
+        // 4. Agréger les scores
+        if (empty($wordScores)) {
+            return 0.0;
         }
 
-        // 5. Limiter le score entre 0 et 1
+        $aggregatedScore = $this->aggregateWordScores($wordScores, $totalWords, $matchedValue);
+
         return min(max($aggregatedScore, 0.0), 1.0);
     }
 
@@ -174,26 +172,22 @@ class ScoreAggregationStage
         $consecutiveBonus = $this->calculateConsecutiveBonus($queryWord, $targetWord);
         $enhancedScore *= $consecutiveBonus;
 
-        // Bonus pour position dans le mot
+        // Bonus pour position dans le texte
         $positionBonus = $this->calculatePositionBonus($targetWord, $fullText);
         $enhancedScore *= $positionBonus;
-
-        // Bonus pour champ important
-        $fieldBonus = $this->calculateFieldBonus($field);
-        $enhancedScore *= $fieldBonus;
-
-        // Pénalité pour dispersion (non-consécutif)
-        $dispersionPenalty = $this->calculateDispersionPenalty($queryWord, $targetWord);
-        $enhancedScore *= $dispersionPenalty;
 
         return min($enhancedScore, 1.0);
     }
 
     private function calculateConsecutiveBonus(string $queryWord, string $targetWord): float
     {
+        $queryWord = strtolower($queryWord);
+        $targetWord = strtolower($targetWord);
+
         $maxConsecutive = 0;
         $queryLength = strlen($queryWord);
 
+        // Chercher la plus longue sous-chaîne consécutive commune
         for ($i = 0; $i < $queryLength; $i++) {
             for ($j = $i + 2; $j <= $queryLength; $j++) {
                 $substring = substr($queryWord, $i, $j - $i);
@@ -212,72 +206,38 @@ class ScoreAggregationStage
 
     private function calculatePositionBonus(string $word, string $fullText): float
     {
-        $position = strpos(strtolower($fullText), strtolower($word));
+        $fullText = strtolower($fullText);
+        $word = strtolower($word);
+
+        $position = strpos($fullText, $word);
 
         if ($position === false) {
-            return self::POSITION_BONUS['middle'];
+            return 1.0;
         }
 
         $textLength = strlen($fullText);
         $wordLength = strlen($word);
         $relativePosition = $position / max(1, $textLength - $wordLength);
 
-        if ($relativePosition < 0.3) {
-            return self::POSITION_BONUS['start'];
-        } elseif ($relativePosition > 0.7) {
-            return self::POSITION_BONUS['end'];
-        }
-
-        return self::POSITION_BONUS['middle'];
-    }
-
-    private function calculateFieldBonus(string $field): float
-    {
-        return self::FIELD_WEIGHTS[$field] ?? self::FIELD_WEIGHTS['default'];
-    }
-
-    private function calculateDispersionPenalty(string $queryWord, string $targetWord): float
-    {
-        // Si la requête est courte (< 4) et non consécutive, pénalité
-        if (strlen($queryWord) >= 3 && strlen($queryWord) <= 6) {
-            $hasConsecutive = $this->hasConsecutiveMatch($queryWord, $targetWord);
-            if (!$hasConsecutive) {
-                return 0.7; // -30%
-            }
+        // Les mots au début ont plus de poids
+        if ($relativePosition < 0.2) {
+            return 1.2; // +20%
+        } elseif ($relativePosition < 0.4) {
+            return 1.1; // +10%
         }
 
         return 1.0;
     }
 
-    private function hasConsecutiveMatch(string $query, string $text): bool
+    private function aggregateWordScores(array $wordScores, int $totalQueryWords, string $matchedValue): float
     {
-        for ($len = strlen($query); $len >= 3; $len--) {
-            for ($i = 0; $i <= strlen($query) - $len; $i++) {
-                $substring = substr($query, $i, $len);
-                if (str_contains($text, $substring)) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    private function aggregateWordScores(array $wordScores, bool $hasMultiWordQuery, string $matchedValue): float
-    {
-        if (empty($wordScores)) {
-            return 0.0;
-        }
-
         $totalScore = 0.0;
         $totalWeight = 0.0;
-        $matchedWords = 0;
+        $matchedWords = count($wordScores);
 
         foreach ($wordScores as $wordScore) {
-            if ($wordScore['score'] > 0) {
-                $totalScore += $wordScore['score'] * $wordScore['weight'];
-                $totalWeight += $wordScore['weight'];
-                $matchedWords++;
-            }
+            $totalScore += $wordScore['score'] * $wordScore['weight'];
+            $totalWeight += $wordScore['weight'];
         }
 
         if ($totalWeight === 0.0) {
@@ -287,66 +247,16 @@ class ScoreAggregationStage
         $averageScore = $totalScore / $totalWeight;
 
         // Bonus de couverture pour requêtes multi-mots
-        if ($hasMultiWordQuery && count($wordScores) > 1) {
-            $coverage = $matchedWords / count($wordScores);
-            $coverageBonus = $this->calculateCoverageBonus($coverage);
-            $averageScore = $averageScore * (1 - $coverageBonus) + $coverageBonus;
-        }
+        if ($totalQueryWords > 1) {
+            $coverage = $matchedWords / $totalQueryWords;
 
-        return min($averageScore, 1.0);
-    }
-
-    private function calculateCoverageBonus(float $coverage): float
-    {
-        if ($coverage >= 1.0) return 0.3;   // +30% si tous les mots correspondent
-        if ($coverage >= 0.75) return 0.15; // +15% si 75% des mots
-        if ($coverage >= 0.5) return 0.05;  // +5% si 50% des mots
-        return 0.0;
-    }
-
-    private function calculateMultiWordPenalty(array $queryWords, string $matchedValue): float
-    {
-        $words = preg_split('/[\s\-_,\.]+/', strtolower($matchedValue));
-
-        if (count($words) <= 1) {
-            return self::MULTI_WORD_PENALTY['single_word'];
-        }
-
-        // Vérifier si la requête est dispersée sur plusieurs mots
-        $queryChars = implode('', $queryWords);
-        $foundInSingleWord = false;
-        $foundInMultipleWords = 0;
-
-        foreach ($words as $word) {
-            $charsFound = 0;
-            foreach (str_split($queryChars) as $char) {
-                if (str_contains($word, $char)) {
-                    $charsFound++;
-                }
-            }
-
-            if ($charsFound >= 3) {
-                $foundInSingleWord = true;
-            }
-            if ($charsFound > 0) {
-                $foundInMultipleWords++;
+            if ($coverage >= 0.8) {
+                $averageScore = min($averageScore * 1.2, 1.0);
+            } elseif ($coverage >= 0.5) {
+                $averageScore = min($averageScore * 1.1, 1.0);
             }
         }
 
-        if ($foundInSingleWord) {
-            return self::MULTI_WORD_PENALTY['multi_word_partial'];
-        }
-
-        if ($foundInMultipleWords > 1) {
-            // Pénalité sévère pour dispersion multi-mots
-            $dispersionRatio = $foundInMultipleWords / min(count($words), strlen($queryChars));
-            if ($dispersionRatio > 0.8) {
-                return 0.3; // -70%
-            } elseif ($dispersionRatio > 0.5) {
-                return 0.5; // -50%
-            }
-        }
-
-        return self::MULTI_WORD_PENALTY['multi_word_dispersed'];
+        return $averageScore;
     }
 }

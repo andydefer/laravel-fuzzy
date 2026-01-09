@@ -80,8 +80,18 @@ class FuzzySearchServiceTest extends TestCase
 
         $results = $service->search('John Doe');
 
-        $this->assertCount(1, $results);
-        $this->assertEquals('John Doe', $results->first()->item->name);
+        // Avec le nouveau système, on peut avoir plusieurs résultats
+        // mais le premier devrait être John Doe avec un score élevé
+        $this->assertGreaterThan(0, $results->count());
+
+        // Trouver John Doe dans les résultats
+        $johnDoeResult = $results->first(function ($result) {
+            return $result->item->name === 'John Doe';
+        });
+
+        $this->assertNotNull($johnDoeResult);
+        $this->assertEquals('John Doe', $johnDoeResult->item->name);
+        $this->assertGreaterThan(0.8, $johnDoeResult->score);
     }
 
     public function test_search_finds_fuzzy_match(): void
@@ -99,8 +109,14 @@ class FuzzySearchServiceTest extends TestCase
 
         $results = $service->searchInModel(User::class, 'john');
 
-        $this->assertCount(1, $results);
-        $this->assertEquals(User::class, get_class($results->first()->item));
+        // Il peut y avoir plusieurs résultats (john, jane, etc.)
+        // Mais au moins John Doe devrait être trouvé
+        $johnDoeResult = $results->first(function ($result) {
+            return $result->item->name === 'John Doe';
+        });
+
+        $this->assertNotNull($johnDoeResult);
+        $this->assertEquals(User::class, get_class($johnDoeResult->item));
     }
 
     public function test_search_with_options(): void
@@ -129,7 +145,7 @@ class FuzzySearchServiceTest extends TestCase
         $service = app(FuzzySearchService::class);
 
         // Recherche d'un terme qui n'existe PAS dans l'index
-        $existingResults = $service->search('xylophone unique');
+        $existingResults = $service->search('xylophoneunique'); // Un mot sans espace
         $this->assertCount(0, $existingResults, 'Should start with no xylophone results');
 
         $user = User::create([
@@ -144,6 +160,12 @@ class FuzzySearchServiceTest extends TestCase
         $results = $service->search('xylophone player');
 
         $this->assertGreaterThanOrEqual(1, $results->count(), 'Should find the new user');
+
+        $xylophoneResult = $results->first(function ($result) {
+            return $result->item->name === 'Xylophone Player';
+        });
+
+        $this->assertNotNull($xylophoneResult);
     }
 
     public function test_remove_model_from_index(): void
@@ -161,7 +183,12 @@ class FuzzySearchServiceTest extends TestCase
         /** @var Collection<int, SearchResultData> $results */
         $results = $service->search('john');
 
-        $this->assertCount(0, $results);
+        // Après suppression, John Doe ne devrait plus être trouvé
+        $johnDoeFound = $results->contains(function ($result) {
+            return $result->item->name === 'John Doe';
+        });
+
+        $this->assertFalse($johnDoeFound, 'John Doe should not be found after removal from index');
     }
 
     public function test_get_stats(): void

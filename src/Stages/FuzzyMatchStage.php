@@ -35,6 +35,7 @@ class FuzzyMatchStage
                 (string) $indexedWord
             );
 
+            // Utiliser le seuil défini dans les options
             if ($similarity >= $context->options->threshold) {
                 $this->processMatches($context, $matches, $similarity);
             }
@@ -52,7 +53,7 @@ class FuzzyMatchStage
 
             $model = $context->getModelInstance($resultKey);
             if ($model) {
-                // Score initial basé uniquement sur la similarité du mot
+                // Score basé sur la similarité et le poids du champ
                 $baseScore = $similarity * ($match['weight'] ?? 1.0);
 
                 $context->results[$resultKey] = new SearchResultData(

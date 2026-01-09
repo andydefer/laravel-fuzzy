@@ -40,14 +40,18 @@ class FuzzySearchService
         $searchOptions = SearchOptionsData::fromConfig($options);
         $models = $this->getSearchableModels();
 
-        $results = collect();
+        $allResults = collect();
 
         foreach ($models as $modelClass) {
             $modelResults = $this->searchInModel($modelClass, $query, $options);
-            $results = $results->merge($modelResults);
+            $allResults = $allResults->merge($modelResults);
         }
 
-        return $results->sortByDesc('score')->values();
+        // Filtrer et trier tous les résultats
+        return $allResults
+            ->filter(fn($result) => $result->score >= $searchOptions->minScore)
+            ->sortByDesc('score')
+            ->values();
     }
 
     /**
@@ -70,10 +74,16 @@ class FuzzySearchService
             indexData: $indexData
         );
 
-        return $this->pipeline
+        $results = $this->pipeline
             ->send($context)
             ->through($this->getPipelineStages())
             ->then(fn(SearchContext $context) => $context->results);
+
+        // Convertir le tableau en Collection et filtrer par minScore
+        return collect($results)
+            ->filter(fn($result) => $result !== null && $result->score >= $searchOptions->minScore)
+            ->sortByDesc('score')
+            ->values();
     }
 
     /**
@@ -299,7 +309,6 @@ class FuzzySearchService
             \Fuzzy\Stages\ExactMatchStage::class,
             \Fuzzy\Stages\WordMatchStage::class,
             \Fuzzy\Stages\FuzzyMatchStage::class,
-            \Fuzzy\Stages\ScoreAggregationStage::class, // Remplace SimilarityBonusStage et NonConsecutivePenaltyStage
             \Fuzzy\Stages\SortAndLimitStage::class,
         ];
     }
