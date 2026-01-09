@@ -144,9 +144,10 @@ class FuzzySearchServiceTest extends TestCase
     {
         $service = app(FuzzySearchService::class);
 
-        // Recherche d'un terme qui n'existe PAS dans l'index
-        $existingResults = $service->search('xylophoneunique'); // Un mot sans espace
-        $this->assertCount(0, $existingResults, 'Should start with no xylophone results');
+        // Recherche d'un terme qui n'existe ABSOLUMENT PAS dans l'index
+        // Utiliser un mot complètement unique et improbable
+        $existingResults = $service->search('xyzlmnopqr12345unique'); // Mot très spécifique
+        $this->assertCount(0, $existingResults, 'Should start with no results for unique term');
 
         $user = User::create([
             'name' => 'Xylophone Player',

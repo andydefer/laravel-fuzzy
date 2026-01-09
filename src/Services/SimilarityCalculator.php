@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Fuzzy\Services;
 
 class SimilarityCalculator
@@ -18,25 +16,48 @@ class SimilarityCalculator
             return 0.0;
         }
 
-        // 1. Correspondance exacte
+        // 1. Exact match
         if ($queryWord === $targetWord) {
             return 1.0;
         }
 
-        // 2. La requête est contenue dans la cible
+        // 2. La requête est contenue dans la cible (AMÉLIORÉ)
         if (str_contains($targetWord, $queryWord)) {
             $ratio = strlen($queryWord) / strlen($targetWord);
-            return min(0.9, 0.7 + ($ratio * 0.2)); // Entre 0.7 et 0.9
+            // Score plus élevé pour les contenances exactes
+            if ($ratio >= 0.8) {
+                return 0.95; // Presque parfait pour les contenances fortes
+            }
+            return min(0.9, 0.75 + ($ratio * 0.2)); // Entre 0.75 et 0.9
         }
 
-        // 3. La cible est contenue dans la requête
+        // 3. La cible est contenue dans la requête (AMÉLIORÉ)
         if (str_contains($queryWord, $targetWord)) {
             $ratio = strlen($targetWord) / strlen($queryWord);
-            return min(0.85, 0.6 + ($ratio * 0.25)); // Entre 0.6 et 0.85
+            return min(0.88, 0.65 + ($ratio * 0.3)); // Entre 0.65 et 0.88
         }
 
-        // 4. Calculer la plus longue sous-chaîne commune
+        // 4. Vérifier les différences d'une seule lettre (typos courantes)
+        $lengthDiff = abs(strlen($queryWord) - strlen($targetWord));
+        if ($lengthDiff <= 1 && min(strlen($queryWord), strlen($targetWord)) >= 4) {
+            $lcsLength = $this->longestCommonSubstringLength($queryWord, $targetWord);
+            $minLength = min(strlen($queryWord), strlen($targetWord));
+
+            // Si la LCS représente au moins 80% du mot le plus court
+            if ($lcsLength >= $minLength - 1) {
+                $baseScore = $lcsLength / max(strlen($queryWord), strlen($targetWord));
+                return min(0.92, $baseScore * 1.15); // Bonus de 15%
+            }
+        }
+
+        // 5. Calculer la plus longue sous-chaîne commune
         $lcsLength = $this->longestCommonSubstringLength($queryWord, $targetWord);
+
+        // CAS SPÉCIAL : La LCS est presque toute la requête (ex: "feney" vs "feeney")
+        if ($lcsLength >= strlen($queryWord) - 1 && strlen($queryWord) >= 4) {
+            $ratio = $lcsLength / max(strlen($queryWord), strlen($targetWord));
+            return min(0.85, 0.7 + ($ratio * 0.2));
+        }
 
         if ($lcsLength >= 3) {
             $maxLength = max(strlen($queryWord), strlen($targetWord));
@@ -52,7 +73,7 @@ class SimilarityCalculator
             }
         }
 
-        // 5. Distance de Levenshtein pour les mots courts
+        // 6. Distance de Levenshtein pour les mots courts
         if (strlen($queryWord) <= 6 || strlen($targetWord) <= 6) {
             $levenshteinScore = $this->normalizedLevenshtein($queryWord, $targetWord);
             if ($levenshteinScore >= 0.6) {
@@ -60,9 +81,11 @@ class SimilarityCalculator
             }
         }
 
-        // 6. Similarité Jaro-Winkler pour les fautes de frappe
+        // 7. Similarité Jaro-Winkler pour les fautes de frappe
         $jaroWinklerScore = $this->jaroWinklerSimilarity($queryWord, $targetWord);
-        if ($jaroWinklerScore >= 0.7) {
+
+        // RÉDUIT le seuil pour Jaro-Winkler pour capturer plus de correspondances
+        if ($jaroWinklerScore >= 0.65) { // Réduit de 0.7 à 0.65
             return $jaroWinklerScore;
         }
 
@@ -192,27 +215,42 @@ class SimilarityCalculator
             return 1.0;
         }
 
-        $words1 = explode(' ', $str1);
-        $words2 = explode(' ', $str2);
+        if (empty($str1) || empty($str2)) {
+            return 0.0;
+        }
+
+        $words1 = preg_split('/[\s\-_,\.]+/', $str1);
+        $words2 = preg_split('/[\s\-_,\.]+/', $str2);
+
+        if (empty($words1) || empty($words2)) {
+            return 0.0;
+        }
 
         $totalScore = 0.0;
         $matchedWords = 0;
 
         foreach ($words1 as $word1) {
-            $bestScore = 0.0;
-
-            foreach ($words2 as $word2) {
-                $score = $this->calculateWordSimilarity($word1, $word2);
-                $bestScore = max($bestScore, $score);
+            $word1 = (string) $word1;
+            if (strlen($word1) < self::MIN_QUERY_LENGTH) {
+                continue;
             }
 
-            if ($bestScore > self::MIN_SIMILARITY_THRESHOLD) {
+            $bestScore = 0.0;
+            foreach ($words2 as $word2) {
+                $word2 = (string) $word2;
+                $score = $this->calculateWordSimilarity($word1, $word2);
+                if ($score > $bestScore) {
+                    $bestScore = $score;
+                }
+            }
+
+            if ($bestScore > 0) {
                 $totalScore += $bestScore;
                 $matchedWords++;
             }
         }
 
-        if ($matchedWords === 0) {
+        if ($totalScore === 0.0) {
             return 0.0;
         }
 
@@ -226,6 +264,14 @@ class SimilarityCalculator
 
     private function normalizeForComparison(string $str): string
     {
-        return preg_replace('/\s+/', ' ', trim(strtolower($str)));
+        if (empty($str)) {
+            return '';
+        }
+
+        $normalized = preg_replace('/[^a-z0-9\s]/i', ' ', $str);
+        $normalized = preg_replace('/\s+/', ' ', $normalized);
+        $normalized = trim($normalized);
+
+        return $normalized;
     }
 }
