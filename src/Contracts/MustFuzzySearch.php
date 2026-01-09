@@ -35,10 +35,17 @@ interface MustFuzzySearch
     public function getSearchableType(): string;
 
     /**
+     * Determine if this model instance should be indexed
+     */
+    public function shouldBeIndexed(): bool;
+
+    /**
      * Convert model to searchable data (optional, for custom transformation)
      */
     public function toSearchableData(): ?FuzzySearchableData;
 
-    // Ajoute ceci
+    /**
+     * Get model attribute
+     */
     public function getAttribute($key);
 }

@@ -108,7 +108,9 @@ class FuzzySearchService
      */
     public function indexModel(MustFuzzySearch $model): void
     {
-        $this->indexBuilder->indexModel($model);
+        if ($model->shouldBeIndexed()) {
+            $this->indexBuilder->indexModel($model);
+        }
     }
 
     /**
@@ -153,10 +155,12 @@ class FuzzySearchService
         // Clear existing index
         FuzzyIndex::forModel($modelClass)->delete();
 
-        // Index all instances
+        // Index all instances that should be indexed
         $modelClass::chunk(100, function ($models) {
             foreach ($models as $model) {
-                $this->indexModel($model);
+                if ($model->shouldBeIndexed()) {
+                    $this->indexModel($model);
+                }
             }
         });
     }

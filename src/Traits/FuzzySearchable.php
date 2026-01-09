@@ -15,14 +15,18 @@ trait FuzzySearchable
     protected static function bootFuzzySearchable(): void
     {
         static::created(function ($model) {
-            if (method_exists($model, 'indexForSearch')) {
-                $model->indexForSearch();
+            if ($model->shouldBeIndexed()) {
+                if (method_exists($model, 'indexForSearch')) {
+                    $model->indexForSearch();
+                }
             }
         });
 
         static::updated(function ($model) {
-            if (method_exists($model, 'updateIndexForSearch')) {
-                $model->updateIndexForSearch();
+            if ($model->shouldBeIndexed()) {
+                if (method_exists($model, 'updateIndexForSearch')) {
+                    $model->updateIndexForSearch();
+                }
             }
         });
 
@@ -31,6 +35,17 @@ trait FuzzySearchable
                 $model->removeFromIndex();
             }
         });
+    }
+
+    /**
+     * Determine if this model instance should be indexed
+     * Can be overridden in individual models
+     */
+    public function shouldBeIndexed(): bool
+    {
+        // Par défaut, tous les modèles sont indexés
+        // Surcharger cette méthode dans vos modèles pour ajouter des conditions
+        return true;
     }
 
     /**

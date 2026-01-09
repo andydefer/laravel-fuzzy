@@ -55,7 +55,10 @@ class IndexSearchCommand extends Command
                 $bar->start();
 
                 foreach ($models as $model) {
-                    $searchService->indexModel($model);
+                    // Respecter la condition shouldBeIndexed()
+                    if ($model->shouldBeIndexed()) {
+                        $searchService->indexModel($model);
+                    }
                     $bar->advance();
                 }
 
