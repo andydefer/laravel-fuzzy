@@ -5,17 +5,24 @@ declare(strict_types=1);
 return [
     /*
     |--------------------------------------------------------------------------
-    | Searchable Models
+    | Auto-Discovery Settings
     |--------------------------------------------------------------------------
     |
-    | List of models that implement MustFuzzySearch interface.
-    | These models will be indexed and searchable.
+    | When searchable_models is empty, the package will automatically
+    | discover models in the app/Models directory.
     |
     */
-    'searchable_models' => [
-        // Example:
-        // App\Models\User::class,
-        // App\Models\Product::class,
+    'auto_discovery' => [
+        'enabled' => true,
+        'directories' => [
+            app_path('Models'),
+        ],
+        'exclude_patterns' => [
+            '/^Abstract/',
+            '/^Base/',
+            '/Interface$/',
+            '/Trait$/',
+        ],
     ],
 
     /*

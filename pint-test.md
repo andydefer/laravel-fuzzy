@@ -1,5 +1,5 @@
 # Pint Formatting Test Report
-*Generated: ven. 09 janv. 2026 17:01:56 WAT*
+*Generated: ven. 09 janv. 2026 17:18:04 WAT*
 
 
   ⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯...⨯⨯⨯.⨯⨯.⨯⨯⨯⨯...⨯⨯⨯⨯⨯..⨯.
@@ -8,14 +8,14 @@
     FAIL   ................................................................................................................................................. 39 files, 28 style issues  
   ⨯ rector.php                                                                                                                                                            concat_space  
   ⨯ src/Commands/ClearIndexCommand.php                                                                                              not_operator_with_successor_space, ordered_imports  
-  ⨯ src/Commands/IndexSearchCommand.php                                    single_quote, concat_space, not_operator_with_successor_space, blank_line_before_statement, ordered_imports  
+  ⨯ src/Commands/IndexSearchCommand.php              new_with_parentheses, single_quote, concat_space, not_operator_with_successor_space, blank_line_before_statement, ordered_imports  
   ⨯ src/Commands/StatsIndexCommand.php                                                                                         function_declaration, not_operator_with_successor_space  
   ⨯ src/Contracts/MustFuzzySearch.php                                                                                                                                  ordered_imports  
   ⨯ src/Data/SearchOptionsData.php                                                                                                braces_position, cast_spaces, single_line_empty_body  
   ⨯ src/FuzzySearchServiceProvider.php                                                                                             new_with_parentheses, concat_space, ordered_imports  
   ⨯ src/Models/FuzzyIndex.php                                                                                                                                          ordered_imports  
   ⨯ src/SearchContext.php                                                                              class_attributes_separation, not_operator_with_successor_space, ordered_imports  
-  ⨯ src/Services/FuzzySearchService.php         class_attributes_separation, function_declaration, concat_space, no_unused_imports, not_operator_with_successor_space, ordered_imports  
+  ⨯ src/Services/FuzzySearchService.php  class_attributes_separation, new_with_parentheses, function_declaration, concat_space, no_unused_imports, not_operator_with_successor_space,…  
   ⨯ src/Services/SimilarityCalculator.php                                                                                     class_attributes_separation, blank_line_before_statement  
   ⨯ src/Services/StringNormalizer.php                                                                                   trailing_comma_in_multiline, not_operator_with_successor_space  
   ⨯ src/Stages/ExactMatchStage.php                                                                                    concat_space, not_operator_with_successor_space, ordered_imports  

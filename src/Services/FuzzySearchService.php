@@ -12,6 +12,9 @@ use Fuzzy\Data\SearchResultData;
 use Fuzzy\Exceptions\ModelNotSearchableException;
 use Fuzzy\SearchContext;
 use Fuzzy\Models\FuzzyIndex;
+use Illuminate\Support\Facades\File;
+use Symfony\Component\Finder\Finder;
+use ReflectionClass;
 
 class FuzzySearchService
 {
@@ -226,15 +229,72 @@ class FuzzySearchService
     }
 
     /**
-     * Get all searchable models from config
+     * Get all searchable models with hybrid approach
+     * Priority: 1. Manual config, 2. Auto-discovery
      */
     protected function getSearchableModels(): array
     {
-        $models = config('fuzzy.searchable_models', []);
+        // 1. Priorité aux modèles configurés manuellement
+        $configuredModels = config('fuzzy.searchable_models', []);
+        if (!empty($configuredModels)) {
+            return array_filter($configuredModels, function ($modelClass) {
+                return $this->isModelSearchable($modelClass);
+            });
+        }
 
-        return array_filter($models, function ($modelClass) {
-            return $this->isModelSearchable($modelClass);
-        });
+        // 2. Auto-détection si pas de configuration manuelle
+        return $this->discoverSearchableModels();
+    }
+
+    /**
+     * Discover models implementing MustFuzzySearch interface
+     */
+    private function discoverSearchableModels(): array
+    {
+        $models = [];
+
+        // Scanner le dossier Models et sous-dossiers
+        $finder = new Finder();
+        $finder->files()
+            ->in(app_path('Models'))
+            ->name('*.php');
+
+        foreach ($finder as $file) {
+            $modelClass = $this->getClassNameFromFile($file->getRealPath());
+
+            if ($modelClass && $this->isModelSearchable($modelClass)) {
+                $models[] = $modelClass;
+            }
+        }
+
+        return array_unique($models);
+    }
+
+    /**
+     * Get fully qualified class name from file path
+     */
+    private function getClassNameFromFile(string $filePath): ?string
+    {
+        $content = file_get_contents($filePath);
+
+        // Extraire le namespace
+        $namespace = '';
+        if (preg_match('/namespace\s+(.+?);/s', $content, $matches)) {
+            $namespace = $matches[1];
+        }
+
+        // Extraire le nom de classe
+        $className = '';
+        if (preg_match('/class\s+(\w+)(?:\s+extends|\s+implements|\s*\{)/', $content, $matches)) {
+            $className = $matches[1];
+        }
+
+        if ($namespace && $className) {
+            $fullClassName = $namespace . '\\' . $className;
+            return class_exists($fullClassName) ? $fullClassName : null;
+        }
+
+        return null;
     }
 
     /**
@@ -242,8 +302,13 @@ class FuzzySearchService
      */
     protected function isModelSearchable(string $modelClass): bool
     {
-        return class_exists($modelClass) &&
-            in_array(MustFuzzySearch::class, class_implements($modelClass));
+        if (!class_exists($modelClass)) {
+            return false;
+        }
+
+        // Vérifier si la classe implémente l'interface
+        $reflection = new ReflectionClass($modelClass);
+        return $reflection->implementsInterface(MustFuzzySearch::class);
     }
 
     /**
