@@ -6,11 +6,11 @@ namespace Fuzzy\Services;
 
 class SimilarityCalculator
 {
-    private const MIN_QUERY_LENGTH_FOR_STRICT_MATCH = 4;
-    private const LENGTH_DIFFERENCE_PENALTY_FACTOR = 0.3;
-    private const SHORT_MATCH_PENALTY = 0.5;
-    private const CROSS_WORD_MATCH_PENALTY = 0.4;
-    private const MIN_SIMILARITY_THRESHOLD = 0.2;
+    private const MIN_QUERY_LENGTH_FOR_STRICT_MATCH = 3;
+    private const LENGTH_DIFFERENCE_PENALTY_FACTOR = 0.2;
+    private const SHORT_MATCH_PENALTY = 0.7; // Réduit de 0.5 à 0.7
+    private const CROSS_WORD_MATCH_PENALTY = 0.6; // Réduit de 0.4 à 0.6
+    private const MIN_SIMILARITY_THRESHOLD = 0.25; // Augmenté de 0.2 à 0.25
 
     public function calculateWordSimilarity(string $queryWord, string $targetWord): float
     {
@@ -21,47 +21,56 @@ class SimilarityCalculator
             return 0.0;
         }
 
-        // Exact match
+        // 1. Correspondance exacte
         if ($queryWord === $targetWord) {
             return 1.0;
         }
 
-        // Contains match
+        // 2. Contient la requête (bon score)
         if (str_contains($targetWord, $queryWord)) {
-            return strlen($queryWord) / strlen($targetWord);
+            $containmentScore = strlen($queryWord) / strlen($targetWord);
+            return min($containmentScore * 1.2, 0.95); // Max 0.95 pour ne pas être parfait
         }
 
+        // 3. Requête contient le mot cible
         if (str_contains($queryWord, $targetWord)) {
-            return strlen($targetWord) / strlen($queryWord);
+            $containmentScore = strlen($targetWord) / strlen($queryWord);
+            return min($containmentScore * 1.1, 0.9);
         }
 
-        // Substring match
-        $bestMatchLength = 0;
-        $queryLength = strlen($queryWord);
-
-        for ($i = 0; $i <= $queryLength - 2; $i++) {
-            for ($j = $i + 2; $j <= $queryLength; $j++) {
-                $substring = substr($queryWord, $i, $j - $i);
-                if (str_contains($targetWord, $substring)) {
-                    $bestMatchLength = max($bestMatchLength, strlen($substring));
-                }
-            }
-        }
+        // 4. Sous-chaîne commune
+        $bestMatchLength = $this->findLongestCommonSubstringLength($queryWord, $targetWord);
 
         if ($bestMatchLength >= 2) {
-            $startsWithBonus = str_starts_with(
-                $targetWord,
-                substr($queryWord, 0, min(2, strlen($queryWord)))
-            ) ? 0.1 : 0.0;
-
             $baseScore = $bestMatchLength / max(strlen($queryWord), strlen($targetWord));
-            $score = min($baseScore + $startsWithBonus, 1.0);
 
-            // Apply penalties
+            // Bonus si ça commence pareil
+            $startsWithBonus = str_starts_with($targetWord, substr($queryWord, 0, min(2, strlen($queryWord)))) ? 0.15 : 0.0;
+
+            $score = min($baseScore + $startsWithBonus, 0.85); // Max 0.85
+
+            // Appliquer les pénalités
             return $this->applyPenalties($score, $queryWord, $targetWord);
         }
 
         return 0.0;
+    }
+
+    private function findLongestCommonSubstringLength(string $str1, string $str2): int
+    {
+        $maxLength = 0;
+        $str1Length = strlen($str1);
+
+        for ($i = 0; $i < $str1Length; $i++) {
+            for ($j = $i + 2; $j <= $str1Length; $j++) {
+                $substring = substr($str1, $i, $j - $i);
+                if (str_contains($str2, $substring)) {
+                    $maxLength = max($maxLength, strlen($substring));
+                }
+            }
+        }
+
+        return $maxLength;
     }
 
     private function applyPenalties(float $baseScore, string $queryWord, string $targetWord): float
@@ -70,39 +79,57 @@ class SimilarityCalculator
             return 0.0;
         }
 
-        $lengthPenalty = $this->calculateLengthPenalty($queryWord, $targetWord);
-        $shortMatchPenalty = $this->calculateShortMatchPenalty($queryWord, $targetWord);
-        $crossWordPenalty = $this->isCrossWordMatch($queryWord, $targetWord)
-            ? self::CROSS_WORD_MATCH_PENALTY
-            : 0.0;
+        $penalties = 0.0;
 
-        $totalPenalty = $lengthPenalty + $shortMatchPenalty + $crossWordPenalty;
-        $totalPenalty = min($totalPenalty, 0.8);
+        // Pénalité de différence de longueur
+        $lengthDiff = abs(strlen($targetWord) - strlen($queryWord));
+        $maxLength = max(strlen($queryWord), strlen($targetWord));
 
+        if ($maxLength > 0) {
+            $lengthPenalty = ($lengthDiff / $maxLength) * self::LENGTH_DIFFERENCE_PENALTY_FACTOR;
+            $penalties += min($lengthPenalty, 0.3);
+        }
+
+        // Pénalité pour requête courte avec match faible
+        if (strlen($queryWord) < self::MIN_QUERY_LENGTH_FOR_STRICT_MATCH) {
+            $matchRatio = $this->findLongestCommonSubstringLength($queryWord, $targetWord) / strlen($queryWord);
+            if ($matchRatio < 0.8) {
+                $penalties += self::SHORT_MATCH_PENALTY * (1 - $matchRatio);
+            }
+        }
+
+        // Pénalité pour match croisé
+        if ($this->isCrossWordMatch($queryWord, $targetWord)) {
+            $penalties += self::CROSS_WORD_MATCH_PENALTY;
+        }
+
+        $totalPenalty = min($penalties, 0.7); // Max 70% de pénalité
         $finalScore = $baseScore * (1 - $totalPenalty);
 
-        return max(0.0, min($finalScore, 1.0));
+        return max(self::MIN_SIMILARITY_THRESHOLD, min($finalScore, 1.0));
     }
 
     private function isCrossWordMatch(string $queryWord, string $targetWord): bool
     {
+        // Si un contient l'autre, ce n'est pas un cross-word match
         if (str_contains($targetWord, $queryWord) || str_contains($queryWord, $targetWord)) {
             return false;
         }
 
-        $commonSubstring = $this->findLongestCommonSubstring($queryWord, $targetWord);
+        $commonSubstring = $this->getLongestCommonSubstring($queryWord, $targetWord);
 
         if (strlen($commonSubstring) >= 3) {
             $queryRatio = strlen($commonSubstring) / strlen($queryWord);
             $targetRatio = strlen($commonSubstring) / strlen($targetWord);
 
-            return ($queryRatio < 0.6 && $targetRatio < 0.6);
+            // Considéré comme cross-word si la sous-chaîne commune représente moins de 70% des deux mots
+            return ($queryRatio < 0.7 && $targetRatio < 0.7);
         }
 
         return true;
     }
 
-    public function findLongestCommonSubstring(string $str1, string $str2): string
+    private function getLongestCommonSubstring(string $str1, string $str2): string
     {
         $longest = '';
         $str1Length = strlen($str1);
@@ -119,88 +146,6 @@ class SimilarityCalculator
         return $longest;
     }
 
-
-    /**
-     * Calculate consecutive characters bonus
-     */
-    public function calculateConsecutiveBonus(string $queryWord, string $targetWord): float
-    {
-        $maxConsecutive = 0;
-        $queryLength = strlen($queryWord);
-
-        for ($i = 0; $i < $queryLength; $i++) {
-            for ($j = $i + 2; $j <= $queryLength; $j++) {
-                $substring = substr($queryWord, $i, $j - $i);
-                if (str_contains($targetWord, $substring)) {
-                    $maxConsecutive = max($maxConsecutive, strlen($substring));
-                }
-            }
-        }
-
-        if ($maxConsecutive >= 5) return 2.0;
-        if ($maxConsecutive >= 4) return 1.6;
-        if ($maxConsecutive >= 3) return 1.3;
-        if ($maxConsecutive >= 2) return 1.1;
-
-        return 1.0;
-    }
-
-
-    /**
-     * Calculate common characters similarity
-     */
-    public function calculateCommonCharsSimilarity(string $str1, string $str2): float
-    {
-        $chars1 = array_unique(str_split(strtolower($str1)));
-        $chars2 = array_unique(str_split(strtolower($str2)));
-
-        $commonChars = array_intersect($chars1, $chars2);
-        $totalUniqueChars = count(array_unique(array_merge($chars1, $chars2)));
-
-        if ($totalUniqueChars === 0) {
-            return 0.0;
-        }
-
-        return count($commonChars) / $totalUniqueChars;
-    }
-
-    private function calculateLengthPenalty(string $queryWord, string $targetWord): float
-    {
-        $queryLength = strlen($queryWord);
-
-        if ($queryLength < self::MIN_QUERY_LENGTH_FOR_STRICT_MATCH) {
-            $lengthDifference = abs(strlen($targetWord) - $queryLength);
-            $maxLength = max($queryLength, strlen($targetWord));
-
-            $penalty = ($lengthDifference / $maxLength) * self::LENGTH_DIFFERENCE_PENALTY_FACTOR;
-
-            return min($penalty, 0.5);
-        }
-
-        return 0.0;
-    }
-
-    private function calculateShortMatchPenalty(string $queryWord, string $targetWord): float
-    {
-        $queryLength = strlen($queryWord);
-
-        if ($queryLength < self::MIN_QUERY_LENGTH_FOR_STRICT_MATCH) {
-            if ($queryWord !== $targetWord) {
-                $matchLength = strlen($this->findLongestCommonSubstring($queryWord, $targetWord));
-                $matchRatio = $matchLength / $queryLength;
-
-                if ($matchRatio < 0.8) {
-                    return self::SHORT_MATCH_PENALTY * (1 - $matchRatio);
-                }
-            }
-        }
-
-        return 0.0;
-    }
-
-    /**
-     * Calculate similarity between two strings
-     */
     public function calculateSimilarity(string $str1, string $str2): float
     {
         $str1 = $this->normalizeForComparison($str1);
@@ -239,7 +184,9 @@ class SimilarityCalculator
         }
 
         $averageScore = $totalScore / count($words1);
-        $coverageBonus = ($matchedWords / count($words1)) * 0.2;
+
+        // Bonus de couverture plus modéré
+        $coverageBonus = ($matchedWords / count($words1)) * 0.15;
 
         return min($averageScore + $coverageBonus, 1.0);
     }

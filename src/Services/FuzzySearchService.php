@@ -299,9 +299,7 @@ class FuzzySearchService
             \Fuzzy\Stages\ExactMatchStage::class,
             \Fuzzy\Stages\WordMatchStage::class,
             \Fuzzy\Stages\FuzzyMatchStage::class,
-            \Fuzzy\Stages\SimilarityBonusStage::class,
-            \Fuzzy\Stages\NonConsecutivePenaltyStage::class, // <-- Ajouté ici
-            \Fuzzy\Stages\MultiWordProcessingStage::class,
+            \Fuzzy\Stages\ScoreAggregationStage::class, // Remplace SimilarityBonusStage et NonConsecutivePenaltyStage
             \Fuzzy\Stages\SortAndLimitStage::class,
         ];
     }

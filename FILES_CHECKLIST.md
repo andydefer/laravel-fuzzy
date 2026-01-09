@@ -1,5 +1,5 @@
 # Project File Checklist
-*Last updated: ven. 09 janv. 2026 12:59:01 WAT*
+*Last updated: ven. 09 janv. 2026 13:36:58 WAT*
 
 ## Previously Checked Files
 
@@ -30,15 +30,16 @@
 24. src/Stages/MultiWordProcessingStage.php [ ]
 25. src/Stages/NonConsecutivePenaltyStage.php [ ]
 26. src/Stages/NormalizeQueryStage.php [ ]
-27. src/Stages/SimilarityBonusStage.php [ ]
-28. src/Stages/SortAndLimitStage.php [ ]
-29. src/Stages/WordMatchStage.php [ ]
-30. src/Traits/FuzzySearchable.php [ ]
-31. tests/database/migrations/2024_01_01_000000_create_test_products_table.php [ ]
-32. tests/database/migrations/2024_01_01_000000_create_test_users_table.php [ ]
-33. tests/Fixtures/Product.php [ ]
-34. tests/Fixtures/User.php [ ]
-35. tests/TestCase.php [ ]
-36. tests/Unit/FuzzySearchServiceTest.php [ ]
-37. tests/Unit/Stages/NonConsecutivePenaltyTest.php [ ]
-38. tests/Unit/Stages/SimilarityBonusStageTest.php [ ]
+27. src/Stages/ScoreAggregationStage.php [ ]
+28. src/Stages/SimilarityBonusStage.php [ ]
+29. src/Stages/SortAndLimitStage.php [ ]
+30. src/Stages/WordMatchStage.php [ ]
+31. src/Traits/FuzzySearchable.php [ ]
+32. tests/database/migrations/2024_01_01_000000_create_test_products_table.php [ ]
+33. tests/database/migrations/2024_01_01_000000_create_test_users_table.php [ ]
+34. tests/Fixtures/Product.php [ ]
+35. tests/Fixtures/User.php [ ]
+36. tests/TestCase.php [ ]
+37. tests/Unit/FuzzySearchServiceTest.php [ ]
+38. tests/Unit/Stages/NonConsecutivePenaltyTest.php [ ]
+39. tests/Unit/Stages/SimilarityBonusStageTest.php [ ]

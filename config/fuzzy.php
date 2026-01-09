@@ -148,10 +148,21 @@ return [
     |
     */
     'similarity' => [
-        'min_query_length_for_strict_match' => 4,
-        'length_difference_penalty_factor' => 0.3,
-        'short_match_penalty' => 0.5,
-        'cross_word_match_penalty' => 0.4,
-        'min_similarity_threshold' => 0.2,
+        'min_query_length_for_strict_match' => 3,
+        'length_difference_penalty_factor' => 0.2,
+        'short_match_penalty' => 0.7,
+        'cross_word_match_penalty' => 0.6,
+        'min_similarity_threshold' => 0.25,
+        'consecutive_bonus' => [
+            2 => 1.1,
+            3 => 1.3,
+            4 => 1.6,
+            5 => 2.0,
+        ],
+        'position_bonus' => [
+            'start' => 1.3,
+            'middle' => 1.0,
+            'end' => 1.2,
+        ],
     ],
 ];
