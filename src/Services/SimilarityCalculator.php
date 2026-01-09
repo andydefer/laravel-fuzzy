@@ -24,63 +24,47 @@ class SimilarityCalculator
         // 2. La requête est contenue dans la cible
         if (str_contains($targetWord, $queryWord)) {
             $ratio = strlen($queryWord) / strlen($targetWord);
-            // Score encore plus élevé
             if ($ratio >= 0.8) {
-                return 0.98; // Presque parfait
+                return 0.95; // Presque parfait
             }
-            return min(0.95, 0.8 + ($ratio * 0.2)); // Entre 0.8 et 0.95
+            return min(0.9, 0.75 + ($ratio * 0.2)); // Entre 0.75 et 0.9
         }
 
-        // 3. La cible est contenue dans la requête (CAS CRITIQUE : "mannte" contient "mante")
+        // 3. La cible est contenue dans la requête
         if (str_contains($queryWord, $targetWord)) {
             $ratio = strlen($targetWord) / strlen($queryWord);
-            // Bonus IMPORTANT pour ce cas
             if ($ratio >= 0.8) {
-                return 0.95; // "mante" dans "mannte" : 5/6 = 0.83 → 0.95
+                return 0.9; // Réduit de 0.95
             }
-            return min(0.9, 0.7 + ($ratio * 0.25)); // Entre 0.7 et 0.9
+            return min(0.85, 0.65 + ($ratio * 0.25)); // Entre 0.65 et 0.85
         }
 
-        // 4. Vérifier si la cible est PRESQUE contenue dans la requête (1-2 lettres de différence)
-        $lengthDiff = abs(strlen($queryWord) - strlen($targetWord));
-        if ($lengthDiff <= 2 && min(strlen($queryWord), strlen($targetWord)) >= 4) {
-            // Chercher la cible dans la requête avec tolérance d'une lettre
-            if ($this->isAlmostContained($targetWord, $queryWord, 1)) {
-                $ratio = strlen($targetWord) / strlen($queryWord);
-                return min(0.9, 0.75 + ($ratio * 0.2)); // Bonus important
-            }
-
-            // Chercher la requête dans la cible avec tolérance d'une lettre
-            if ($this->isAlmostContained($queryWord, $targetWord, 1)) {
-                $ratio = strlen($queryWord) / strlen($targetWord);
-                return min(0.9, 0.75 + ($ratio * 0.2)); // Bonus important
-            }
-        }
-
-        // 5. Calculer la plus longue sous-chaîne commune
+        // 4. Calculer la plus longue sous-chaîne commune
         $lcsLength = $this->longestCommonSubstringLength($queryWord, $targetWord);
 
-        // CAS SPÉCIAL : La LCS est presque toute la requête ou presque toute la cible
         $queryLength = strlen($queryWord);
         $targetLength = strlen($targetWord);
 
-        if ($lcsLength >= $queryLength - 1 && $queryLength >= 4) {
-            // LCS presque toute la requête (ex: "mannte" vs "mante" : LCS="mant")
+        // CAS SPÉCIAL : La LCS représente une grande partie d'un des mots
+        $minLength = min($queryLength, $targetLength);
+
+        if ($lcsLength >= $minLength - 1 && $minLength >= 4) {
+            // LCS presque complète (1 lettre de différence)
             $ratio = $lcsLength / max($queryLength, $targetLength);
             return min(0.85, 0.7 + ($ratio * 0.2));
         }
 
-        if ($lcsLength >= $targetLength - 1 && $targetLength >= 4) {
-            // LCS presque toute la cible
+        if ($lcsLength >= $minLength - 2 && $minLength >= 5) {
+            // LCS à 2 lettres près
             $ratio = $lcsLength / max($queryLength, $targetLength);
-            return min(0.85, 0.7 + ($ratio * 0.2));
+            return min(0.8, 0.6 + ($ratio * 0.25));
         }
 
+        // 5. Calcul de similarité basé sur LCS pour les cas moyens
         if ($lcsLength >= 3) {
             $maxLength = max($queryLength, $targetLength);
             $lcsRatio = $lcsLength / $maxLength;
 
-            // Bonus pour les sous-chaînes relativement longues
             if ($lcsRatio >= 0.7) {
                 return min(0.8, $lcsRatio * 1.1);
             } elseif ($lcsRatio >= 0.5) {
@@ -90,57 +74,29 @@ class SimilarityCalculator
             }
         }
 
-        // 6. Distance de Levenshtein pour les mots courts
-        if ($queryLength <= 6 || $targetLength <= 6) {
-            $levenshteinScore = $this->normalizedLevenshtein($queryWord, $targetWord);
-            if ($levenshteinScore >= 0.6) {
-                return $levenshteinScore;
-            }
+        // 6. Distance de Levenshtein (NOTRE ALGORITHME PRINCIPAL)
+        $levenshteinScore = $this->normalizedLevenshtein($queryWord, $targetWord);
+
+        // Appliquer des seuils stricts pour Levenshtein
+        if ($levenshteinScore >= 0.7) {
+            // Score élevé = bonne correspondance
+            return $levenshteinScore;
+        } elseif ($levenshteinScore >= 0.5 && $minLength >= 4) {
+            // Score moyen = correspondance acceptable pour mots de 4+ lettres
+            return $levenshteinScore;
+        } elseif ($levenshteinScore >= 0.3 && $minLength >= 6) {
+            // Score bas = seulement pour mots longs
+            return $levenshteinScore * 0.8; // Réduire encore
         }
 
-        // 7. Similarité Jaro-Winkler pour les fautes de frappe
-        $jaroWinklerScore = $this->jaroWinklerSimilarity($queryWord, $targetWord);
-
-        if ($jaroWinklerScore >= 0.65) {
-            return $jaroWinklerScore;
+        // 7. Vérifier les débuts de mots similaires (préfixes communs)
+        if ($this->hasCommonPrefix($queryWord, $targetWord, 3)) {
+            $prefixLength = $this->commonPrefixLength($queryWord, $targetWord);
+            $ratio = $prefixLength / max($queryLength, $targetLength);
+            return min(0.6, 0.4 + ($ratio * 0.3));
         }
 
         return 0.0;
-    }
-
-    /**
-     * Vérifie si une chaîne est presque contenue dans une autre avec une tolérance d'erreur
-     */
-    private function isAlmostContained(string $needle, string $haystack, int $maxErrors = 1): bool
-    {
-        $needleLen = strlen($needle);
-        $haystackLen = strlen($haystack);
-
-        if ($needleLen > $haystackLen + $maxErrors) {
-            return false;
-        }
-
-        // Chercher avec tolérance d'erreur
-        for ($i = 0; $i <= $haystackLen - $needleLen + $maxErrors; $i++) {
-            $errors = 0;
-
-            for ($j = 0; $j < $needleLen; $j++) {
-                $haystackPos = $i + $j;
-
-                if ($haystackPos >= $haystackLen || $haystack[$haystackPos] !== $needle[$j]) {
-                    $errors++;
-                    if ($errors > $maxErrors) {
-                        break 2; // Trop d'erreurs, passer à la position suivante
-                    }
-                }
-            }
-
-            if ($errors <= $maxErrors) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     private function longestCommonSubstringLength(string $str1, string $str2): int
@@ -167,17 +123,28 @@ class SimilarityCalculator
     {
         $len1 = strlen($str1);
         $len2 = strlen($str2);
-        $maxLen = max($len1, $len2);
 
-        if ($maxLen === 0) {
+        if ($len1 === 0 && $len2 === 0) {
             return 1.0;
         }
 
+        if ($len1 === 0 || $len2 === 0) {
+            return 0.0;
+        }
+
+        $maxLen = max($len1, $len2);
         $distance = levenshtein($str1, $str2);
 
-        // Normalisation avec bonus pour petites distances
+        // Normalisation simple
         $similarity = 1 - ($distance / $maxLen);
 
+        // Pénalité supplémentaire pour les grandes distances
+        if ($distance > 2) {
+            $penaltyFactor = min(0.7, 1.0 - ($distance * 0.1));
+            $similarity *= $penaltyFactor;
+        }
+
+        // Bonus pour les petites distances (1-2 caractères)
         if ($distance <= 2 && $maxLen >= 4) {
             $similarity = min($similarity + 0.1, 1.0);
         }
@@ -185,76 +152,35 @@ class SimilarityCalculator
         return max($similarity, 0.0);
     }
 
-    private function jaroWinklerSimilarity(string $str1, string $str2): float
+    private function hasCommonPrefix(string $str1, string $str2, int $minLength = 3): bool
     {
-        $len1 = strlen($str1);
-        $len2 = strlen($str2);
-
-        if ($len1 === 0 || $len2 === 0) {
-            return 0.0;
+        $minLen = min(strlen($str1), strlen($str2));
+        if ($minLen < $minLength) {
+            return false;
         }
 
-        $matchDistance = (int) max(floor(max($len1, $len2) / 2) - 1, 0);
-
-        $str1Matches = array_fill(0, $len1, false);
-        $str2Matches = array_fill(0, $len2, false);
-        $matches = 0;
-        $transpositions = 0;
-
-        // Trouver les correspondances
-        for ($i = 0; $i < $len1; $i++) {
-            $start = max(0, $i - $matchDistance);
-            $end = min($i + $matchDistance + 1, $len2);
-
-            for ($j = $start; $j < $end; $j++) {
-                if (!$str2Matches[$j] && $str1[$i] === $str2[$j]) {
-                    $str1Matches[$i] = true;
-                    $str2Matches[$j] = true;
-                    $matches++;
-                    break;
-                }
+        for ($i = 0; $i < $minLength; $i++) {
+            if ($str1[$i] !== $str2[$i]) {
+                return false;
             }
         }
 
-        if ($matches === 0) {
-            return 0.0;
-        }
+        return true;
+    }
 
-        // Compter les transpositions
-        $k = 0;
-        for ($i = 0; $i < $len1; $i++) {
-            if ($str1Matches[$i]) {
-                while (!$str2Matches[$k]) {
-                    $k++;
-                }
-                if ($str1[$i] !== $str2[$k]) {
-                    $transpositions++;
-                }
-                $k++;
-            }
-        }
+    private function commonPrefixLength(string $str1, string $str2): int
+    {
+        $minLen = min(strlen($str1), strlen($str2));
+        $length = 0;
 
-        $transpositions = $transpositions / 2;
-
-        // Calculer Jaro
-        $jaro = (($matches / $len1) + ($matches / $len2) + (($matches - $transpositions) / $matches)) / 3.0;
-
-        // Ajouter Winkler bonus pour préfixe commun
-        $prefixLength = 0;
-        $maxPrefixLength = min($len1, $len2, 4);
-
-        for ($i = 0; $i < $maxPrefixLength; $i++) {
-            if ($str1[$i] === $str2[$i]) {
-                $prefixLength++;
-            } else {
+        for ($i = 0; $i < $minLen; $i++) {
+            if ($str1[$i] !== $str2[$i]) {
                 break;
             }
+            $length++;
         }
 
-        $winklerBonus = $prefixLength * 0.1 * (1.0 - $jaro);
-        $jaroWinkler = $jaro + $winklerBonus;
-
-        return min($jaroWinkler, 1.0);
+        return $length;
     }
 
     public function calculateSimilarity(string $str1, string $str2): float
@@ -307,10 +233,17 @@ class SimilarityCalculator
 
         $averageScore = $totalScore / count($words1);
 
-        // Bonus pour couverture
-        $coverageBonus = ($matchedWords / count($words1)) * 0.15;
+        // Bonus pour couverture - MAIS pénalité si moins de 50% des mots trouvés
+        $coverage = $matchedWords / count($words1);
+        if ($coverage >= 0.5) {
+            $coverageBonus = $coverage * 0.15;
+            $averageScore = min($averageScore + $coverageBonus, 1.0);
+        } else {
+            // Pénalité sévère si moins de la moitié des mots trouvés
+            $averageScore *= $coverage * 1.5;
+        }
 
-        return min($averageScore + $coverageBonus, 1.0);
+        return min(max($averageScore, 0.0), 1.0);
     }
 
     private function normalizeForComparison(string $str): string

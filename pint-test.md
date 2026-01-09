@@ -1,5 +1,5 @@
 # Pint Formatting Test Report
-*Generated: ven. 09 janv. 2026 14:50:48 WAT*
+*Generated: ven. 09 janv. 2026 15:18:19 WAT*
 
 
   ⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯...⨯⨯⨯.⨯⨯.⨯⨯⨯⨯...⨯⨯⨯⨯⨯..⨯.
@@ -16,7 +16,7 @@
   ⨯ src/Models/FuzzyIndex.php                                                                                                                                          ordered_imports  
   ⨯ src/SearchContext.php                                                                              class_attributes_separation, not_operator_with_successor_space, ordered_imports  
   ⨯ src/Services/FuzzySearchService.php         class_attributes_separation, function_declaration, concat_space, no_unused_imports, not_operator_with_successor_space, ordered_imports  
-  ⨯ src/Services/SimilarityCalculator.php                                                  class_attributes_separation, not_operator_with_successor_space, blank_line_before_statement  
+  ⨯ src/Services/SimilarityCalculator.php                                                                                     class_attributes_separation, blank_line_before_statement  
   ⨯ src/Services/StringNormalizer.php                                                                                   trailing_comma_in_multiline, not_operator_with_successor_space  
   ⨯ src/Stages/ExactMatchStage.php                                                                                    concat_space, not_operator_with_successor_space, ordered_imports  
   ⨯ src/Stages/FuzzyMatchStage.php                                                                                    concat_space, not_operator_with_successor_space, ordered_imports  
