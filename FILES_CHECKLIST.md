@@ -1,5 +1,5 @@
 # Project File Checklist
-*Last updated: ven. 09 janv. 2026 12:25:08 WAT*
+*Last updated: ven. 09 janv. 2026 12:59:01 WAT*
 
 ## Previously Checked Files
 
@@ -40,4 +40,5 @@
 34. tests/Fixtures/User.php [ ]
 35. tests/TestCase.php [ ]
 36. tests/Unit/FuzzySearchServiceTest.php [ ]
-37. tests/Unit/Stages/SimilarityBonusStageTest.php [ ]
+37. tests/Unit/Stages/NonConsecutivePenaltyTest.php [ ]
+38. tests/Unit/Stages/SimilarityBonusStageTest.php [ ]

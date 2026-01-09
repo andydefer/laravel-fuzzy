@@ -17,6 +17,9 @@ class NonConsecutivePenaltyStage
         6 => 0.8,  // Requête de 6 caractères sans match consécutif: -20%
     ];
 
+    private const MULTI_WORD_DISPERSION_SEVERE_PENALTY = 0.3; // -70% pour dispersion multi-mots
+    private const MULTI_WORD_DISPERSION_MODERATE_PENALTY = 0.5; // -50% pour dispersion modérée
+
     public function handle(SearchContext $context, Closure $next)
     {
         if (empty($context->results)) {
@@ -24,8 +27,8 @@ class NonConsecutivePenaltyStage
         }
 
         foreach ($context->results as $key => $result) {
-            // Ne pas toucher aux scores parfaits
-            if ($result->score < 1.0) {
+            // Ne pas pénaliser les scores très élevés (>= 0.85)
+            if ($result->score < 0.85) {
                 $penalizedScore = $this->calculatePenalizedScore($context, $result);
 
                 // Ne pas descendre en dessous du minScore
@@ -47,7 +50,16 @@ class NonConsecutivePenaltyStage
         $query = strtolower(trim($context->query));
         $matchedValue = strtolower($result->matchedValue);
 
+        // NE PAS PÉNALISER si c'est une correspondance exacte ou quasi-exacte
+        if ($this->isExactOrNearExactMatch($query, $matchedValue, $context)) {
+            return $score;
+        }
+
         $queryLength = strlen($query);
+
+        // Pénalité pour dispersion multi-mots (EX: "unpdm" vs "un bon produit de mode")
+        $multiWordDispersionPenalty = $this->calculateMultiWordDispersionPenalty($query, $matchedValue);
+        $score *= $multiWordDispersionPenalty;
 
         // Seulement pour les requêtes courtes (3-6 caractères)
         if ($queryLength >= 3 && $queryLength <= 6) {
@@ -70,6 +82,97 @@ class NonConsecutivePenaltyStage
         }
 
         return max($score, $context->options->minScore);
+    }
+
+    private function calculateMultiWordDispersionPenalty(string $query, string $text): float
+    {
+        // Diviser le texte en mots
+        $words = preg_split('/[\s\-_,\.]+/', $text);
+
+        if (count($words) <= 1) {
+            return 1.0; // Pas de dispersion multi-mots si un seul mot
+        }
+
+        // Pour chaque caractère de la requête, trouver dans quel mot il apparaît
+        $wordPositions = [];
+        $queryChars = str_split($query);
+
+        foreach ($queryChars as $charIndex => $char) {
+            foreach ($words as $wordIndex => $word) {
+                if (str_contains($word, $char)) {
+                    if (!isset($wordPositions[$charIndex])) {
+                        $wordPositions[$charIndex] = [];
+                    }
+                    $wordPositions[$charIndex][] = $wordIndex;
+                }
+            }
+        }
+
+        // Si aucun caractère n'est trouvé dans aucun mot, pénalité maximale
+        if (empty($wordPositions)) {
+            return self::MULTI_WORD_DISPERSION_SEVERE_PENALTY;
+        }
+
+        // Analyser la distribution des caractères sur les mots
+        $charDistribution = [];
+        foreach ($wordPositions as $charIndex => $wordIndices) {
+            foreach ($wordIndices as $wordIndex) {
+                $charDistribution[$wordIndex][] = $charIndex;
+            }
+        }
+
+        // Compter combien de mots contiennent des caractères de la requête
+        $wordsWithQueryChars = count($charDistribution);
+        $totalWords = count($words);
+
+        // Si les caractères sont dispersés sur plusieurs mots, appliquer une pénalité
+        if ($wordsWithQueryChars > 1) {
+            // Calculer le ratio de dispersion
+            $dispersionRatio = $wordsWithQueryChars / min($totalWords, strlen($query));
+
+            // Plus la dispersion est grande, plus la pénalité est sévère
+            if ($dispersionRatio > 0.8) {
+                // Très dispersé (ex: "unpdm" sur 5 mots)
+                return self::MULTI_WORD_DISPERSION_SEVERE_PENALTY;
+            } elseif ($dispersionRatio > 0.5) {
+                // Modérément dispersé
+                return self::MULTI_WORD_DISPERSION_MODERATE_PENALTY;
+            } elseif ($dispersionRatio > 0.3) {
+                // Légèrement dispersé
+                return 0.7; // -30%
+            }
+        }
+
+        return 1.0; // Pas de pénalité
+    }
+
+    private function isExactOrNearExactMatch(string $query, string $text, SearchContext $context): bool
+    {
+        // Vérifier si la requête correspond exactement à la valeur
+        if ($query === $text) {
+            return true;
+        }
+
+        // Vérifier si la requête est contenue dans la valeur (match partiel)
+        if (str_contains($text, $query)) {
+            return true;
+        }
+
+        // Vérifier si c'est une correspondance de phrase complète
+        $normalizedText = $this->normalizeForComparison($text);
+        if ($context->normalizedQuery === $normalizedText) {
+            return true;
+        }
+
+        // Vérifier les mots qui commencent par la requête
+        $words = preg_split('/[\s\-_,\.]+/', $text);
+        foreach ($words as $word) {
+            if (str_starts_with($word, $query) && strlen($query) >= 3) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function hasConsecutiveMatch(string $query, string $text): bool
@@ -149,5 +252,23 @@ class NonConsecutivePenaltyStage
         }
 
         return false;
+    }
+
+    /**
+     * Normalize string for comparison (same as StringNormalizer)
+     */
+    private function normalizeForComparison(string $str): string
+    {
+        if (empty($str)) {
+            return '';
+        }
+
+        return (string) \Illuminate\Support\Str::of($str)
+            ->trim()
+            ->lower()
+            ->ascii()
+            ->replaceMatches('/[^a-z0-9\s_-]/', '')
+            ->replaceMatches('/\s+/', ' ')
+            ->toString();
     }
 }

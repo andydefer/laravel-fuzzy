@@ -405,5 +405,3 @@ class FuzzySearchServiceTest extends TestCase
         );
     }
 }
-
-// /** @var Collection<int, SearchResultData> $results */
