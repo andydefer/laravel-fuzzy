@@ -29,7 +29,7 @@
     ],
     "license": "MIT",
     "minimum-stability": "dev",
-    "name": "laravel-fuzzy/fuzzy-search",
+    "name": "andydefer/fuzzy-search",
     "prefer-stable": true,
     "require": {
         "illuminate/database": "^12.0",
