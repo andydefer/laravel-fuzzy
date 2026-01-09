@@ -1,11 +1,11 @@
 # Pint Formatting Test Report
-*Generated: ven. 09 janv. 2026 11:51:27 WAT*
+*Generated: ven. 09 janv. 2026 12:25:05 WAT*
 
 
-  ⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯...⨯⨯⨯.⨯⨯.⨯⨯⨯⨯...⨯⨯⨯⨯..⨯.
+  ⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯...⨯⨯⨯.⨯⨯.⨯⨯⨯⨯...⨯⨯⨯⨯..⨯.
 
   ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── Laravel  
-    FAIL   ................................................................................................................................................. 36 files, 25 style issues  
+    FAIL   ................................................................................................................................................. 37 files, 26 style issues  
   ⨯ rector.php                                                                                                                                                            concat_space  
   ⨯ src/Commands/ClearIndexCommand.php                                                                                              not_operator_with_successor_space, ordered_imports  
   ⨯ src/Commands/IndexSearchCommand.php                                    single_quote, concat_space, not_operator_with_successor_space, blank_line_before_statement, ordered_imports  
@@ -21,6 +21,7 @@
   ⨯ src/Stages/ExactMatchStage.php                                                                                    concat_space, not_operator_with_successor_space, ordered_imports  
   ⨯ src/Stages/FuzzyMatchStage.php                  control_structure_braces, concat_space, braces_position, statement_indentation, not_operator_with_successor_space, ordered_imports  
   ⨯ src/Stages/MultiWordProcessingStage.php                               class_attributes_separation, not_operator_with_successor_space, blank_line_before_statement, ordered_imports  
+  ⨯ src/Stages/NonConsecutivePenaltyStage.php                                                                                       not_operator_with_successor_space, ordered_imports  
   ⨯ src/Stages/NormalizeQueryStage.php                                                                                                                                 ordered_imports  
   ⨯ src/Stages/SimilarityBonusStage.php                     class_attributes_separation, concat_space, not_operator_with_successor_space, blank_line_before_statement, ordered_imports  
   ⨯ src/Stages/SortAndLimitStage.php                                                                                                                                   ordered_imports  

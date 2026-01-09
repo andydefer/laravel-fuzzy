@@ -300,6 +300,7 @@ class FuzzySearchService
             \Fuzzy\Stages\WordMatchStage::class,
             \Fuzzy\Stages\FuzzyMatchStage::class,
             \Fuzzy\Stages\SimilarityBonusStage::class,
+            \Fuzzy\Stages\NonConsecutivePenaltyStage::class, // <-- Ajouté ici
             \Fuzzy\Stages\MultiWordProcessingStage::class,
             \Fuzzy\Stages\SortAndLimitStage::class,
         ];
