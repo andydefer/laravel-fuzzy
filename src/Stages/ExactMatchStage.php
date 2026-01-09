@@ -23,6 +23,7 @@ class ExactMatchStage
                     if ($model) {
                         $score = 1.0 * $match['weight'];
 
+                        // NE PAS filtrer par minScore ici - laisser SortAndLimitStage le faire
                         $context->results[$resultKey] = new SearchResultData(
                             item: $model,
                             score: $score,
@@ -31,6 +32,33 @@ class ExactMatchStage
                             matchedValue: $match['original_value']
                         );
                         $context->seen[$resultKey] = true;
+                    }
+                }
+            }
+        }
+
+        // Also check for exact matches of individual words
+        foreach ($context->queryWords as $queryWord) {
+            if (isset($context->wordIndex[$queryWord])) {
+                foreach ($context->wordIndex[$queryWord] as $match) {
+                    $resultKey = $match['indexable_type'] . '_' . $match['indexable_id'];
+
+                    if (!isset($context->seen[$resultKey])) {
+                        $model = $context->getModelInstance($resultKey);
+
+                        if ($model) {
+                            $score = 0.9 * $match['weight']; // Slightly less than full query exact match
+
+                            // NE PAS filtrer par minScore ici - laisser SortAndLimitStage le faire
+                            $context->results[$resultKey] = new SearchResultData(
+                                item: $model,
+                                score: $score,
+                                modelType: $match['indexable_type'],
+                                matchedField: $match['field'],
+                                matchedValue: $match['original_value']
+                            );
+                            $context->seen[$resultKey] = true;
+                        }
                     }
                 }
             }

@@ -25,6 +25,7 @@ class WordMatchStage
 
                     $score = 0.9 * $match['weight']; // Slightly less than exact match
 
+                    // NE PAS filtrer par minScore ici - laisser SortAndLimitStage le faire
                     $model = $context->getModelInstance($resultKey);
                     if ($model) {
                         $context->results[$resultKey] = new SearchResultData(

@@ -15,13 +15,26 @@ class MultiWordProcessingStage
     public function handle(SearchContext $context, Closure $next)
     {
         if (!$context->hasMultipleWords || empty($context->results)) {
-            $context->finalResults = collect($context->results);
+            // Filter by minScore even for single word results
+            $filteredResults = [];
+            foreach ($context->results as $key => $result) {
+                // Vérifiez que le résultat n'est pas null
+                if ($result !== null && $result->score >= $context->options->minScore) {
+                    $filteredResults[$key] = $result;
+                }
+            }
+            $context->finalResults = collect($filteredResults);
             return $next($context);
         }
 
         $finalResults = [];
 
         foreach ($context->results as $key => $result) {
+            // Vérifiez que le résultat n'est pas null
+            if ($result === null) {
+                continue;
+            }
+
             $model = $context->getModelInstance($key);
 
             if (!$model) {
@@ -48,7 +61,7 @@ class MultiWordProcessingStage
     {
         $indexEntries = [];
 
-        foreach ($context->wordIndex as $matches) {
+        foreach ($context->wordIndex as $word => $matches) {
             foreach ($matches as $match) {
                 if ($match['indexable_type'] === $modelType && $match['indexable_id'] == $modelId) {
                     $indexEntries[] = $match;

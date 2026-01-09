@@ -15,7 +15,7 @@ class User extends Model implements MustFuzzySearch
 
     protected $fillable = ['name', 'email', 'type'];
 
-    public array $searchableFields = ['name', 'email'];
+    public array $searchableFields = ['name', 'email']; // Ajout de 'public'
 
     public ?string $fuzzyFormat = UserSearchData::class;
 }

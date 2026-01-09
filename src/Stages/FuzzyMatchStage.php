@@ -69,8 +69,9 @@ class FuzzyMatchStage
                     $wordSimilarity
                 );
 
+                // NE PAS filtrer par minScore ici - laissez SortAndLimitStage le faire
                 $model = $context->getModelInstance($resultKey);
-                if ($model && $finalScore >= $context->options->minScore) {
+                if ($model) {
                     $context->results[$resultKey] = new SearchResultData(
                         item: $model,
                         score: $finalScore,

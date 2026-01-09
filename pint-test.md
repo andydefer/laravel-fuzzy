@@ -1,20 +1,21 @@
 # Pint Formatting Test Report
-*Generated: ven. 09 janv. 2026 07:21:08 WAT*
+*Generated: ven. 09 janv. 2026 08:16:10 WAT*
 
 
-  ⨯⨯⨯⨯.⨯⨯⨯⨯⨯....⨯⨯⨯.⨯⨯.⨯⨯⨯⨯...⨯⨯⨯..⨯.
+  ⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯...⨯⨯⨯.⨯⨯.⨯⨯⨯⨯...⨯⨯⨯..⨯.
 
   ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── Laravel  
-    FAIL   ................................................................................................................................................. 35 files, 22 style issues  
+    FAIL   ................................................................................................................................................. 34 files, 23 style issues  
   ⨯ rector.php                                                                                                                                                            concat_space  
   ⨯ src/Commands/ClearIndexCommand.php                                                                                              not_operator_with_successor_space, ordered_imports  
   ⨯ src/Commands/IndexSearchCommand.php                                    single_quote, concat_space, not_operator_with_successor_space, blank_line_before_statement, ordered_imports  
   ⨯ src/Commands/StatsIndexCommand.php                                                                                         function_declaration, not_operator_with_successor_space  
   ⨯ src/Contracts/MustFuzzySearch.php                                                                                                                                  ordered_imports  
+  ⨯ src/Data/SearchOptionsData.php                                                                                                braces_position, cast_spaces, single_line_empty_body  
   ⨯ src/FuzzySearchServiceProvider.php                                                                                             new_with_parentheses, concat_space, ordered_imports  
   ⨯ src/Models/FuzzyIndex.php                                                                                                                                          ordered_imports  
   ⨯ src/SearchContext.php                                                                              class_attributes_separation, not_operator_with_successor_space, ordered_imports  
-  ⨯ src/Services/FuzzySearchService.php  class_attributes_separation, new_with_parentheses, function_declaration, concat_space, no_unused_imports, not_operator_with_successor_space,…  
+  ⨯ src/Services/FuzzySearchService.php         class_attributes_separation, function_declaration, concat_space, no_unused_imports, not_operator_with_successor_space, ordered_imports  
   ⨯ src/Services/SimilarityCalculator.php                                                                                 class_attributes_separation, no_unneeded_control_parentheses  
   ⨯ src/Services/StringNormalizer.php                                                                                   trailing_comma_in_multiline, not_operator_with_successor_space  
   ⨯ src/Stages/ExactMatchStage.php                                                                                    concat_space, not_operator_with_successor_space, ordered_imports  
@@ -27,5 +28,5 @@
   ⨯ tests/Fixtures/Product.php                                                                                                                                         ordered_imports  
   ⨯ tests/Fixtures/User.php                                                                                                                                            ordered_imports  
   ⨯ tests/TestCase.php                                                                                                      class_attributes_separation, concat_space, ordered_imports  
-  ⨯ tests/Unit/FuzzySearchServiceTest.php                                                                                concat_space, phpdoc_single_line_var_spacing, ordered_imports  
+  ⨯ tests/Unit/FuzzySearchServiceTest.php                                              single_quote, concat_space, trailing_comma_in_multiline, statement_indentation, ordered_imports  
 

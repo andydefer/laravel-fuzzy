@@ -14,5 +14,5 @@ class Product extends Model implements MustFuzzySearch
 
     protected $fillable = ['name', 'description', 'price'];
 
-    public array $searchableFields = ['name', 'description'];
+    public array $searchableFields = ['name', 'description']; // Ajout de 'public'
 }

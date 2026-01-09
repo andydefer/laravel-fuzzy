@@ -35,9 +35,9 @@ class FuzzySearchService
     /**
      * Search across all searchable models
      */
-    public function search(string $query, ?SearchOptionsData $options = null): Collection
+    public function search(string $query, array $options = []): Collection
     {
-        $options = $options ?? new SearchOptionsData();
+        $searchOptions = SearchOptionsData::fromConfig($options);
         $models = $this->getSearchableModels();
 
         $results = collect();
@@ -53,18 +53,17 @@ class FuzzySearchService
     /**
      * Search in specific model
      */
-    public function searchInModel(string $modelClass, string $query, ?SearchOptionsData $options = null): Collection
+    public function searchInModel(string $modelClass, string $query, array $options = []): Collection
     {
         $this->validateModel($modelClass);
 
-        $options = $options ?? new SearchOptionsData();
-
+        $searchOptions = SearchOptionsData::fromConfig($options);
         $indexData = $this->getIndexDataForModel($modelClass);
 
         $context = new SearchContext(
             modelClass: $modelClass,
             query: $query,
-            options: $options,
+            options: $searchOptions,
             normalizer: $this->normalizer,
             similarityCalculator: $this->similarityCalculator,
             indexBuilder: $this->indexBuilder,
@@ -80,7 +79,7 @@ class FuzzySearchService
     /**
      * Search in multiple specific models
      */
-    public function searchInModels(array $modelClasses, string $query, ?SearchOptionsData $options = null): Collection
+    public function searchInModels(array $modelClasses, string $query, array $options = []): Collection
     {
         $results = collect();
 
