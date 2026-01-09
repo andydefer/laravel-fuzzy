@@ -88,40 +88,48 @@ class IndexSearchCommand extends Command
 
     protected function indexAllModels(FuzzySearchService $searchService, bool $force, int $chunkSize, bool $auto = false): void
     {
-        // Détecter les modèles selon le mode
-        if ($auto) {
-            $models = $this->discoverSearchableModels();
-            $this->info('Using auto-discovery mode');
-        } else {
-            $models = config('fuzzy.searchable_models', []);
-            $this->info('Using manual configuration mode');
+        // MODIFICATION CLAVIER : COMBINER AUTOMATIQUEMENT LES DEUX SOURCES
+        $models = [];
 
-            // Filtrer les modèles non valides
-            $models = array_filter($models, function ($modelClass) {
-                return class_exists($modelClass) &&
-                    in_array(MustFuzzySearch::class, class_implements($modelClass));
-            });
-        }
+        // 1. Récupérer les modèles configurés manuellement
+        $configuredModels = config('fuzzy.searchable_models', []);
+
+        // 2. Auto-détection TOUJOURS activée (sauf si désactivée dans config)
+        $autoDiscoveryEnabled = config('fuzzy.auto_discovery.enabled', true);
+        $discoveredModels = $autoDiscoveryEnabled ? $this->discoverSearchableModels() : [];
+
+        // 3. Fusionner les deux listes (éliminer les doublons)
+        $allModels = array_unique(array_merge($configuredModels, $discoveredModels));
+
+        // 4. Filtrer uniquement les modèles valides
+        $models = array_filter($allModels, function ($modelClass) {
+            if (!class_exists($modelClass)) {
+                return false;
+            }
+
+            $reflection = new ReflectionClass($modelClass);
+            return $reflection->implementsInterface(MustFuzzySearch::class);
+        });
 
         if (empty($models)) {
-            if ($auto) {
-                $this->warn('No searchable models found via auto-discovery.');
-                $this->warn('Make sure your models:');
-                $this->warn('1. Are in the app/Models directory');
-                $this->warn('2. Implement the MustFuzzySearch interface');
-                $this->warn('3. Use the FuzzySearchable trait');
-            } else {
-                $this->warn('No searchable models configured.');
-                $this->warn('Add models to config/fuzzy.php or use --auto flag for auto-discovery');
-            }
+            $this->warn('No searchable models found.');
+            $this->warn('Make sure your models:');
+            $this->warn('1. Implement the MustFuzzySearch interface');
+            $this->warn('2. Use the FuzzySearchable trait');
+            $this->warn('');
+            $this->warn('You can either:');
+            $this->warn('a) Add models to config/fuzzy.php (searchable_models array)');
+            $this->warn('b) Place models in app/Models/ directory');
             return;
         }
 
         $this->info('Starting full search index...');
         $this->info('Found ' . count($models) . ' searchable model(s):');
 
+        // Afficher la source de chaque modèle
         foreach ($models as $model) {
-            $this->info("  - {$model}");
+            $source = in_array($model, $configuredModels) ? 'config' : 'auto-discovered';
+            $this->info("  - {$model} ({$source})");
         }
 
         $this->newLine();
@@ -149,13 +157,23 @@ class IndexSearchCommand extends Command
      */
     protected function listDiscoverableModels(): void
     {
-        $this->info('=== Manual Configuration ===');
-        $configuredModels = config('fuzzy.searchable_models', []);
+        $this->info('=== Current Configuration ===');
 
+        $configuredModels = config('fuzzy.searchable_models', []);
+        $autoDiscoveryEnabled = config('fuzzy.auto_discovery.enabled', true);
+
+        if ($autoDiscoveryEnabled) {
+            $discoveredModels = $this->discoverSearchableModels();
+        } else {
+            $discoveredModels = [];
+            $this->warn('Auto-discovery is disabled in config');
+        }
+
+        // Modèles configurés manuellement
         if (empty($configuredModels)) {
             $this->warn('No models configured in config/fuzzy.php');
         } else {
-            $this->info('Models in config:');
+            $this->info('Manually configured models:');
             foreach ($configuredModels as $model) {
                 $exists = class_exists($model) ? '✓' : '✗';
                 $implements = class_exists($model) &&
@@ -165,24 +183,48 @@ class IndexSearchCommand extends Command
         }
 
         $this->newLine();
-        $this->info('=== Auto-Discovery ===');
 
-        $discoveredModels = $this->discoverSearchableModels();
+        // Modèles auto-détectés
+        if ($autoDiscoveryEnabled) {
+            $this->info('Auto-discovered models:');
+            if (empty($discoveredModels)) {
+                $this->warn('No models found via auto-discovery');
+            } else {
+                foreach ($discoveredModels as $model) {
+                    $this->info("  ✓ {$model}");
+                }
+            }
+        }
 
-        if (empty($discoveredModels)) {
-            $this->warn('No models found via auto-discovery');
+        $this->newLine();
+        $this->info('=== Combined Result (what will be indexed) ===');
+
+        $allModels = array_unique(array_merge($configuredModels, $discoveredModels));
+        $validModels = array_filter($allModels, function ($modelClass) {
+            if (!class_exists($modelClass)) {
+                return false;
+            }
+
+            $reflection = new ReflectionClass($modelClass);
+            return $reflection->implementsInterface(MustFuzzySearch::class);
+        });
+
+        if (empty($validModels)) {
+            $this->error('No valid searchable models found!');
         } else {
-            $this->info('Discovered models:');
-            foreach ($discoveredModels as $model) {
-                $this->info("  ✓ {$model}");
+            $this->info('Valid searchable models:');
+            foreach ($validModels as $model) {
+                $source = in_array($model, $configuredModels) ? 'config' : 'auto';
+                $this->info("  ✓ {$model} ({$source})");
             }
         }
 
         $this->newLine();
         $this->info('Usage:');
-        $this->info('  php artisan fuzzy:index              # Use config (default)');
-        $this->info('  php artisan fuzzy:index --auto       # Use auto-discovery');
+        $this->info('  php artisan fuzzy:index              # Index all (config + auto-discovered)');
+        $this->info('  php artisan fuzzy:index --force      # Force reindex');
         $this->info('  php artisan fuzzy:index --list       # List models only');
+        $this->info('  php artisan fuzzy:index User         # Index specific model');
     }
 
     /**
