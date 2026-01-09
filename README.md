@@ -15,7 +15,6 @@
 - 🧹 **Nettoyage intelligent des requêtes** avec stop words
 - 🔄 **Pipeline de traitement modulaire** avec stages configurables
 - 📈 **Statistiques et monitoring** de l'index
-- 🧪 **Tests complets** inclus (2300+ tests)
 - 🚀 **Intégration facile** avec les modèles Eloquent existants
 
 ## 📦 Installation
@@ -47,8 +46,8 @@ php artisan migrate
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use LaravelFuzzy\Contracts\MustFuzzySearch;
-use LaravelFuzzy\Traits\FuzzySearchable;
+use Fuzzy\Contracts\MustFuzzySearch;
+use Fuzzy\Traits\FuzzySearchable;
 
 class Product extends Model implements MustFuzzySearch
 {
@@ -234,7 +233,7 @@ class Product extends Model implements MustFuzzySearch
 
 namespace App\Data;
 
-use LaravelFuzzy\Data\FuzzySearchableData;
+use Fuzzy\Data\FuzzySearchableData;
 use App\Models\Product;
 
 class ProductSearchData extends FuzzySearchableData
@@ -378,7 +377,7 @@ Le package utilise un pipeline modulaire avec 6 stages :
 
 namespace App\Services\Search;
 
-use LaravelFuzzy\Stages\FuzzyMatchStage;
+use Fuzzy\Stages\FuzzyMatchStage;
 
 class CustomFuzzyStage extends FuzzyMatchStage
 {
@@ -405,7 +404,7 @@ class CustomFuzzyStage extends FuzzyMatchStage
 
 ## 🧪 Tests et qualité
 
-Le package inclut plus de 2300 tests pour garantir la stabilité :
+Le package inclut plusieurs tests pour garantir la stabilité :
 
 ```bash
 # Exécuter tous les tests

@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace LaravelFuzzy\Services;
+namespace Fuzzy\Services;
 
-use LaravelFuzzy\Contracts\MustFuzzySearch;
-use LaravelFuzzy\Models\FuzzyIndex;
+use Fuzzy\Contracts\MustFuzzySearch;
+use Fuzzy\Models\FuzzyIndex;
 
 class IndexBuilder
 {

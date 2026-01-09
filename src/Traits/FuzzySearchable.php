@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace LaravelFuzzy\Traits;
+namespace Fuzzy\Traits;
 
-use LaravelFuzzy\Contracts\MustFuzzySearch;
-use LaravelFuzzy\Data\FuzzySearchableData;
+use Fuzzy\Contracts\MustFuzzySearch;
+use Fuzzy\Data\FuzzySearchableData;
 
 trait FuzzySearchable
 {

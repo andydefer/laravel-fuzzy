@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace LaravelFuzzy\Tests\Unit;
+namespace Fuzzy\Tests\Unit;
 
-use LaravelFuzzy\Tests\TestCase;
-use LaravelFuzzy\Services\FuzzySearchService;
-use LaravelFuzzy\Data\SearchOptionsData;
-use LaravelFuzzy\Tests\Fixtures\User;
-use LaravelFuzzy\Tests\Fixtures\Product;
+use Fuzzy\Tests\TestCase;
+use Fuzzy\Services\FuzzySearchService;
+use Fuzzy\Data\SearchOptionsData;
+use Fuzzy\Tests\Fixtures\User;
+use Fuzzy\Tests\Fixtures\Product;
 
 class FuzzySearchServiceTest extends TestCase
 {

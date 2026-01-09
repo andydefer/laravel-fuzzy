@@ -1,22 +1,22 @@
 {
     "autoload": {
         "psr-4": {
-            "LaravelFuzzy\\": "src/"
+            "Fuzzy\\": "src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "LaravelFuzzy\\Tests\\": "tests/"
+            "Fuzzy\\Tests\\": "tests/"
         }
     },
     "description": "Powerful fuzzy search system for Laravel with database indexing",
     "extra": {
         "laravel": {
             "aliases": {
-                "FuzzySearch": "LaravelFuzzy\\FuzzySearch"
+                "FuzzySearch": "Fuzzy\\FuzzySearch"
             },
             "providers": [
-                "LaravelFuzzy\\FuzzySearchServiceProvider"
+                "Fuzzy\\FuzzySearchServiceProvider"
             ]
         }
     },

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace LaravelFuzzy\Models;
+namespace Fuzzy\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace LaravelFuzzy\Services;
+namespace Fuzzy\Services;
 
 use Illuminate\Support\Str;
 

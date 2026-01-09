@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace LaravelFuzzy;
+namespace Fuzzy;
 
 use Illuminate\Support\Facades\Facade;
 
@@ -10,9 +10,9 @@ use Illuminate\Support\Facades\Facade;
  * @method static \Illuminate\Support\Collection search(string $query, array $options = [])
  * @method static \Illuminate\Support\Collection searchInModel(string $modelClass, string $query, array $options = [])
  * @method static \Illuminate\Support\Collection searchInModels(array $modelClasses, string $query, array $options = [])
- * @method static void indexModel(\LaravelFuzzy\Contracts\MustFuzzySearch $model)
- * @method static void updateModelIndex(\LaravelFuzzy\Contracts\MustFuzzySearch $model)
- * @method static void removeModelFromIndex(\LaravelFuzzy\Contracts\MustFuzzySearch $model)
+ * @method static void indexModel(\Fuzzy\Contracts\MustFuzzySearch $model)
+ * @method static void updateModelIndex(\Fuzzy\Contracts\MustFuzzySearch $model)
+ * @method static void removeModelFromIndex(\Fuzzy\Contracts\MustFuzzySearch $model)
  * @method static void reindexAll()
  * @method static void reindexModel(string $modelClass)
  * @method static array getStats()
@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\Facade;
  * @method static string normalize(string $str)
  * @method static array splitIntoWords(string $str)
  *
- * @see \LaravelFuzzy\Services\FuzzySearchService
+ * @see \Fuzzy\Services\FuzzySearchService
  */
 class FuzzySearch extends Facade
 {

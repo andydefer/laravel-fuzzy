@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace LaravelFuzzy\Contracts;
+namespace Fuzzy\Contracts;
 
 use Illuminate\Database\Eloquent\Model;
-use LaravelFuzzy\Data\FuzzySearchableData;
+use Fuzzy\Data\FuzzySearchableData;
 
 interface MustFuzzySearch
 {

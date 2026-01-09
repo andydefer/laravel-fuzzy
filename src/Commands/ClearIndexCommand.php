@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace LaravelFuzzy\Commands;
+namespace Fuzzy\Commands;
 
 use Illuminate\Console\Command;
-use LaravelFuzzy\Models\FuzzyIndex;
+use Fuzzy\Models\FuzzyIndex;
 
 class ClearIndexCommand extends Command
 {

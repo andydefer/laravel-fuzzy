@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace LaravelFuzzy\Data;
+namespace Fuzzy\Data;
 
-use LaravelFuzzy\Contracts\MustFuzzySearch;
+use Fuzzy\Contracts\MustFuzzySearch;
 use Spatie\LaravelData\Data;
 
 class SearchResultData extends Data

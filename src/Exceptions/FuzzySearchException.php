@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace LaravelFuzzy\Exceptions;
+namespace Fuzzy\Exceptions;
 
 use Exception;
 

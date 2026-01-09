@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace LaravelFuzzy\Tests\Fixtures;
+namespace Fuzzy\Tests\Fixtures;
 
 use Illuminate\Database\Eloquent\Model;
-use LaravelFuzzy\Contracts\MustFuzzySearch;
-use LaravelFuzzy\Traits\FuzzySearchable;
+use Fuzzy\Contracts\MustFuzzySearch;
+use Fuzzy\Traits\FuzzySearchable;
 
 class Product extends Model implements MustFuzzySearch
 {

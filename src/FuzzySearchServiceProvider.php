@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace LaravelFuzzy;
+namespace Fuzzy;
 
 use Illuminate\Support\ServiceProvider;
-use LaravelFuzzy\Commands\IndexSearchCommand;
-use LaravelFuzzy\Commands\ClearIndexCommand;
-use LaravelFuzzy\Commands\StatsIndexCommand;
+use Fuzzy\Commands\IndexSearchCommand;
+use Fuzzy\Commands\ClearIndexCommand;
+use Fuzzy\Commands\StatsIndexCommand;
 
 class FuzzySearchServiceProvider extends ServiceProvider
 {
@@ -19,21 +19,21 @@ class FuzzySearchServiceProvider extends ServiceProvider
         );
 
         $this->app->singleton('laravel-fuzzy.normalizer', function ($app) {
-            return new \LaravelFuzzy\Services\StringNormalizer();
+            return new \Fuzzy\Services\StringNormalizer();
         });
 
         $this->app->singleton('laravel-fuzzy.similarity', function ($app) {
-            return new \LaravelFuzzy\Services\SimilarityCalculator();
+            return new \Fuzzy\Services\SimilarityCalculator();
         });
 
         $this->app->singleton('laravel-fuzzy.index-builder', function ($app) {
-            return new \LaravelFuzzy\Services\IndexBuilder(
+            return new \Fuzzy\Services\IndexBuilder(
                 $app->make('laravel-fuzzy.normalizer')
             );
         });
 
         $this->app->singleton('laravel-fuzzy.search', function ($app) {
-            return new \LaravelFuzzy\Services\FuzzySearchService(
+            return new \Fuzzy\Services\FuzzySearchService(
                 $app->make(\Illuminate\Pipeline\Pipeline::class),
                 $app->make('laravel-fuzzy.normalizer'),
                 $app->make('laravel-fuzzy.similarity'),
@@ -41,7 +41,7 @@ class FuzzySearchServiceProvider extends ServiceProvider
             );
         });
 
-        $this->app->alias('laravel-fuzzy.search', \LaravelFuzzy\Services\FuzzySearchService::class);
+        $this->app->alias('laravel-fuzzy.search', \Fuzzy\Services\FuzzySearchService::class);
     }
 
     public function boot(): void

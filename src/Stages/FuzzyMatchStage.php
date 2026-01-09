@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace LaravelFuzzy\Stages;
+namespace Fuzzy\Stages;
 
-use LaravelFuzzy\SearchContext;
-use LaravelFuzzy\Data\SearchResultData;
+use Fuzzy\SearchContext;
+use Fuzzy\Data\SearchResultData;
 use Closure;
 
 class FuzzyMatchStage

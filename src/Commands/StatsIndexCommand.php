@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace LaravelFuzzy\Commands;
+namespace Fuzzy\Commands;
 
 use Illuminate\Console\Command;
 

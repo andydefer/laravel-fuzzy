@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace LaravelFuzzy\Tests;
+namespace Fuzzy\Tests;
 
 use Illuminate\Support\Facades\Config;
 use Orchestra\Testbench\TestCase as Orchestra;
-use LaravelFuzzy\FuzzySearchServiceProvider;
+use Fuzzy\FuzzySearchServiceProvider;
 
 abstract class TestCase extends Orchestra
 {
@@ -65,8 +65,8 @@ abstract class TestCase extends Orchestra
         ]);
 
         $app['config']->set('fuzzy.searchable_models', [
-            \LaravelFuzzy\Tests\Fixtures\User::class,
-            \LaravelFuzzy\Tests\Fixtures\Product::class,
+            \Fuzzy\Tests\Fixtures\User::class,
+            \Fuzzy\Tests\Fixtures\Product::class,
         ]);
     }
 }

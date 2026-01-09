@@ -2,16 +2,16 @@
 
 declare(strict_types=1);
 
-namespace LaravelFuzzy\Services;
+namespace Fuzzy\Services;
 
 use Illuminate\Support\Collection;
 use Illuminate\Pipeline\Pipeline;
-use LaravelFuzzy\Contracts\MustFuzzySearch;
-use LaravelFuzzy\Data\SearchOptionsData;
-use LaravelFuzzy\Data\SearchResultData;
-use LaravelFuzzy\Exceptions\ModelNotSearchableException;
-use LaravelFuzzy\SearchContext;
-use LaravelFuzzy\Models\FuzzyIndex;
+use Fuzzy\Contracts\MustFuzzySearch;
+use Fuzzy\Data\SearchOptionsData;
+use Fuzzy\Data\SearchResultData;
+use Fuzzy\Exceptions\ModelNotSearchableException;
+use Fuzzy\SearchContext;
+use Fuzzy\Models\FuzzyIndex;
 
 class FuzzySearchService
 {
@@ -296,12 +296,12 @@ class FuzzySearchService
     protected function getPipelineStages(): array
     {
         return [
-            \LaravelFuzzy\Stages\NormalizeQueryStage::class,
-            \LaravelFuzzy\Stages\ExactMatchStage::class,
-            \LaravelFuzzy\Stages\WordMatchStage::class,
-            \LaravelFuzzy\Stages\FuzzyMatchStage::class,
-            \LaravelFuzzy\Stages\MultiWordProcessingStage::class,
-            \LaravelFuzzy\Stages\SortAndLimitStage::class,
+            \Fuzzy\Stages\NormalizeQueryStage::class,
+            \Fuzzy\Stages\ExactMatchStage::class,
+            \Fuzzy\Stages\WordMatchStage::class,
+            \Fuzzy\Stages\FuzzyMatchStage::class,
+            \Fuzzy\Stages\MultiWordProcessingStage::class,
+            \Fuzzy\Stages\SortAndLimitStage::class,
         ];
     }
 }

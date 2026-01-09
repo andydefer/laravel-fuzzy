@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace LaravelFuzzy\Stages;
+namespace Fuzzy\Stages;
 
-use LaravelFuzzy\SearchContext;
+use Fuzzy\SearchContext;
 use Closure;
 
 class SortAndLimitStage

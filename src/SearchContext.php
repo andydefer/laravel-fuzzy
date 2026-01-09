@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace LaravelFuzzy;
+namespace Fuzzy;
 
-use LaravelFuzzy\Data\SearchOptionsData;
-use LaravelFuzzy\Services\StringNormalizer;
-use LaravelFuzzy\Services\SimilarityCalculator;
-use LaravelFuzzy\Services\IndexBuilder;
+use Fuzzy\Data\SearchOptionsData;
+use Fuzzy\Services\StringNormalizer;
+use Fuzzy\Services\SimilarityCalculator;
+use Fuzzy\Services\IndexBuilder;
 use Illuminate\Support\Collection;
 
 class SearchContext

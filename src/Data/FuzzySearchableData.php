@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace LaravelFuzzy\Data;
+namespace Fuzzy\Data;
 
 use Illuminate\Database\Eloquent\Model;
 use Spatie\LaravelData\Data;

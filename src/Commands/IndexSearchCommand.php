@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace LaravelFuzzy\Commands;
+namespace Fuzzy\Commands;
 
 use Illuminate\Console\Command;
-use LaravelFuzzy\Contracts\MustFuzzySearch;
+use Fuzzy\Contracts\MustFuzzySearch;
 
 class IndexSearchCommand extends Command
 {
