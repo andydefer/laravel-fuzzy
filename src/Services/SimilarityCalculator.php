@@ -102,7 +102,7 @@ class SimilarityCalculator
         return true;
     }
 
-    private function findLongestCommonSubstring(string $str1, string $str2): string
+    public function findLongestCommonSubstring(string $str1, string $str2): string
     {
         $longest = '';
         $str1Length = strlen($str1);
@@ -117,6 +117,51 @@ class SimilarityCalculator
         }
 
         return $longest;
+    }
+
+
+    /**
+     * Calculate consecutive characters bonus
+     */
+    public function calculateConsecutiveBonus(string $queryWord, string $targetWord): float
+    {
+        $maxConsecutive = 0;
+        $queryLength = strlen($queryWord);
+
+        for ($i = 0; $i < $queryLength; $i++) {
+            for ($j = $i + 2; $j <= $queryLength; $j++) {
+                $substring = substr($queryWord, $i, $j - $i);
+                if (str_contains($targetWord, $substring)) {
+                    $maxConsecutive = max($maxConsecutive, strlen($substring));
+                }
+            }
+        }
+
+        if ($maxConsecutive >= 5) return 2.0;
+        if ($maxConsecutive >= 4) return 1.6;
+        if ($maxConsecutive >= 3) return 1.3;
+        if ($maxConsecutive >= 2) return 1.1;
+
+        return 1.0;
+    }
+
+
+    /**
+     * Calculate common characters similarity
+     */
+    public function calculateCommonCharsSimilarity(string $str1, string $str2): float
+    {
+        $chars1 = array_unique(str_split(strtolower($str1)));
+        $chars2 = array_unique(str_split(strtolower($str2)));
+
+        $commonChars = array_intersect($chars1, $chars2);
+        $totalUniqueChars = count(array_unique(array_merge($chars1, $chars2)));
+
+        if ($totalUniqueChars === 0) {
+            return 0.0;
+        }
+
+        return count($commonChars) / $totalUniqueChars;
     }
 
     private function calculateLengthPenalty(string $queryWord, string $targetWord): float

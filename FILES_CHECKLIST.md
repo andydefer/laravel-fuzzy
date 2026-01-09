@@ -1,5 +1,5 @@
 # Project File Checklist
-*Last updated: ven. 09 janv. 2026 08:16:11 WAT*
+*Last updated: ven. 09 janv. 2026 11:51:30 WAT*
 
 ## Previously Checked Files
 
@@ -29,12 +29,14 @@
 23. src/Stages/FuzzyMatchStage.php [ ]
 24. src/Stages/MultiWordProcessingStage.php [ ]
 25. src/Stages/NormalizeQueryStage.php [ ]
-26. src/Stages/SortAndLimitStage.php [ ]
-27. src/Stages/WordMatchStage.php [ ]
-28. src/Traits/FuzzySearchable.php [ ]
-29. tests/database/migrations/2024_01_01_000000_create_test_products_table.php [ ]
-30. tests/database/migrations/2024_01_01_000000_create_test_users_table.php [ ]
-31. tests/Fixtures/Product.php [ ]
-32. tests/Fixtures/User.php [ ]
-33. tests/TestCase.php [ ]
-34. tests/Unit/FuzzySearchServiceTest.php [ ]
+26. src/Stages/SimilarityBonusStage.php [ ]
+27. src/Stages/SortAndLimitStage.php [ ]
+28. src/Stages/WordMatchStage.php [ ]
+29. src/Traits/FuzzySearchable.php [ ]
+30. tests/database/migrations/2024_01_01_000000_create_test_products_table.php [ ]
+31. tests/database/migrations/2024_01_01_000000_create_test_users_table.php [ ]
+32. tests/Fixtures/Product.php [ ]
+33. tests/Fixtures/User.php [ ]
+34. tests/TestCase.php [ ]
+35. tests/Unit/FuzzySearchServiceTest.php [ ]
+36. tests/Unit/Stages/SimilarityBonusStageTest.php [ ]

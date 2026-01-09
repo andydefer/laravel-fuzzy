@@ -299,6 +299,7 @@ class FuzzySearchService
             \Fuzzy\Stages\ExactMatchStage::class,
             \Fuzzy\Stages\WordMatchStage::class,
             \Fuzzy\Stages\FuzzyMatchStage::class,
+            \Fuzzy\Stages\SimilarityBonusStage::class,
             \Fuzzy\Stages\MultiWordProcessingStage::class,
             \Fuzzy\Stages\SortAndLimitStage::class,
         ];

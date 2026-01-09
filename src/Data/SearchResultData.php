@@ -23,7 +23,7 @@ class SearchResultData extends Data
     public function toArray(): array
     {
         $data = [
-            'score' => $this->score,
+            'score' => round($this->score, 2),
             'model_type' => $this->modelType,
             'matched_field' => $this->matchedField,
             'matched_value' => $this->matchedValue,
