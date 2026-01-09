@@ -1,0 +1,52 @@
+{
+    "autoload": {
+        "psr-4": {
+            "LaravelFuzzy\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "LaravelFuzzy\\Tests\\": "tests/"
+        }
+    },
+    "description": "Powerful fuzzy search system for Laravel with database indexing",
+    "extra": {
+        "laravel": {
+            "aliases": {
+                "FuzzySearch": "LaravelFuzzy\\FuzzySearch"
+            },
+            "providers": [
+                "LaravelFuzzy\\FuzzySearchServiceProvider"
+            ]
+        }
+    },
+    "keywords": [
+        "laravel",
+        "fuzzy",
+        "search",
+        "full-text",
+        "indexing"
+    ],
+    "license": "MIT",
+    "minimum-stability": "dev",
+    "name": "laravel-fuzzy/fuzzy-search",
+    "prefer-stable": true,
+    "require": {
+        "illuminate/database": "^12.0",
+        "illuminate/support": "^12.0",
+        "laravel/framework": "^12.0",
+        "php": "^8.2",
+        "spatie/laravel-data": "^4.0|^5.0"
+    },
+    "require-dev": {
+        "barryvdh/laravel-ide-helper": "^3.6",
+        "larastan/larastan": "^3.8",
+        "laravel/pint": "^1.26",
+        "orchestra/testbench": "^10.8",
+        "phpunit/phpunit": "^12.5",
+        "rector/rector": "*",
+        "symfony/var-dumper": "^7.0",
+        "vimeo/psalm": "^6.14"
+    },
+    "type": "library"
+}
