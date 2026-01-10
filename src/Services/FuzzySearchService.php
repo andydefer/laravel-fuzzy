@@ -4,25 +4,55 @@ declare(strict_types=1);
 
 namespace Fuzzy\Services;
 
-use Illuminate\Support\Collection;
-use Illuminate\Pipeline\Pipeline;
 use Fuzzy\Contracts\MustFuzzySearch;
 use Fuzzy\Data\SearchOptionsData;
 use Fuzzy\Data\SearchResultData;
 use Fuzzy\Exceptions\ModelNotSearchableException;
-use Fuzzy\SearchContext;
 use Fuzzy\Models\FuzzyIndex;
+use Fuzzy\SearchContext;
+use Fuzzy\Stages;
+use Illuminate\Pipeline\Pipeline;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\File;
-use Symfony\Component\Finder\Finder;
 use ReflectionClass;
+use Symfony\Component\Finder\Finder;
 
+/**
+ * Main service for fuzzy search operations.
+ *
+ * Provides search capabilities across searchable models with fuzzy matching,
+ * exact matching, and word-based search strategies.
+ */
 class FuzzySearchService
 {
+    /**
+     * @var Pipeline Laravel pipeline for processing search stages
+     */
     protected Pipeline $pipeline;
+
+    /**
+     * @var StringNormalizer Service for normalizing strings and queries
+     */
     protected StringNormalizer $normalizer;
+
+    /**
+     * @var SimilarityCalculator Service for calculating similarity scores
+     */
     protected SimilarityCalculator $similarityCalculator;
+
+    /**
+     * @var IndexBuilder Service for building and managing search indexes
+     */
     protected IndexBuilder $indexBuilder;
 
+    /**
+     * Create a new fuzzy search service instance.
+     *
+     * @param Pipeline $pipeline
+     * @param StringNormalizer $normalizer
+     * @param SimilarityCalculator $similarityCalculator
+     * @param IndexBuilder $indexBuilder
+     */
     public function __construct(
         Pipeline $pipeline,
         StringNormalizer $normalizer,
@@ -36,7 +66,11 @@ class FuzzySearchService
     }
 
     /**
-     * Search across all searchable models
+     * Search across all searchable models.
+     *
+     * @param string $query Search query string
+     * @param array $options Search options to override defaults
+     * @return Collection<SearchResultData> Collection of search results sorted by score
      */
     public function search(string $query, array $options = []): Collection
     {
@@ -50,15 +84,17 @@ class FuzzySearchService
             $allResults = $allResults->merge($modelResults);
         }
 
-        // Filtrer et trier tous les résultats
-        return $allResults
-            ->filter(fn($result) => $result->score >= $searchOptions->minScore)
-            ->sortByDesc('score')
-            ->values();
+        return $this->filterAndSortResults($allResults, $searchOptions->minScore);
     }
 
     /**
-     * Search in specific model
+     * Search within a specific model.
+     *
+     * @param string $modelClass Fully qualified model class name
+     * @param string $query Search query string
+     * @param array $options Search options to override defaults
+     * @return Collection<SearchResultData> Search results for the specified model
+     * @throws ModelNotSearchableException If model doesn't implement MustFuzzySearch
      */
     public function searchInModel(string $modelClass, string $query, array $options = []): Collection
     {
@@ -82,15 +118,16 @@ class FuzzySearchService
             ->through($this->getPipelineStages())
             ->then(fn(SearchContext $context) => $context->results);
 
-        // Convertir le tableau en Collection et filtrer par minScore
-        return collect($results)
-            ->filter(fn($result) => $result !== null && $result->score >= $searchOptions->minScore)
-            ->sortByDesc('score')
-            ->values();
+        return $this->filterAndSortResults(collect($results), $searchOptions->minScore);
     }
 
     /**
-     * Search in multiple specific models
+     * Search across multiple specific models.
+     *
+     * @param array $modelClasses Array of fully qualified model class names
+     * @param string $query Search query string
+     * @param array $options Search options to override defaults
+     * @return Collection<SearchResultData> Combined results from all specified models
      */
     public function searchInModels(array $modelClasses, string $query, array $options = []): Collection
     {
@@ -107,7 +144,10 @@ class FuzzySearchService
     }
 
     /**
-     * Index a specific model instance
+     * Index a specific model instance for search.
+     *
+     * @param MustFuzzySearch $model Model instance to index
+     * @return void
      */
     public function indexModel(MustFuzzySearch $model): void
     {
@@ -117,7 +157,10 @@ class FuzzySearchService
     }
 
     /**
-     * Update index for a model instance
+     * Update the search index for a model instance.
+     *
+     * @param MustFuzzySearch $model Model instance to update
+     * @return void
      */
     public function updateModelIndex(MustFuzzySearch $model): void
     {
@@ -126,7 +169,10 @@ class FuzzySearchService
     }
 
     /**
-     * Remove a model instance from index
+     * Remove a model instance from the search index.
+     *
+     * @param MustFuzzySearch $model Model instance to remove
+     * @return void
      */
     public function removeModelFromIndex(MustFuzzySearch $model): void
     {
@@ -137,7 +183,9 @@ class FuzzySearchService
     }
 
     /**
-     * Reindex all searchable models
+     * Reindex all searchable models.
+     *
+     * @return void
      */
     public function reindexAll(): void
     {
@@ -149,16 +197,18 @@ class FuzzySearchService
     }
 
     /**
-     * Reindex specific model
+     * Reindex all instances of a specific model.
+     *
+     * @param string $modelClass Fully qualified model class name
+     * @return void
+     * @throws ModelNotSearchableException If model doesn't implement MustFuzzySearch
      */
     public function reindexModel(string $modelClass): void
     {
         $this->validateModel($modelClass);
 
-        // Clear existing index
         FuzzyIndex::forModel($modelClass)->delete();
 
-        // Index all instances that should be indexed
         $modelClass::chunk(100, function ($models) {
             foreach ($models as $model) {
                 if ($model->shouldBeIndexed()) {
@@ -169,31 +219,44 @@ class FuzzySearchService
     }
 
     /**
-     * Calculate similarity between two strings
+     * Calculate similarity score between two strings.
+     *
+     * @param string $firstString First string to compare
+     * @param string $secondString Second string to compare
+     * @return float Similarity score between 0 and 1
      */
-    public function calculateSimilarity(string $str1, string $str2): float
+    public function calculateSimilarity(string $firstString, string $secondString): float
     {
-        return $this->similarityCalculator->calculateSimilarity($str1, $str2);
+        return $this->similarityCalculator->calculateSimilarity($firstString, $secondString);
     }
 
     /**
-     * Normalize a string
+     * Normalize a string for search operations.
+     *
+     * @param string $string String to normalize
+     * @return string Normalized string
      */
-    public function normalize(string $str): string
+    public function normalize(string $string): string
     {
-        return $this->normalizer->normalize($str);
+        return $this->normalizer->normalize($string);
     }
 
     /**
-     * Split string into words
+     * Split a string into individual words.
+     *
+     * @param string $string String to split
+     * @return array<string> Array of words
      */
-    public function splitIntoWords(string $str): array
+    public function splitIntoWords(string $string): array
     {
-        return $this->normalizer->splitIntoWords($str);
+        return $this->normalizer->splitIntoWords($string);
     }
 
     /**
-     * Normalize query for search
+     * Normalize a search query.
+     *
+     * @param string $query Search query to normalize
+     * @return string Normalized query
      */
     public function normalizeQuery(string $query): string
     {
@@ -201,7 +264,9 @@ class FuzzySearchService
     }
 
     /**
-     * Get index statistics
+     * Get search index statistics.
+     *
+     * @return array Statistics including total entries and per-model counts
      */
     public function getStats(): array
     {
@@ -213,48 +278,41 @@ class FuzzySearchService
         $models = $this->getSearchableModels();
 
         foreach ($models as $modelClass) {
-            $count = FuzzyIndex::forModel($modelClass)->count();
-            $stats['models'][$modelClass] = [
-                'count' => $count,
-                'fields' => FuzzyIndex::forModel($modelClass)
-                    ->selectRaw('field, COUNT(*) as count')
-                    ->groupBy('field')
-                    ->get()
-                    ->pluck('count', 'field')
-                    ->toArray(),
-            ];
+            $stats['models'][$modelClass] = $this->getModelStats($modelClass);
         }
 
         return $stats;
     }
 
     /**
-     * Get all searchable models with hybrid approach
-     * Priority: 1. Manual config, 2. Auto-discovery
+     * Get all searchable models using hybrid approach.
+     * Priority: 1. Manual configuration, 2. Auto-discovery
+     *
+     * @return array<string> Array of fully qualified model class names
      */
     protected function getSearchableModels(): array
     {
-        // 1. Priorité aux modèles configurés manuellement
         $configuredModels = config('fuzzy.searchable_models', []);
+
         if (!empty($configuredModels)) {
             return array_filter($configuredModels, function ($modelClass) {
                 return $this->isModelSearchable($modelClass);
             });
         }
 
-        // 2. Auto-détection si pas de configuration manuelle
         return $this->discoverSearchableModels();
     }
 
     /**
-     * Discover models implementing MustFuzzySearch interface
+     * Discover models implementing MustFuzzySearch interface.
+     *
+     * @return array<string> Array of discovered model class names
      */
     private function discoverSearchableModels(): array
     {
         $models = [];
-
-        // Scanner le dossier Models et sous-dossiers
         $finder = new Finder();
+
         $finder->files()
             ->in(app_path('Models'))
             ->name('*.php');
@@ -271,20 +329,21 @@ class FuzzySearchService
     }
 
     /**
-     * Get fully qualified class name from file path
+     * Extract fully qualified class name from a file.
+     *
+     * @param string $filePath Path to the PHP file
+     * @return string|null Fully qualified class name or null if not found
      */
     private function getClassNameFromFile(string $filePath): ?string
     {
         $content = file_get_contents($filePath);
-
-        // Extraire le namespace
         $namespace = '';
+        $className = '';
+
         if (preg_match('/namespace\s+(.+?);/s', $content, $matches)) {
             $namespace = $matches[1];
         }
 
-        // Extraire le nom de classe
-        $className = '';
         if (preg_match('/class\s+(\w+)(?:\s+extends|\s+implements|\s*\{)/', $content, $matches)) {
             $className = $matches[1];
         }
@@ -298,7 +357,10 @@ class FuzzySearchService
     }
 
     /**
-     * Check if model is searchable
+     * Check if a model implements the MustFuzzySearch interface.
+     *
+     * @param string $modelClass Model class name to check
+     * @return bool True if model is searchable
      */
     protected function isModelSearchable(string $modelClass): bool
     {
@@ -306,13 +368,15 @@ class FuzzySearchService
             return false;
         }
 
-        // Vérifier si la classe implémente l'interface
         $reflection = new ReflectionClass($modelClass);
         return $reflection->implementsInterface(MustFuzzySearch::class);
     }
 
     /**
-     * Validate model implements MustFuzzySearch
+     * Validate that a model implements MustFuzzySearch interface.
+     *
+     * @param string $modelClass Model class name to validate
+     * @throws ModelNotSearchableException If model is not searchable
      */
     protected function validateModel(string $modelClass): void
     {
@@ -324,42 +388,21 @@ class FuzzySearchService
     }
 
     /**
-     * Get index data for model from database
+     * Get index data for a specific model from the database.
+     *
+     * @param string $modelClass Model class name
+     * @return array Index data including word index and item map
      */
     protected function getIndexDataForModel(string $modelClass): array
     {
+        /** @var Collection<int, FuzzyIndex> $indexEntries */
         $indexEntries = FuzzyIndex::forModel($modelClass)->get();
 
         $wordIndex = [];
         $itemMap = [];
 
         foreach ($indexEntries as $entry) {
-            // Build word index
-            foreach ($entry->words as $word) {
-                if (strlen($word) >= 2) {
-                    if (!isset($wordIndex[$word])) {
-                        $wordIndex[$word] = [];
-                    }
-
-                    $wordIndex[$word][] = [
-                        'indexable_type' => $entry->indexable_type,
-                        'indexable_id' => $entry->indexable_id,
-                        'field' => $entry->field,
-                        'original_value' => $entry->original_value,
-                        'normalized_words' => $entry->words,
-                        'weight' => $entry->weight,
-                    ];
-                }
-            }
-
-            // Build item map
-            $key = $entry->indexable_type . '_' . $entry->indexable_id;
-            if (!isset($itemMap[$key])) {
-                $itemMap[$key] = [
-                    'indexable_type' => $entry->indexable_type,
-                    'indexable_id' => $entry->indexable_id,
-                ];
-            }
+            $this->processIndexEntry($entry, $wordIndex, $itemMap);
         }
 
         return [
@@ -369,16 +412,87 @@ class FuzzySearchService
     }
 
     /**
-     * Get pipeline stages
+     * Process a single index entry and update word index and item map.
+     *
+     * @param FuzzyIndex $entry Index entry to process
+     * @param array &$wordIndex Reference to word index array
+     * @param array &$itemMap Reference to item map array
+     */
+    private function processIndexEntry(FuzzyIndex $entry, array &$wordIndex, array &$itemMap): void
+    {
+        foreach ($entry->words as $word) {
+            if (strlen($word) >= 2) {
+                if (!isset($wordIndex[$word])) {
+                    $wordIndex[$word] = [];
+                }
+
+                $wordIndex[$word][] = [
+                    'indexable_type' => $entry->indexable_type,
+                    'indexable_id' => $entry->indexable_id,
+                    'field' => $entry->field,
+                    'original_value' => $entry->original_value,
+                    'normalized_words' => $entry->words,
+                    'weight' => $entry->weight,
+                ];
+            }
+        }
+
+        $key = $entry->indexable_type . '_' . $entry->indexable_id;
+        if (!isset($itemMap[$key])) {
+            $itemMap[$key] = [
+                'indexable_type' => $entry->indexable_type,
+                'indexable_id' => $entry->indexable_id,
+            ];
+        }
+    }
+
+    /**
+     * Get the pipeline stages for search processing.
+     *
+     * @return array<string> Array of pipeline stage class names
      */
     protected function getPipelineStages(): array
     {
         return [
-            \Fuzzy\Stages\NormalizeQueryStage::class,
-            \Fuzzy\Stages\ExactMatchStage::class,
-            \Fuzzy\Stages\WordMatchStage::class,
-            \Fuzzy\Stages\FuzzyMatchStage::class,
-            \Fuzzy\Stages\SortAndLimitStage::class,
+            Stages\NormalizeQueryStage::class,
+            Stages\ExactMatchStage::class,
+            Stages\WordMatchStage::class,
+            Stages\FuzzyMatchStage::class,
+            Stages\SortAndLimitStage::class,
+        ];
+    }
+
+    /**
+     * Filter and sort search results.
+     *
+     * @param Collection $results Collection of search results
+     * @param float $minScore Minimum score threshold
+     * @return Collection Filtered and sorted results
+     */
+    private function filterAndSortResults(Collection $results, float $minScore): Collection
+    {
+        return $results
+            ->filter(fn($result) => $result !== null && $result->score >= $minScore)
+            ->sortByDesc('score')
+            ->values();
+    }
+
+    /**
+     * Get statistics for a specific model.
+     *
+     * @param string $modelClass Model class name
+     * @return array Model statistics including count and field distribution
+     */
+    private function getModelStats(string $modelClass): array
+    {
+        return [
+            'count' => FuzzyIndex::forModel($modelClass)->count(),
+            'fields' => FuzzyIndex::forModel($modelClass)
+                ->selectRaw('field, COUNT(*) as count')
+                ->groupBy('field')
+                ->get()
+                ->pluck('count', 'field')
+                ->toArray(),
         ];
     }
 }

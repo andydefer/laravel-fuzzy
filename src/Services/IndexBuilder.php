@@ -6,18 +6,25 @@ namespace Fuzzy\Services;
 
 use Fuzzy\Contracts\MustFuzzySearch;
 use Fuzzy\Models\FuzzyIndex;
+use Illuminate\Database\Eloquent\Model;
 
+/**
+ * Service responsible for building and updating search indexes for searchable models.
+ */
 class IndexBuilder
 {
-    private StringNormalizer $normalizer;
-
-    public function __construct(StringNormalizer $normalizer)
-    {
-        $this->normalizer = $normalizer;
-    }
+    /**
+     * @param StringNormalizer $normalizer Service for normalizing text data
+     */
+    public function __construct(
+        private readonly StringNormalizer $normalizer
+    ) {}
 
     /**
-     * Index a model instance
+     * Index all searchable fields of a model instance.
+     *
+     * @param MustFuzzySearch $model The model instance to index
+     * @return void
      */
     public function indexModel(MustFuzzySearch $model): void
     {
@@ -29,15 +36,26 @@ class IndexBuilder
             $value = $model->getAttribute($field);
 
             if ($value !== null) {
-                $this->indexField($modelType, $modelId, $field, (string) $value);
+                $this->indexField(
+                    modelType: $modelType,
+                    modelId: $modelId,
+                    field: $field,
+                    value: (string) $value
+                );
             }
         }
     }
 
     /**
-     * Index a specific field value
+     * Index a specific field value for a model.
+     *
+     * @param string $modelType Fully qualified class name of the model
+     * @param mixed $modelId The model's primary key
+     * @param string $field The field name being indexed
+     * @param string $value The field value to index
+     * @return void
      */
-    public function indexField(string $modelType, $modelId, string $field, string $value): void
+    public function indexField(string $modelType, mixed $modelId, string $field, string $value): void
     {
         $normalizedValue = $this->normalizer->normalize($value);
 
@@ -51,7 +69,6 @@ class IndexBuilder
             return;
         }
 
-        // Calculate weight based on field importance
         $weight = $this->calculateFieldWeight($field);
 
         FuzzyIndex::updateOrCreate(
@@ -75,7 +92,10 @@ class IndexBuilder
     }
 
     /**
-     * Calculate weight for a field
+     * Calculate the importance weight for a field.
+     *
+     * @param string $field The field name
+     * @return float Weight between 0.0 and 1.0
      */
     protected function calculateFieldWeight(string $field): float
     {
@@ -91,7 +111,10 @@ class IndexBuilder
     }
 
     /**
-     * Batch index multiple models
+     * Index multiple models in batch.
+     *
+     * @param array<MustFuzzySearch|Model> $models Array of models to index
+     * @return void
      */
     public function batchIndex(array $models): void
     {

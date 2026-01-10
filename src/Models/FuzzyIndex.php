@@ -6,11 +6,29 @@ namespace Fuzzy\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 
+/**
+ * Represents a search index entry for fuzzy search functionality.
+ *
+ * Stores normalized search data and metadata for searchable models.
+ * Each entry contains original and normalized field values,
+ * word breakdowns, and weighting information for relevance scoring.
+ */
 class FuzzyIndex extends Model
 {
+    /**
+     * The database table name.
+     *
+     * @var string
+     */
     protected $table = 'fuzzy_index';
 
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var array<int, string>
+     */
     protected $fillable = [
         'indexable_type',
         'indexable_id',
@@ -22,6 +40,11 @@ class FuzzyIndex extends Model
         'metadata',
     ];
 
+    /**
+     * The attributes that should be cast.
+     *
+     * @var array<string, string>
+     */
     protected $casts = [
         'words' => 'array',
         'metadata' => 'array',
@@ -31,7 +54,11 @@ class FuzzyIndex extends Model
     ];
 
     /**
-     * Scope for specific model type
+     * Scope the query to a specific model type.
+     *
+     * @param Builder $query
+     * @param string $modelType
+     * @return Builder
      */
     public function scopeForModel(Builder $query, string $modelType): Builder
     {
@@ -39,7 +66,12 @@ class FuzzyIndex extends Model
     }
 
     /**
-     * Scope for specific model instance
+     * Scope the query to a specific model instance.
+     *
+     * @param Builder $query
+     * @param string $modelType
+     * @param int|string $modelId
+     * @return Builder
      */
     public function scopeForModelInstance(Builder $query, string $modelType, $modelId): Builder
     {
@@ -48,7 +80,11 @@ class FuzzyIndex extends Model
     }
 
     /**
-     * Scope for field
+     * Scope the query to a specific field.
+     *
+     * @param Builder $query
+     * @param string $field
+     * @return Builder
      */
     public function scopeForField(Builder $query, string $field): Builder
     {
@@ -56,7 +92,11 @@ class FuzzyIndex extends Model
     }
 
     /**
-     * Scope with word
+     * Scope the query to entries containing a specific word.
+     *
+     * @param Builder $query
+     * @param string $word
+     * @return Builder
      */
     public function scopeWithWord(Builder $query, string $word): Builder
     {
@@ -64,7 +104,11 @@ class FuzzyIndex extends Model
     }
 
     /**
-     * Scope with normalized value
+     * Scope the query to entries with normalized values containing the given string.
+     *
+     * @param Builder $query
+     * @param string $value
+     * @return Builder
      */
     public function scopeWithNormalizedValue(Builder $query, string $value): Builder
     {
@@ -72,9 +116,11 @@ class FuzzyIndex extends Model
     }
 
     /**
-     * Get the indexable model
+     * Get the polymorphic relationship to the indexable model.
+     *
+     * @return MorphTo
      */
-    public function indexable()
+    public function indexable(): MorphTo
     {
         return $this->morphTo();
     }

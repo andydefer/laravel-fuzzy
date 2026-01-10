@@ -6,8 +6,18 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
-{
+/**
+ * Creates the products table for storing product information.
+ *
+ * This migration sets up the basic structure for product management,
+ * including fields for name, description, price, and automatic timestamps.
+ */
+return new class() extends Migration {
+    /**
+     * Run the migration.
+     *
+     * @return void
+     */
     public function up(): void
     {
         Schema::create('products', function (Blueprint $table) {
@@ -17,11 +27,15 @@ return new class extends Migration
             $table->decimal('price', 10, 2);
             $table->timestamps();
 
-            // Index sur le nom pour recherche rapide
             $table->index('name');
         });
     }
 
+    /**
+     * Reverse the migration.
+     *
+     * @return void
+     */
     public function down(): void
     {
         Schema::dropIfExists('products');

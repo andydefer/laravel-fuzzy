@@ -6,8 +6,20 @@ namespace Fuzzy\Data;
 
 use Spatie\LaravelData\Data;
 
+/**
+ * Data object representing search options for fuzzy search queries.
+ *
+ * Encapsulates all configurable parameters for controlling search behavior,
+ * including scoring thresholds, result limits, and fuzzy matching settings.
+ */
 class SearchOptionsData extends Data
 {
+    /**
+     * @param float $minScore Minimum relevance score for results (0.0 to 1.0)
+     * @param int $maxResults Maximum number of results to return
+     * @param bool $fuzzy Whether to use fuzzy matching algorithms
+     * @param float $threshold Similarity threshold for fuzzy matching (0.0 to 1.0)
+     */
     public function __construct(
         public float $minScore = 0.1,
         public int $maxResults = 20,
@@ -16,28 +28,31 @@ class SearchOptionsData extends Data
     ) {}
 
     /**
-     * Create from array - support both snake_case and camelCase
+     * Create instance from array with support for both camelCase and snake_case keys.
+     *
+     * @param array $data Input data with search options
+     * @return self
      */
     public static function fromArray(array $data): self
     {
-        // Extract values with proper priority: camelCase first, then snake_case
-        $minScore = isset($data['minScore']) ? (float)$data['minScore'] : (isset($data['min_score']) ? (float)$data['min_score'] : 0.1);
-
-        $maxResults = isset($data['maxResults']) ? (int)$data['maxResults'] : (isset($data['max_results']) ? (int)$data['max_results'] : 20);
-
+        $minScore = $data['minScore'] ?? $data['min_score'] ?? 0.1;
+        $maxResults = $data['maxResults'] ?? $data['max_results'] ?? 20;
         $fuzzy = $data['fuzzy'] ?? true;
-        $threshold = isset($data['threshold']) ? (float)$data['threshold'] : 0.3;
+        $threshold = $data['threshold'] ?? 0.3;
 
         return new self(
-            minScore: $minScore,
-            maxResults: $maxResults,
-            fuzzy: $fuzzy,
-            threshold: $threshold,
+            minScore: (float) $minScore,
+            maxResults: (int) $maxResults,
+            fuzzy: (bool) $fuzzy,
+            threshold: (float) $threshold,
         );
     }
 
     /**
-     * Create from config with proper defaults
+     * Create instance from configuration with optional overrides.
+     *
+     * @param array $override Options to override default configuration
+     * @return self
      */
     public static function fromConfig(array $override = []): self
     {
@@ -48,9 +63,8 @@ class SearchOptionsData extends Data
             'threshold' => 0.3,
         ]);
 
-        // Merge override with config defaults
-        $merged = array_merge($defaultConfig, $override);
+        $mergedOptions = array_merge($defaultConfig, $override);
 
-        return self::fromArray($merged);
+        return self::fromArray($mergedOptions);
     }
 }

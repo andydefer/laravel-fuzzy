@@ -6,27 +6,36 @@ namespace Fuzzy\Traits;
 
 use Fuzzy\Contracts\MustFuzzySearch;
 use Fuzzy\Data\FuzzySearchableData;
+use Illuminate\Support\Collection;
 
+/**
+ * Provides fuzzy search capabilities to Eloquent models.
+ *
+ * This trait automatically indexes models for search operations and provides
+ * methods for searching within the model's scope. It handles the lifecycle
+ * events (create, update, delete) to maintain search index consistency.
+ */
 trait FuzzySearchable
 {
     /**
-     * Boot the trait
+     * Boot the fuzzy searchable trait.
+     *
+     * Sets up model event listeners to automatically manage search index
+     * during create, update, and delete operations.
+     *
+     * @return void
      */
     protected static function bootFuzzySearchable(): void
     {
         static::created(function ($model) {
-            if ($model->shouldBeIndexed()) {
-                if (method_exists($model, 'indexForSearch')) {
-                    $model->indexForSearch();
-                }
+            if ($model->shouldBeIndexed() && method_exists($model, 'indexForSearch')) {
+                $model->indexForSearch();
             }
         });
 
         static::updated(function ($model) {
-            if ($model->shouldBeIndexed()) {
-                if (method_exists($model, 'updateIndexForSearch')) {
-                    $model->updateIndexForSearch();
-                }
+            if ($model->shouldBeIndexed() && method_exists($model, 'updateIndexForSearch')) {
+                $model->updateIndexForSearch();
             }
         });
 
@@ -38,18 +47,21 @@ trait FuzzySearchable
     }
 
     /**
-     * Determine if this model instance should be indexed
-     * Can be overridden in individual models
+     * Determine if this model instance should be indexed.
+     *
+     * Override this method in individual models to implement custom indexing logic.
+     *
+     * @return bool
      */
     public function shouldBeIndexed(): bool
     {
-        // Par défaut, tous les modèles sont indexés
-        // Surcharger cette méthode dans vos modèles pour ajouter des conditions
         return true;
     }
 
     /**
-     * Default searchable fields - can be overridden in model
+     * Get the searchable fields for the model.
+     *
+     * @return array<string>
      */
     public function getSearchableFields(): array
     {
@@ -59,17 +71,19 @@ trait FuzzySearchable
     }
 
     /**
-     * Default format class - can be overridden in model
+     * Get the format class for custom search data transformation.
+     *
+     * @return string|null
      */
     public function getFuzzyFormat(): ?string
     {
-        return property_exists($this, 'fuzzyFormat')
-            ? $this->fuzzyFormat
-            : null;
+        return property_exists($this, 'fuzzyFormat') ? $this->fuzzyFormat : null;
     }
 
     /**
-     * Default searchable name - can be overridden in model
+     * Get the display name for search results.
+     *
+     * @return string
      */
     public function getSearchableName(): string
     {
@@ -77,7 +91,9 @@ trait FuzzySearchable
     }
 
     /**
-     * Default indexable ID
+     * Get the identifier used for indexing.
+     *
+     * @return string|int
      */
     public function getIndexableId(): string|int
     {
@@ -85,7 +101,9 @@ trait FuzzySearchable
     }
 
     /**
-     * Default searchable type
+     * Get the type identifier for search results.
+     *
+     * @return string
      */
     public function getSearchableType(): string
     {
@@ -93,7 +111,12 @@ trait FuzzySearchable
     }
 
     /**
-     * Convert to searchable data
+     * Convert the model to searchable data.
+     *
+     * Uses a custom format class if specified, otherwise creates a standard
+     * FuzzySearchableData instance.
+     *
+     * @return FuzzySearchableData|null
      */
     public function toSearchableData(): ?FuzzySearchableData
     {
@@ -113,7 +136,9 @@ trait FuzzySearchable
     }
 
     /**
-     * Index this model for search
+     * Index this model for search.
+     *
+     * @return void
      */
     public function indexForSearch(): void
     {
@@ -121,7 +146,9 @@ trait FuzzySearchable
     }
 
     /**
-     * Update index for this model
+     * Update the search index for this model.
+     *
+     * @return void
      */
     public function updateIndexForSearch(): void
     {
@@ -129,7 +156,9 @@ trait FuzzySearchable
     }
 
     /**
-     * Remove this model from index
+     * Remove this model from the search index.
+     *
+     * @return void
      */
     public function removeFromIndex(): void
     {
@@ -137,9 +166,13 @@ trait FuzzySearchable
     }
 
     /**
-     * Search in this model only
+     * Search within this model's scope.
+     *
+     * @param string $query The search query
+     * @param array $options Additional search options
+     * @return Collection<int, mixed>
      */
-    public static function fuzzySearch(string $query, array $options = []): \Illuminate\Support\Collection
+    public static function fuzzySearch(string $query, array $options = []): Collection
     {
         return app('laravel-fuzzy.search')->searchInModel(static::class, $query, $options);
     }

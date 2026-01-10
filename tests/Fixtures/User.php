@@ -9,19 +9,51 @@ use Fuzzy\Contracts\MustFuzzySearch;
 use Fuzzy\Traits\FuzzySearchable;
 use Fuzzy\Data\FuzzySearchableData;
 
+/**
+ * Test fixture representing a User model with fuzzy search capabilities.
+ *
+ * Used for testing the fuzzy search functionality with custom data formatting.
+ */
 class User extends Model implements MustFuzzySearch
 {
     use FuzzySearchable;
 
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var array<string>
+     */
     protected $fillable = ['name', 'email', 'type'];
 
-    public array $searchableFields = ['name', 'email']; // Ajout de 'public'
+    /**
+     * The fields that should be searchable.
+     *
+     * @var array<string>
+     */
+    public array $searchableFields = ['name', 'email'];
 
+    /**
+     * Custom formatter class for search data.
+     *
+     * @var string|null
+     */
     public ?string $fuzzyFormat = UserSearchData::class;
 }
 
+/**
+ * Custom search data formatter for User model.
+ *
+ * Transforms User model instances into structured search data with specific
+ * field mappings and formatting.
+ */
 class UserSearchData extends FuzzySearchableData
 {
+    /**
+     * Create a search data instance from a User model.
+     *
+     * @param Model $user The User model instance
+     * @return self
+     */
     public static function fromModel(Model $user): self
     {
         return new self(

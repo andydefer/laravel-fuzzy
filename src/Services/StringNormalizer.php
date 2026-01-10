@@ -6,10 +6,17 @@ namespace Fuzzy\Services;
 
 use Illuminate\Support\Str;
 
+/**
+ * Service for normalizing text strings for indexing and search operations.
+ */
 class StringNormalizer
 {
     /**
-     * Normalize a string for indexing and comparison
+     * Normalize a string by removing special characters, converting to lowercase,
+     * and standardizing whitespace.
+     *
+     * @param string $str The input string to normalize
+     * @return string Normalized string
      */
     public function normalize(string $str): string
     {
@@ -27,7 +34,10 @@ class StringNormalizer
     }
 
     /**
-     * Split string into words
+     * Split a string into individual words.
+     *
+     * @param string $str The string to split
+     * @return array<int, string> Array of words
      */
     public function splitIntoWords(string $str): array
     {
@@ -38,107 +48,46 @@ class StringNormalizer
         $str = str_replace(['_', '-'], ' ', $str);
         $words = preg_split('/\s+/', $str, -1, PREG_SPLIT_NO_EMPTY);
 
-        return array_values(array_filter($words, function ($word) {
-            return strlen($word) > 0;
-        }));
+        return array_values(array_filter($words, fn($word) => strlen($word) > 0));
     }
 
     /**
-     * Normalize for search query
+     * Normalize a search query by removing stop words from longer queries.
+     *
+     * @param string $query The search query to normalize
+     * @return string Normalized query without stop words
      */
     public function normalizeQuery(string $query): string
     {
         $query = $this->normalize($query);
-
-        // Remove very common words if query is long
         $words = $this->splitIntoWords($query);
 
         if (count($words) > 3) {
-            $stopWords = config('fuzzy.stop_words', [
-                'the',
-                'and',
-                'or',
-                'a',
-                'an',
-                'in',
-                'on',
-                'at',
-                'to',
-                'for',
-                'of',
-                'with',
-                'by',
-                'is',
-                'are',
-                'was',
-                'were',
-                'be',
-                'been',
-                'being',
-                'have',
-                'has',
-                'had',
-                'do',
-                'does',
-                'did',
-                'but',
-                'if',
-                'then',
-                'else',
-                'when',
-                'where',
-                'why',
-                'how',
-                'all',
-                'any',
-                'both',
-                'each',
-                'few',
-                'more',
-                'most',
-                'other',
-                'some',
-                'such',
-                'no',
-                'nor',
-                'not',
-                'only',
-                'own',
-                'same',
-                'so',
-                'than',
-                'too',
-                'very',
-                'can',
-                'will',
-                'just',
-                'should',
-                'now'
-            ]);
-
-            $words = array_filter($words, function ($word) use ($stopWords) {
-                return !in_array($word, $stopWords);
-            });
+            $stopWords = config('fuzzy.stop_words', []);
+            $words = array_filter($words, fn($word) => !in_array($word, $stopWords));
         }
 
         return implode(' ', $words);
     }
 
     /**
-     * Extract keywords from string
+     * Extract the most relevant keywords from a string.
+     *
+     * @param string $str The string to analyze
+     * @param int $maxKeywords Maximum number of keywords to return
+     * @return array<int, string> Extracted keywords sorted by frequency
      */
     public function extractKeywords(string $str, int $maxKeywords = 10): array
     {
         $normalized = $this->normalize($str);
         $words = $this->splitIntoWords($normalized);
 
-        // Filter out stop words and very short words
         $stopWords = config('fuzzy.stop_words', []);
-        $keywords = array_filter($words, function ($word) use ($stopWords) {
-            return strlen($word) >= 3 && !in_array($word, $stopWords);
-        });
+        $keywords = array_filter(
+            $words,
+            fn($word) => strlen($word) >= 3 && !in_array($word, $stopWords)
+        );
 
-        // Count frequency
         $frequencies = array_count_values($keywords);
         arsort($frequencies);
 

@@ -6,8 +6,17 @@ namespace Fuzzy\Exceptions;
 
 use Exception;
 
+/**
+ * Exception for generic fuzzy search errors.
+ */
 class FuzzySearchException extends Exception
 {
+    /**
+     * Creates an exception for when a model is not searchable.
+     *
+     * @param string $modelClass The model class name
+     * @return self
+     */
     public static function modelNotSearchable(string $modelClass): self
     {
         return new self(
@@ -15,6 +24,12 @@ class FuzzySearchException extends Exception
         );
     }
 
+    /**
+     * Creates an exception for when a search index is not found.
+     *
+     * @param string $modelClass The model class name
+     * @return self
+     */
     public static function indexNotFound(string $modelClass): self
     {
         return new self(
@@ -22,6 +37,12 @@ class FuzzySearchException extends Exception
         );
     }
 
+    /**
+     * Creates an exception for an invalid format class.
+     *
+     * @param string $formatClass The format class name
+     * @return self
+     */
     public static function invalidFormatClass(string $formatClass): self
     {
         return new self(

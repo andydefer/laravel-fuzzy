@@ -4,29 +4,54 @@ declare(strict_types=1);
 
 namespace Fuzzy\Commands;
 
-use Illuminate\Console\Command;
 use Fuzzy\Models\FuzzyIndex;
+use Illuminate\Console\Command;
 
+/**
+ * Command to clear the search index for specific models or all models.
+ */
 class ClearIndexCommand extends Command
 {
+    /**
+     * The command signature.
+     *
+     * @var string
+     */
     protected $signature = 'fuzzy:clear
                             {model? : Specific model to clear}
                             {--force : Skip confirmation}';
 
+    /**
+     * The command description.
+     *
+     * @var string
+     */
     protected $description = 'Clear search index';
 
-    public function handle()
+    /**
+     * Execute the console command.
+     *
+     * @return void
+     */
+    public function handle(): void
     {
-        $specificModel = $this->argument('model');
+        $modelClass = $this->argument('model');
         $force = $this->option('force');
 
-        if ($specificModel) {
-            $this->clearModelIndex($specificModel, $force);
+        if ($modelClass) {
+            $this->clearModelIndex($modelClass, $force);
         } else {
             $this->clearAllIndexes($force);
         }
     }
 
+    /**
+     * Clear the index for a specific model.
+     *
+     * @param string $modelClass The model class to clear
+     * @param bool $force Whether to skip confirmation
+     * @return void
+     */
     protected function clearModelIndex(string $modelClass, bool $force): void
     {
         if (!$force && !$this->confirm("Clear index for model {$modelClass}?")) {
@@ -34,12 +59,17 @@ class ClearIndexCommand extends Command
         }
 
         $count = FuzzyIndex::forModel($modelClass)->count();
-
         FuzzyIndex::forModel($modelClass)->delete();
 
         $this->info("✓ Cleared {$count} entries for {$modelClass}");
     }
 
+    /**
+     * Clear all search indexes.
+     *
+     * @param bool $force Whether to skip confirmation
+     * @return void
+     */
     protected function clearAllIndexes(bool $force): void
     {
         if (!$force && !$this->confirm('Clear ALL search indexes?')) {
@@ -47,7 +77,6 @@ class ClearIndexCommand extends Command
         }
 
         $count = FuzzyIndex::count();
-
         FuzzyIndex::query()->truncate();
 
         $this->info("✓ Cleared all indexes ({$count} entries)");

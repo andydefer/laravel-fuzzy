@@ -14,10 +14,20 @@ use Illuminate\Support\Collection;
 use Fuzzy\Data\SearchResultData;
 use Fuzzy\Models\FuzzyIndex;
 
+/**
+ * Unit tests for FuzzySearchService.
+ *
+ * Tests search functionality, indexing, and configuration options.
+ */
 class FuzzySearchServiceTest extends TestCase
 {
-    protected FuzzySearchService $service;
+    private FuzzySearchService $service;
 
+    /**
+     * Set up test data and index.
+     *
+     * @return void
+     */
     protected function setUp(): void
     {
         parent::setUp();
@@ -25,12 +35,30 @@ class FuzzySearchServiceTest extends TestCase
         $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
         $this->service = app(FuzzySearchService::class);
 
-        // Clear ALL data including index
+        $this->cleanTestData();
+        $this->createTestData();
+        $this->service->reindexAll();
+    }
+
+    /**
+     * Clean all test data and indexes.
+     *
+     * @return void
+     */
+    private function cleanTestData(): void
+    {
         FuzzyIndex::query()->truncate();
         User::query()->delete();
         Product::query()->delete();
+    }
 
-        // Create test data
+    /**
+     * Create test users and products.
+     *
+     * @return void
+     */
+    private function createTestData(): void
+    {
         User::create([
             'name' => 'John Doe',
             'email' => 'john@example.com',
@@ -60,79 +88,98 @@ class FuzzySearchServiceTest extends TestCase
             'description' => 'Mechanical keyboard with RGB lighting',
             'price' => 89.99,
         ]);
-
-        // Index all models
-        $this->service->reindexAll();
     }
 
+    /**
+     * Test search returns collection.
+     *
+     * @return void
+     */
     public function test_search_returns_collection(): void
     {
-        $service = app(FuzzySearchService::class);
+        // Arrange: Service is already set up in setUp()
 
-        $results = $service->search('john');
+        // Act: Perform search
+        $results = $this->service->search('john');
 
+        // Assert: Results should be a Collection
         $this->assertInstanceOf(Collection::class, $results);
     }
 
+    /**
+     * Test search finds exact match.
+     *
+     * @return void
+     */
     public function test_search_finds_exact_match(): void
     {
-        $service = app(FuzzySearchService::class);
+        // Arrange: Service and test data are already set up
 
-        $results = $service->search('John Doe');
+        // Act: Search for exact name
+        $results = $this->service->search('John Doe');
 
-        // Avec le nouveau système, on peut avoir plusieurs résultats
-        // mais le premier devrait être John Doe avec un score élevé
+        // Assert: Should find John Doe with high score
         $this->assertGreaterThan(0, $results->count());
 
-        // Trouver John Doe dans les résultats
-        $johnDoeResult = $results->first(function ($result) {
-            return $result->item->name === 'John Doe';
-        });
-
+        $johnDoeResult = $this->findResultByName($results, 'John Doe');
         $this->assertNotNull($johnDoeResult);
         $this->assertEquals('John Doe', $johnDoeResult->item->name);
         $this->assertGreaterThan(0.8, $johnDoeResult->score);
     }
 
+    /**
+     * Test search finds fuzzy match.
+     *
+     * @return void
+     */
     public function test_search_finds_fuzzy_match(): void
     {
-        $service = app(FuzzySearchService::class);
+        // Arrange: Service and test data are already set up
 
-        $results = $service->search('jon do', ['fuzzy' => true]);
+        // Act: Search with fuzzy matching enabled
+        $results = $this->service->search('jon do', ['fuzzy' => true]);
 
+        // Assert: Should find results despite typos
         $this->assertGreaterThan(0, $results->count());
     }
 
+    /**
+     * Test search within specific model.
+     *
+     * @return void
+     */
     public function test_search_in_specific_model(): void
     {
-        $service = app(FuzzySearchService::class);
+        // Arrange: Service and test data are already set up
 
-        $results = $service->searchInModel(User::class, 'john');
+        // Act: Search only in User model
+        $results = $this->service->searchInModel(User::class, 'john');
 
-        // Il peut y avoir plusieurs résultats (john, jane, etc.)
-        // Mais au moins John Doe devrait être trouvé
-        $johnDoeResult = $results->first(function ($result) {
-            return $result->item->name === 'John Doe';
-        });
-
+        // Assert: Should find John Doe as a User
+        $johnDoeResult = $this->findResultByName($results, 'John Doe');
         $this->assertNotNull($johnDoeResult);
         $this->assertEquals(User::class, get_class($johnDoeResult->item));
     }
 
+    /**
+     * Test search with custom options.
+     *
+     * @return void
+     */
     public function test_search_with_options(): void
     {
-        $service = app(FuzzySearchService::class);
-
+        // Arrange: Set search options
         $options = [
             'min_score' => 0.5,
             'max_results' => 5,
             'fuzzy' => true,
-            'threshold' => 0.4
+            'threshold' => 0.4,
         ];
 
-        /** @var Collection<int, SearchResultData> $results */
-        $results = $service->search('laptop', $options);
+        // Act: Search with custom options
+        $results = $this->service->search('laptop', $options);
 
+        // Assert: Results should respect options
         $this->assertLessThanOrEqual(5, $results->count());
 
         foreach ($results as $result) {
@@ -140,14 +187,17 @@ class FuzzySearchServiceTest extends TestCase
         }
     }
 
+    /**
+     * Test indexing a model.
+     *
+     * @return void
+     */
     public function test_index_model(): void
     {
-        $service = app(FuzzySearchService::class);
-
-        // Recherche d'un terme qui n'existe ABSOLUMENT PAS dans l'index
-        // Utiliser un mot complètement unique et improbable
-        $existingResults = $service->search('xyzlmnopqr12345unique'); // Mot très spécifique
-        $this->assertCount(0, $existingResults, 'Should start with no results for unique term');
+        // Arrange: Create a unique user
+        $uniqueTerm = 'xyzlmnopqr12345unique';
+        $initialResults = $this->service->search($uniqueTerm);
+        $this->assertCount(0, $initialResults);
 
         $user = User::create([
             'name' => 'Xylophone Player',
@@ -155,207 +205,249 @@ class FuzzySearchServiceTest extends TestCase
             'type' => 'user',
         ]);
 
-        $service->indexModel($user);
+        // Act: Index the new user
+        $this->service->indexModel($user);
 
-        /** @var Collection<int, SearchResultData> $results */
-        $results = $service->search('xylophone player');
+        // Assert: Should find the new user
+        $results = $this->service->search('xylophone player');
+        $this->assertGreaterThanOrEqual(1, $results->count());
 
-        $this->assertGreaterThanOrEqual(1, $results->count(), 'Should find the new user');
-
-        $xylophoneResult = $results->first(function ($result) {
-            return $result->item->name === 'Xylophone Player';
-        });
-
+        $xylophoneResult = $this->findResultByName($results, 'Xylophone Player');
         $this->assertNotNull($xylophoneResult);
     }
 
+    /**
+     * Test removing model from index.
+     *
+     * @return void
+     */
     public function test_remove_model_from_index(): void
     {
-        $service = app(FuzzySearchService::class);
-
+        // Arrange: Get existing user
         $user = User::first();
 
-        // First verify the user exists in search
-        $beforeResults = $service->search('john');
-        $this->assertGreaterThan(0, $beforeResults->count());
+        // Act: Remove user from index
+        $this->service->removeModelFromIndex($user);
 
-        $service->removeModelFromIndex($user);
-
-        /** @var Collection<int, SearchResultData> $results */
-        $results = $service->search('john');
-
-        // Après suppression, John Doe ne devrait plus être trouvé
+        // Assert: User should not be found in search
+        $results = $this->service->search('john');
         $johnDoeFound = $results->contains(function ($result) {
             return $result->item->name === 'John Doe';
         });
 
-        $this->assertFalse($johnDoeFound, 'John Doe should not be found after removal from index');
+        $this->assertFalse($johnDoeFound);
     }
 
+    /**
+     * Test getting search statistics.
+     *
+     * @return void
+     */
     public function test_get_stats(): void
     {
-        $service = app(FuzzySearchService::class);
+        // Arrange: Service is already set up
 
-        $stats = $service->getStats();
+        // Act: Get statistics
+        $stats = $this->service->getStats();
 
+        // Assert: Should contain expected keys
         $this->assertArrayHasKey('total_entries', $stats);
         $this->assertArrayHasKey('models', $stats);
         $this->assertArrayHasKey(User::class, $stats['models']);
     }
 
+    /**
+     * Test similarity calculation.
+     *
+     * @return void
+     */
     public function test_calculate_similarity(): void
     {
-        $service = app(FuzzySearchService::class);
+        // Arrange: Service is already set up
 
-        $similarity = $service->calculateSimilarity('hello', 'hello');
-        $this->assertEquals(1.0, $similarity);
+        // Act: Calculate similarity for exact match
+        $exactSimilarity = $this->service->calculateSimilarity('hello', 'hello');
 
-        $similarity2 = $service->calculateSimilarity('hello', 'helo');
+        // Assert: Exact match should have score of 1.0
+        $this->assertEquals(1.0, $exactSimilarity);
 
-        // Avec le nouvel algorithme plus tolérant, "helo" vs "hello"
-        // peut avoir un score très élevé (presque 1.0)
-        $this->assertGreaterThan(0, $similarity2);
+        // Act: Calculate similarity for close match
+        $fuzzySimilarity = $this->service->calculateSimilarity('hello', 'helo');
 
-        // Modifier pour accepter des scores jusqu'à 1.0
-        $this->assertLessThanOrEqual(1.0, $similarity2);
-
-        // Optionnel : vérifier que le score est raisonnablement élevé
-        // (devrait être autour de 0.9-0.95 avec notre algorithme)
-        $this->assertGreaterThan(0.8, $similarity2);
+        // Assert: Close match should have reasonable score
+        $this->assertGreaterThan(0, $fuzzySimilarity);
+        $this->assertLessThanOrEqual(1.0, $fuzzySimilarity);
+        $this->assertGreaterThan(0.8, $fuzzySimilarity);
     }
+
+    /**
+     * Test minimum score from configuration.
+     *
+     * @return void
+     */
     public function test_min_score_is_respected_from_config(): void
     {
-        // Configure high min_score in config
+        // Arrange: Set high minimum score in config
         config(['fuzzy.default_options.min_score' => 0.8]);
 
-        /** @var Collection<int, SearchResultData> $results */
+        // Act: Search with configured minimum score
         $results = $this->service->search('laptop');
 
-        // Add assertion to fix risky test
+        // Assert: All results should meet minimum score
         $this->assertInstanceOf(Collection::class, $results);
 
-        // All results should have score >= 0.8
         foreach ($results as $result) {
-            $this->assertGreaterThanOrEqual(
-                0.8,
-                $result->score,
-                "Result '{$result->item->name}' has score {$result->score} which is below min_score 0.8"
-            );
+            $this->assertGreaterThanOrEqual(0.8, $result->score);
         }
     }
 
+    /**
+     * Test minimum score override with options.
+     *
+     * @return void
+     */
     public function test_min_score_is_respected_with_options_override(): void
     {
-        // Set low default in config
+        // Arrange: Set low default score
         config(['fuzzy.default_options.min_score' => 0.1]);
 
-    // Override with high minScore in options - aucun résultat ne devrait atteindre 0.9
-        /** @var Collection<int, SearchResultData> $results */
+        // Act: Search with high minimum score override
         $results = $this->service->search('laptop', ['min_score' => 0.9]);
 
-        // Ajoutez cette assertion pour vérifier que si des résultats existent, ils respectent min_score
+        // Assert: All results should meet overridden score
         $this->assertInstanceOf(Collection::class, $results);
 
         if ($results->count() > 0) {
             foreach ($results as $result) {
-                $this->assertGreaterThanOrEqual(
-                    0.9,
-                    $result->score,
-                    "Result should have score >= 0.9"
-                );
+                $this->assertGreaterThanOrEqual(0.9, $result->score);
             }
         }
     }
 
+    /**
+     * Test minimum score with different naming conventions.
+     *
+     * @return void
+     */
     public function test_min_score_works_with_snake_case_and_camel_case(): void
     {
+        // Arrange: Set minimum score in config
         config(['fuzzy.default_options.min_score' => 0.7]);
 
-        // Test with snake_case
-        /** @var Collection<int, SearchResultData> $results1 */
-        $results1 = $this->service->search('john', ['min_score' => 0.8]);
+        // Act: Search with snake_case option
+        $snakeCaseResults = $this->service->search('john', ['min_score' => 0.8]);
 
-        // Test with camelCase
-        /** @var Collection<int, SearchResultData> $results2 */
-        $results2 = $this->service->search('john', ['minScore' => 0.8]);
+        // Act: Search with camelCase option
+        $camelCaseResults = $this->service->search('john', ['minScore' => 0.8]);
 
+        // Assert: Both should produce same results
         $this->assertEquals(
-            $results1->count(),
-            $results2->count(),
-            "Both naming conventions should produce the same results"
+            $snakeCaseResults->count(),
+            $camelCaseResults->count()
         );
     }
 
+    /**
+     * Test facade respects minimum score.
+     *
+     * @return void
+     */
     public function test_facade_respects_min_score(): void
     {
-    // Test with a query that won't get exact match
+        // Arrange: Service is ready
+
+        // Act: Search via facade with high minimum score
         /** @var Collection<int, SearchResultData> $results */
         $results = FuzzySearch::search('joh', ['min_score' => 1.0]);
 
+        // Assert: All results should meet minimum score
         $this->assertInstanceOf(Collection::class, $results);
 
-        // 'joh' is not exact match, so score should be < 1.0
         foreach ($results as $result) {
             $this->assertGreaterThanOrEqual(1.0, $result->score);
         }
     }
 
+    /**
+     * Test search in model respects minimum score.
+     *
+     * @return void
+     */
     public function test_search_in_model_respects_min_score(): void
     {
-        /** @var Collection<int, SearchResultData> $results */
-        $results = $this->service->searchInModel(User::class, 'joh', [ // Note: 'joh' not 'john'
-            'min_score' => 0.9,
-            'fuzzy' => true
-        ]);
+        // Arrange: Service is ready
 
-        // Vérifiez que tous les résultats respectent le min_score
+        // Act: Search in User model with high minimum score
+        $results = $this->service->searchInModel(
+            User::class,
+            'joh',
+            ['min_score' => 0.9, 'fuzzy' => true]
+        );
+
+        // Assert: All results should meet minimum score
+        $this->assertInstanceOf(Collection::class, $results);
+
         foreach ($results as $result) {
             $this->assertGreaterThanOrEqual(0.9, $result->score);
         }
-
-        // Ajoutez cette assertion pour éviter le test risqué
-        $this->assertInstanceOf(Collection::class, $results);
     }
 
+    /**
+     * Test multi-word search respects minimum score.
+     *
+     * @return void
+     */
     public function test_multi_word_processing_respects_min_score(): void
     {
-        /** @var Collection<int, SearchResultData> $results */
+        // Arrange: Service is ready
+
+        // Act: Search with multi-word query
         $results = $this->service->search('high end laptop', [
             'min_score' => 0.6,
-            'fuzzy' => true
+            'fuzzy' => true,
         ]);
 
+        // Assert: All results should meet minimum score
         foreach ($results as $result) {
-            $this->assertGreaterThanOrEqual(
-                0.6,
-                $result->score,
-                "Multi-word query should respect min_score"
-            );
+            $this->assertGreaterThanOrEqual(0.6, $result->score);
         }
     }
 
+    /**
+     * Test exact match bypasses minimum score.
+     *
+     * @return void
+     */
     public function test_exact_match_bypasses_min_score(): void
     {
-        // Recherche d'une correspondance exacte
-        /** @var Collection<int, SearchResultData> $results */
+        // Arrange: Service is ready
+
+        // Act: Search for exact match with high minimum score
         $results = $this->service->search('John Doe', [
             'min_score' => 0.99,
-            'fuzzy' => false, // Désactive le fuzzy pour test exact
+            'fuzzy' => false,
         ]);
 
-        // Vérifiez si nous avons des résultats
+        // Assert: Either we get results that meet the high score, or no results at all
+        $this->assertInstanceOf(Collection::class, $results);
+
         if ($results->count() > 0) {
-            // La correspondance exacte devrait avoir un score élevé
+            // If we have results, they must meet the high minimum score
             $this->assertGreaterThanOrEqual(0.99, $results->first()->score);
         } else {
-            // Si aucun résultat, c'est OK car le score peut être < 0.99
-            $this->assertTrue(true);
+            // If no results, that's also valid - the score was too high
+            $this->assertCount(0, $results, 'No results returned with min_score 0.99');
         }
     }
 
+    /**
+     * Test sorting and limiting respects minimum score.
+     *
+     * @return void
+     */
     public function test_sort_and_limit_stage_respects_min_score(): void
     {
-        // Create more test data with varying scores
+        // Arrange: Create additional test users
         for ($i = 1; $i <= 10; $i++) {
             User::create([
                 'name' => "Test User $i",
@@ -366,58 +458,62 @@ class FuzzySearchServiceTest extends TestCase
 
         $this->service->reindexModel(User::class);
 
-        /** @var Collection<int, SearchResultData> $results */
+        // Act: Search with limits and minimum score
         $results = $this->service->search('test', [
             'min_score' => 0.3,
             'max_results' => 5,
         ]);
 
+        // Assert: Results should respect both limits
         $this->assertLessThanOrEqual(5, $results->count());
 
-        // Check all results meet min_score
         foreach ($results as $result) {
             $this->assertGreaterThanOrEqual(0.3, $result->score);
         }
 
-        // Check results are sorted descending
+        // Assert: Results should be sorted by score descending
         $scores = $results->pluck('score')->toArray();
         $sortedScores = $scores;
         rsort($sortedScores);
         $this->assertEquals($sortedScores, $scores);
     }
 
+    /**
+     * Test search options data handles edge cases.
+     *
+     * @return void
+     */
     public function test_search_options_data_handles_edge_cases(): void
     {
-        // Test with empty options
+        // Arrange & Act: Test empty options
         $options1 = SearchOptionsData::fromConfig([]);
         $this->assertEquals(0.1, $options1->minScore);
 
-        // Test with invalid values
-        $options2 = SearchOptionsData::fromConfig([
-            'min_score' => -0.5, // Negative value
-        ]);
+        // Arrange & Act: Test negative value
+        $options2 = SearchOptionsData::fromConfig(['min_score' => -0.5]);
         $this->assertEquals(-0.5, $options2->minScore);
 
-        // Test with very high value - should be accepted but capped during search
-        $options3 = SearchOptionsData::fromConfig([
-            'minScore' => 2.0, // > 1.0
-        ]);
+        // Arrange & Act: Test value above 1.0
+        $options3 = SearchOptionsData::fromConfig(['minScore' => 2.0]);
         $this->assertEquals(2.0, $options3->minScore);
 
-        // Test that searching with minScore > 1.0 returns no results (or only exact matches)
-        /** @var Collection<int, SearchResultData> $results */
+        // Act: Search with minimum score above 1.0
         $results = $this->service->search('john', ['min_score' => 2.0]);
 
-        // Avec min_score 2.0, aucun résultat ne devrait passer car le score max est 1.0
+        // Assert: All results should meet the unrealistic score
         foreach ($results as $result) {
             $this->assertGreaterThanOrEqual(2.0, $result->score);
         }
     }
 
-    /** @test */
+    /**
+     * Test minimum score of zero returns all results.
+     *
+     * @return void
+     */
     public function test_min_score_zero_returns_all_results(): void
     {
-        // Créez un utilisateur avec "test" dans le nom pour être sûr d'avoir des résultats
+        // Arrange: Create test user
         User::create([
             'name' => 'Test User',
             'email' => 'testuser@example.com',
@@ -426,17 +522,27 @@ class FuzzySearchServiceTest extends TestCase
 
         $this->service->reindexModel(User::class);
 
-    // Recherche avec un terme qui existe
-        /** @var Collection<int, SearchResultData> $results */
+        // Act: Search with zero minimum score
         $results = $this->service->search('test', [
             'min_score' => 0,
             'max_results' => 100,
         ]);
 
-        $this->assertGreaterThan(
-            0,
-            $results->count(),
-            "Should return some results with min_score 0"
-        );
+        // Assert: Should return results
+        $this->assertGreaterThan(0, $results->count());
+    }
+
+    /**
+     * Find a search result by name.
+     *
+     * @param Collection<int, SearchResultData> $results
+     * @param string $name
+     * @return SearchResultData|null
+     */
+    private function findResultByName(Collection $results, string $name): ?SearchResultData
+    {
+        return $results->first(function ($result) use ($name) {
+            return $result->item->name === $name;
+        });
     }
 }

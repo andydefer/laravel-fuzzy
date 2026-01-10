@@ -7,7 +7,14 @@ namespace Fuzzy\Stages;
 use Fuzzy\SearchContext;
 use Fuzzy\Data\SearchResultData;
 use Closure;
+use Illuminate\Support\Collection;
 
+/**
+ * Score aggregation and unified calculation stage.
+ *
+ * This stage combines scores from different similarity algorithms,
+ * applies field weights and bonuses to produce a final score.
+ */
 class ScoreAggregationStage
 {
     private const FIELD_WEIGHTS = [
@@ -20,12 +27,19 @@ class ScoreAggregationStage
     ];
 
     private const CONSECUTIVE_BONUS = [
-        2 => 1.05,  // +5%
-        3 => 1.15,  // +15%
-        4 => 1.30,  // +30%
-        5 => 1.50,  // +50%
+        2 => 1.05,
+        3 => 1.15,
+        4 => 1.30,
+        5 => 1.50,
     ];
 
+    /**
+     * Calculates final scores by aggregating different similarity metrics.
+     *
+     * @param SearchContext $context Context containing preliminary results
+     * @param Closure $next Next stage in the pipeline
+     * @return mixed Results with calculated final scores
+     */
     public function handle(SearchContext $context, Closure $next)
     {
         if (empty($context->results)) {
@@ -39,15 +53,7 @@ class ScoreAggregationStage
                 continue;
             }
 
-            // Récupérer toutes les entrées d'index pour ce modèle
-            $indexEntries = $this->getIndexEntriesForModel($context, $result->modelType, $result->item->getIndexableId());
-
-            if (empty($indexEntries)) {
-                continue;
-            }
-
-            // Calculer le score unifié
-            $finalScore = $this->calculateUnifiedScore($context, $indexEntries, $result->matchedValue);
+            $finalScore = $this->computeFinalScoreForResult($context, $result);
 
             if ($finalScore >= $context->options->minScore) {
                 $result->score = $finalScore;
@@ -59,6 +65,37 @@ class ScoreAggregationStage
         return $next($context);
     }
 
+    /**
+     * Calculates the final score for a given result.
+     *
+     * @param SearchContext $context Search context
+     * @param SearchResultData $result Result to evaluate
+     * @return float Final score normalized between 0 and 1
+     */
+    private function computeFinalScoreForResult(SearchContext $context, SearchResultData $result): float
+    {
+        $indexEntries = $this->getIndexEntriesForModel(
+            $context,
+            $result->modelType,
+            $result->item->getIndexableId()
+        );
+
+        if (empty($indexEntries)) {
+            return 0.0;
+        }
+
+        $finalScore = $this->calculateUnifiedScore($context, $indexEntries, $result->matchedValue);
+        return min(max($finalScore, 0.0), 1.0);
+    }
+
+    /**
+     * Retrieves all index entries for a specific model.
+     *
+     * @param SearchContext $context Context containing word index
+     * @param string $modelType Model type
+     * @param mixed $modelId Model identifier
+     * @return array Index entries matching the model
+     */
     private function getIndexEntriesForModel(SearchContext $context, string $modelType, $modelId): array
     {
         $indexEntries = [];
@@ -74,6 +111,14 @@ class ScoreAggregationStage
         return $indexEntries;
     }
 
+    /**
+     * Calculates a unified score based on multiple similarity metrics.
+     *
+     * @param SearchContext $context Search context
+     * @param array $indexEntries Index entries for the model
+     * @param string $matchedValue Original matching value
+     * @return float Unified score
+     */
     private function calculateUnifiedScore(SearchContext $context, array $indexEntries, string $matchedValue): float
     {
         $queryWords = $context->queryWords;
@@ -83,7 +128,29 @@ class ScoreAggregationStage
             return 0.0;
         }
 
-        // 1. Vérifier la correspondance exacte de phrase
+        $exactMatchScore = $this->calculateExactMatchScore($context, $matchedValue);
+        if ($exactMatchScore > 0) {
+            return $exactMatchScore;
+        }
+
+        $wordScores = $this->calculateWordScores($context, $queryWords, $indexEntries);
+
+        if (empty($wordScores)) {
+            return 0.0;
+        }
+
+        return $this->aggregateWordScores($wordScores, $totalWords, $matchedValue);
+    }
+
+    /**
+     * Calculates score for exact phrase matches.
+     *
+     * @param SearchContext $context Search context
+     * @param string $matchedValue Value to compare
+     * @return float Exact match score or 0
+     */
+    private function calculateExactMatchScore(SearchContext $context, string $matchedValue): float
+    {
         $normalizedMatched = $context->normalizer->normalize($matchedValue);
         $normalizedQuery = $context->normalizedQuery;
 
@@ -91,12 +158,23 @@ class ScoreAggregationStage
             return 1.0;
         }
 
-        // 2. Vérifier si la requête est contenue dans la valeur
         if (str_contains($normalizedMatched, $normalizedQuery)) {
             return min(0.95, 0.8 + (strlen($normalizedQuery) / strlen($normalizedMatched)) * 0.2);
         }
 
-        // 3. Calculer les scores par mot
+        return 0.0;
+    }
+
+    /**
+     * Calculates individual word scores for each query word.
+     *
+     * @param SearchContext $context Search context
+     * @param array $queryWords Array of query words
+     * @param array $indexEntries Index entries to evaluate
+     * @return array Calculated word scores
+     */
+    private function calculateWordScores(SearchContext $context, array $queryWords, array $indexEntries): array
+    {
         $wordScores = [];
 
         foreach ($queryWords as $queryWord) {
@@ -104,61 +182,77 @@ class ScoreAggregationStage
                 continue;
             }
 
-            $bestWordScore = 0.0;
-            $bestFieldWeight = self::FIELD_WEIGHTS['default'];
+            $bestWordScore = $this->findBestWordScore($context, $queryWord, $indexEntries);
 
-            foreach ($indexEntries as $entry) {
-                $fieldWeight = self::FIELD_WEIGHTS[$entry['field']] ?? self::FIELD_WEIGHTS['default'];
+            if ($bestWordScore['score'] > 0) {
+                $wordScores[] = $bestWordScore;
+            }
+        }
 
-                foreach ($entry['normalized_words'] as $targetWord) {
-                    $targetWord = (string) $targetWord;
+        return $wordScores;
+    }
 
-                    if (strlen($targetWord) < 2) {
-                        continue;
-                    }
+    /**
+     * Finds the best score for a single query word across all index entries.
+     *
+     * @param SearchContext $context Search context
+     * @param string $queryWord Word to score
+     * @param array $indexEntries Index entries to search
+     * @return array Best score information including weight and word
+     */
+    private function findBestWordScore(SearchContext $context, string $queryWord, array $indexEntries): array
+    {
+        $bestScore = 0.0;
+        $bestFieldWeight = self::FIELD_WEIGHTS['default'];
 
-                    // Calculer la similarité avancée
-                    $similarity = $context->similarityCalculator->calculateWordSimilarity($queryWord, $targetWord);
+        foreach ($indexEntries as $entry) {
+            $fieldWeight = self::FIELD_WEIGHTS[$entry['field']] ?? self::FIELD_WEIGHTS['default'];
 
-                    if ($similarity > 0) {
-                        // Appliquer les bonus
-                        $enhancedScore = $this->enhanceWordScore(
-                            $queryWord,
-                            $targetWord,
-                            $similarity,
-                            $entry['field'],
-                            $entry['original_value'] ?? $matchedValue
-                        );
+            foreach ($entry['normalized_words'] as $targetWord) {
+                $targetWord = (string) $targetWord;
 
-                        $weightedScore = $enhancedScore * $fieldWeight;
+                if (strlen($targetWord) < 2) {
+                    continue;
+                }
 
-                        if ($weightedScore > $bestWordScore) {
-                            $bestWordScore = $weightedScore;
-                            $bestFieldWeight = $fieldWeight;
-                        }
+                $similarity = $context->similarityCalculator->calculateWordSimilarity($queryWord, $targetWord);
+
+                if ($similarity > 0) {
+                    $enhancedScore = $this->enhanceWordScore(
+                        $queryWord,
+                        $targetWord,
+                        $similarity,
+                        $entry['field'],
+                        $entry['original_value'] ?? ''
+                    );
+
+                    $weightedScore = $enhancedScore * $fieldWeight;
+
+                    if ($weightedScore > $bestScore) {
+                        $bestScore = $weightedScore;
+                        $bestFieldWeight = $fieldWeight;
                     }
                 }
             }
-
-            if ($bestWordScore > 0) {
-                $wordScores[] = [
-                    'score' => $bestWordScore,
-                    'weight' => $bestFieldWeight,
-                    'word' => $queryWord,
-                ];
-            }
         }
 
-        // 4. Agréger les scores
-        if (empty($wordScores)) {
-            return 0.0;
-        }
-
-        $aggregatedScore = $this->aggregateWordScores($wordScores, $totalWords, $matchedValue);
-
-        return min(max($aggregatedScore, 0.0), 1.0);
+        return [
+            'score' => $bestScore,
+            'weight' => $bestFieldWeight,
+            'word' => $queryWord,
+        ];
     }
 
+    /**
+     * Enhances a base similarity score with various bonuses.
+     *
+     * @param string $queryWord Original query word
+     * @param string $targetWord Target word from index
+     * @param float $baseScore Base similarity score
+     * @param string $field Field name where the word was found
+     * @param string $fullText Full original text value
+     * @return float Enhanced score with bonuses applied
+     */
     private function enhanceWordScore(
         string $queryWord,
         string $targetWord,
@@ -168,26 +262,48 @@ class ScoreAggregationStage
     ): float {
         $enhancedScore = $baseScore;
 
-        // Bonus pour caractères consécutifs
         $consecutiveBonus = $this->calculateConsecutiveBonus($queryWord, $targetWord);
         $enhancedScore *= $consecutiveBonus;
 
-        // Bonus pour position dans le texte
         $positionBonus = $this->calculatePositionBonus($targetWord, $fullText);
         $enhancedScore *= $positionBonus;
 
         return min($enhancedScore, 1.0);
     }
 
+    /**
+     * Calculates bonus for consecutive character matches.
+     *
+     * @param string $queryWord Query word
+     * @param string $targetWord Target word
+     * @return float Bonus multiplier (1.0 = no bonus)
+     */
     private function calculateConsecutiveBonus(string $queryWord, string $targetWord): float
     {
         $queryWord = strtolower($queryWord);
         $targetWord = strtolower($targetWord);
 
+        $maxConsecutive = $this->findLongestCommonSubstring($queryWord, $targetWord);
+
+        if ($maxConsecutive >= 2) {
+            return self::CONSECUTIVE_BONUS[min($maxConsecutive, 5)] ?? 1.0;
+        }
+
+        return 1.0;
+    }
+
+    /**
+     * Finds the longest common substring between two words.
+     *
+     * @param string $queryWord First word
+     * @param string $targetWord Second word
+     * @return int Length of longest common substring
+     */
+    private function findLongestCommonSubstring(string $queryWord, string $targetWord): int
+    {
         $maxConsecutive = 0;
         $queryLength = strlen($queryWord);
 
-        // Chercher la plus longue sous-chaîne consécutive commune
         for ($i = 0; $i < $queryLength; $i++) {
             for ($j = $i + 2; $j <= $queryLength; $j++) {
                 $substring = substr($queryWord, $i, $j - $i);
@@ -197,13 +313,16 @@ class ScoreAggregationStage
             }
         }
 
-        if ($maxConsecutive >= 2) {
-            return self::CONSECUTIVE_BONUS[min($maxConsecutive, 5)] ?? 1.0;
-        }
-
-        return 1.0;
+        return $maxConsecutive;
     }
 
+    /**
+     * Calculates bonus based on word position in text.
+     *
+     * @param string $word Word to locate
+     * @param string $fullText Full text to search
+     * @return float Position bonus multiplier
+     */
     private function calculatePositionBonus(string $word, string $fullText): float
     {
         $fullText = strtolower($fullText);
@@ -219,16 +338,23 @@ class ScoreAggregationStage
         $wordLength = strlen($word);
         $relativePosition = $position / max(1, $textLength - $wordLength);
 
-        // Les mots au début ont plus de poids
         if ($relativePosition < 0.2) {
-            return 1.2; // +20%
+            return 1.2;
         } elseif ($relativePosition < 0.4) {
-            return 1.1; // +10%
+            return 1.1;
         }
 
         return 1.0;
     }
 
+    /**
+     * Aggregates individual word scores into a final unified score.
+     *
+     * @param array $wordScores Individual word scores
+     * @param int $totalQueryWords Total number of query words
+     * @param string $matchedValue Original matched value
+     * @return float Final aggregated score
+     */
     private function aggregateWordScores(array $wordScores, int $totalQueryWords, string $matchedValue): float
     {
         $totalScore = 0.0;
@@ -246,17 +372,29 @@ class ScoreAggregationStage
 
         $averageScore = $totalScore / $totalWeight;
 
-        // Bonus de couverture pour requêtes multi-mots
         if ($totalQueryWords > 1) {
             $coverage = $matchedWords / $totalQueryWords;
-
-            if ($coverage >= 0.8) {
-                $averageScore = min($averageScore * 1.2, 1.0);
-            } elseif ($coverage >= 0.5) {
-                $averageScore = min($averageScore * 1.1, 1.0);
-            }
+            $averageScore = $this->applyCoverageBonus($averageScore, $coverage);
         }
 
         return $averageScore;
+    }
+
+    /**
+     * Applies coverage bonus for multi-word queries.
+     *
+     * @param float $baseScore Base average score
+     * @param float $coverage Percentage of query words matched
+     * @return float Score with coverage bonus applied
+     */
+    private function applyCoverageBonus(float $baseScore, float $coverage): float
+    {
+        if ($coverage >= 0.8) {
+            return min($baseScore * 1.2, 1.0);
+        } elseif ($coverage >= 0.5) {
+            return min($baseScore * 1.1, 1.0);
+        }
+
+        return $baseScore;
     }
 }

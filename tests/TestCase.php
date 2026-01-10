@@ -8,11 +8,19 @@ use Illuminate\Support\Facades\Config;
 use Orchestra\Testbench\TestCase as Orchestra;
 use Fuzzy\FuzzySearchServiceProvider;
 
+/**
+ * Base test case for Fuzzy Search package tests.
+ *
+ * Provides common setup and configuration for testing the fuzzy search functionality.
+ */
 abstract class TestCase extends Orchestra
 {
-
     /**
      * Set up the test environment.
+     *
+     * Loads migrations and configures in-memory caching for isolated testing.
+     *
+     * @return void
      */
     protected function setUp(): void
     {
@@ -23,9 +31,10 @@ abstract class TestCase extends Orchestra
         $this->configureMemoryCache();
     }
 
-
     /**
      * Load package migrations.
+     *
+     * @return void
      */
     private function loadPackageMigrations(): void
     {
@@ -34,6 +43,8 @@ abstract class TestCase extends Orchestra
 
     /**
      * Load test-specific migrations.
+     *
+     * @return void
      */
     private function loadTestMigrations(): void
     {
@@ -42,12 +53,20 @@ abstract class TestCase extends Orchestra
 
     /**
      * Configure in-memory cache for tests.
+     *
+     * @return void
      */
     private function configureMemoryCache(): void
     {
         Config::set('cache.default', 'array');
     }
 
+    /**
+     * Get package service providers.
+     *
+     * @param \Illuminate\Foundation\Application $app
+     * @return array<class-string>
+     */
     protected function getPackageProviders($app): array
     {
         return [
@@ -55,6 +74,12 @@ abstract class TestCase extends Orchestra
         ];
     }
 
+    /**
+     * Configure test environment.
+     *
+     * @param \Illuminate\Foundation\Application $app
+     * @return void
+     */
     protected function getEnvironmentSetUp($app): void
     {
         $app['config']->set('database.default', 'testing');

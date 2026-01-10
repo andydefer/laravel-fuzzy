@@ -1,37 +1,43 @@
 # Pint Formatting Test Report
-*Generated: ven. 09 janv. 2026 17:28:16 WAT*
+*Generated: sam. 10 janv. 2026 01:33:04 WAT*
 
 
-  ⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯...⨯⨯⨯.⨯⨯.⨯⨯⨯⨯...⨯⨯⨯⨯⨯..⨯.
+  ⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯.⨯⨯⨯⨯⨯⨯⨯
 
   ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── Laravel  
-    FAIL   ................................................................................................................................................. 39 files, 28 style issues  
+    FAIL   ................................................................................................................................................. 35 files, 34 style issues  
+  ⨯ database/migrations/2024_01_01_000000_create_fuzzy_index_table.php                                      class_definition, no_superfluous_phpdoc_tags, braces_position, phpdoc_trim  
   ⨯ rector.php                                                                                                                                                            concat_space  
-  ⨯ src/Commands/ClearIndexCommand.php                                                                                              not_operator_with_successor_space, ordered_imports  
-  ⨯ src/Commands/IndexSearchCommand.php              new_with_parentheses, single_quote, concat_space, not_operator_with_successor_space, blank_line_before_statement, ordered_imports  
-  ⨯ src/Commands/StatsIndexCommand.php                                                                                         function_declaration, not_operator_with_successor_space  
-  ⨯ src/Contracts/MustFuzzySearch.php                                                                                                                                  ordered_imports  
-  ⨯ src/Data/SearchOptionsData.php                                                                                                braces_position, cast_spaces, single_line_empty_body  
-  ⨯ src/FuzzySearchServiceProvider.php                                                                                             new_with_parentheses, concat_space, ordered_imports  
-  ⨯ src/Models/FuzzyIndex.php                                                                                                                                          ordered_imports  
-  ⨯ src/SearchContext.php                                                                              class_attributes_separation, not_operator_with_successor_space, ordered_imports  
-  ⨯ src/Services/FuzzySearchService.php  class_attributes_separation, new_with_parentheses, function_declaration, concat_space, no_unused_imports, not_operator_with_successor_space,…  
-  ⨯ src/Services/SimilarityCalculator.php                                                                                     class_attributes_separation, blank_line_before_statement  
-  ⨯ src/Services/StringNormalizer.php                                                                                   trailing_comma_in_multiline, not_operator_with_successor_space  
-  ⨯ src/Stages/ExactMatchStage.php                                                                                    concat_space, not_operator_with_successor_space, ordered_imports  
-  ⨯ src/Stages/FuzzyMatchStage.php                                                                                    concat_space, not_operator_with_successor_space, ordered_imports  
-  ⨯ src/Stages/MultiWordProcessingStage.php                               class_attributes_separation, not_operator_with_successor_space, blank_line_before_statement, ordered_imports  
-  ⨯ src/Stages/NonConsecutivePenaltyStage.php                                                          class_attributes_separation, not_operator_with_successor_space, ordered_imports  
-  ⨯ src/Stages/NormalizeQueryStage.php                                                                                                                                 ordered_imports  
-  ⨯ src/Stages/ScoreAggregationStage.php                                                                               no_unused_imports, blank_line_before_statement, ordered_imports  
-  ⨯ src/Stages/SimilarityBonusStage.php                     class_attributes_separation, concat_space, not_operator_with_successor_space, blank_line_before_statement, ordered_imports  
-  ⨯ src/Stages/SortAndLimitStage.php                                                                                                                                   ordered_imports  
-  ⨯ src/Stages/WordMatchStage.php                                                                                                                        concat_space, ordered_imports  
-  ⨯ src/Traits/FuzzySearchable.php                                                                                                                                   no_unused_imports  
+  ⨯ src/Commands/ClearIndexCommand.php                                                        no_superfluous_phpdoc_tags, phpdoc_trim, not_operator_with_successor_space, phpdoc_align  
+  ⨯ src/Commands/IndexSearchCommand.php new_with_parentheses, function_declaration, single_quote, no_superfluous_phpdoc_tags, concat_space, phpdoc_trim, not_operator_with_successor_…  
+  ⨯ src/Commands/StatsIndexCommand.php                                                      function_declaration, no_superfluous_phpdoc_tags, phpdoc_trim, blank_line_before_statement  
+  ⨯ src/Contracts/MustFuzzySearch.php                                                                           no_superfluous_phpdoc_tags, phpdoc_trim, ordered_imports, phpdoc_align  
+  ⨯ src/Data/FuzzySearchableData.php                                                                 no_superfluous_phpdoc_tags, braces_position, single_line_empty_body, phpdoc_align  
+  ⨯ src/Data/IndexConfigData.php                                                                                                 braces_position, single_line_empty_body, phpdoc_align  
+  ⨯ src/Data/SearchOptionsData.php                                                                   no_superfluous_phpdoc_tags, braces_position, single_line_empty_body, phpdoc_align  
+  ⨯ src/Data/SearchResultData.php                                                                                                braces_position, single_line_empty_body, phpdoc_align  
+  ⨯ src/Exceptions/FuzzySearchException.php                                                                                                   no_superfluous_phpdoc_tags, phpdoc_align  
+  ⨯ src/Exceptions/ModelNotSearchableException.php                                                                                                                        phpdoc_align  
+  ⨯ src/FuzzySearch.php                                                                                                       no_superfluous_phpdoc_tags, phpdoc_trim, ordered_imports  
+  ⨯ src/FuzzySearchServiceProvider.php                                                    new_with_parentheses, no_superfluous_phpdoc_tags, concat_space, phpdoc_trim, ordered_imports  
+  ⨯ src/Models/FuzzyIndex.php                                                                                   no_superfluous_phpdoc_tags, phpdoc_trim, ordered_imports, phpdoc_align  
+  ⨯ src/SearchContext.php                                                                class_attributes_separation, not_operator_with_successor_space, ordered_imports, phpdoc_align  
+  ⨯ src/Services/FuzzySearchService.php new_with_parentheses, function_declaration, no_superfluous_phpdoc_tags, concat_space, phpdoc_separation, phpdoc_trim, not_operator_with_succe…  
+  ⨯ src/Services/IndexBuilder.php                                                                    no_superfluous_phpdoc_tags, braces_position, single_line_empty_body, phpdoc_align  
+  ⨯ src/Services/SimilarityCalculator.php                                                                       class_attributes_separation, blank_line_before_statement, phpdoc_align  
+  ⨯ src/Services/StringNormalizer.php                                                                            function_declaration, not_operator_with_successor_space, phpdoc_align  
+  ⨯ src/Stages/ExactMatchStage.php                                          no_superfluous_phpdoc_tags, concat_space, not_operator_with_successor_space, ordered_imports, phpdoc_align  
+  ⨯ src/Stages/FuzzyMatchStage.php                                          no_superfluous_phpdoc_tags, concat_space, not_operator_with_successor_space, ordered_imports, phpdoc_align  
+  ⨯ src/Stages/MultiWordProcessingStage.php class_attributes_separation, no_superfluous_phpdoc_tags, not_operator_with_successor_space, blank_line_before_statement, ordered_imports,…  
+  ⨯ src/Stages/NormalizeQueryStage.php                                                                                                                   ordered_imports, phpdoc_align  
+  ⨯ src/Stages/ScoreAggregationStage.php                                                                 no_unused_imports, blank_line_before_statement, ordered_imports, phpdoc_align  
+  ⨯ src/Stages/SortAndLimitStage.php                                                                            function_declaration, no_unused_imports, ordered_imports, phpdoc_align  
+  ⨯ src/Stages/WordMatchStage.php                                                                                       concat_space, no_unused_imports, ordered_imports, phpdoc_align  
+  ⨯ src/Traits/FuzzySearchable.php                                                                            no_superfluous_phpdoc_tags, phpdoc_trim, no_unused_imports, phpdoc_align  
   ⨯ tests/Fixtures/Product.php                                                                                                                                         ordered_imports  
-  ⨯ tests/Fixtures/User.php                                                                                                                                            ordered_imports  
-  ⨯ tests/TestCase.php                                                                                                      class_attributes_separation, concat_space, ordered_imports  
-  ⨯ tests/Unit/FuzzySearchServiceTest.php                 class_attributes_separation, single_quote, concat_space, trailing_comma_in_multiline, statement_indentation, ordered_imports  
-  ⨯ tests/Unit/Stages/NonConsecutivePenaltyTest.php single_quote, concat_space, trailing_comma_in_multiline, not_operator_with_successor_space, blank_line_before_statement, ordered_…  
-  ⨯ tests/Unit/Stages/SimilarityBonusStageTest.php class_attributes_separation, new_with_parentheses, concat_space, trailing_comma_in_multiline, not_operator_with_successor_space, o…  
+  ⨯ tests/Fixtures/User.php                                                                                     no_superfluous_phpdoc_tags, phpdoc_trim, ordered_imports, phpdoc_align  
+  ⨯ tests/TestCase.php                                                                            no_superfluous_phpdoc_tags, concat_space, phpdoc_trim, ordered_imports, phpdoc_align  
+  ⨯ tests/Unit/FuzzySearchServiceTest.php                                                         no_superfluous_phpdoc_tags, concat_space, phpdoc_trim, ordered_imports, phpdoc_align  
+  ⨯ tests/database/migrations/2024_01_01_000000_create_test_products_table.php                          new_with_parentheses, no_superfluous_phpdoc_tags, braces_position, phpdoc_trim  
+  ⨯ tests/database/migrations/2024_01_01_000000_create_test_users_table.php                             new_with_parentheses, no_superfluous_phpdoc_tags, braces_position, phpdoc_trim  
 

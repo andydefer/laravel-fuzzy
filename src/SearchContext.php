@@ -10,6 +10,13 @@ use Fuzzy\Services\SimilarityCalculator;
 use Fuzzy\Services\IndexBuilder;
 use Illuminate\Support\Collection;
 
+/**
+ * Encapsulates the context and state for a single fuzzy search operation.
+ *
+ * This class holds all the necessary data and services required to perform
+ * a fuzzy search, including normalized query, computed indexes, intermediate
+ * results, and final search outcomes.
+ */
 class SearchContext
 {
     public string $modelClass;
@@ -19,7 +26,6 @@ class SearchContext
     public SimilarityCalculator $similarityCalculator;
     public IndexBuilder $indexBuilder;
     public array $indexData;
-
     public string $normalizedQuery = '';
     public array $queryWords = [];
     public array $wordIndex = [];
@@ -29,6 +35,17 @@ class SearchContext
     public bool $hasMultipleWords = false;
     public Collection $finalResults;
 
+    /**
+     * Initialize a new search context.
+     *
+     * @param string $modelClass The model class being searched
+     * @param string $query The original search query
+     * @param SearchOptionsData $options Configuration options for the search
+     * @param StringNormalizer $normalizer Service to normalize strings
+     * @param SimilarityCalculator $similarityCalculator Service to calculate similarity scores
+     * @param IndexBuilder $indexBuilder Service to build search indexes
+     * @param array $indexData Precomputed search index data
+     */
     public function __construct(
         string $modelClass,
         string $query,
@@ -51,7 +68,10 @@ class SearchContext
     }
 
     /**
-     * Get model instance from item map
+     * Retrieve a model instance from the item map by its key.
+     *
+     * @param string $key The unique identifier for the indexed item
+     * @return object|null The retrieved model instance or null if not found
      */
     public function getModelInstance(string $key): ?object
     {
