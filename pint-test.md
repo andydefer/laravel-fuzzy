@@ -1,5 +1,5 @@
 # Pint Formatting Test Report
-*Generated: sam. 10 janv. 2026 01:33:04 WAT*
+*Generated: sam. 10 janv. 2026 17:41:51 WAT*
 
 
   ⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯.⨯⨯⨯⨯⨯⨯⨯
@@ -11,11 +11,11 @@
   ⨯ src/Commands/ClearIndexCommand.php                                                        no_superfluous_phpdoc_tags, phpdoc_trim, not_operator_with_successor_space, phpdoc_align  
   ⨯ src/Commands/IndexSearchCommand.php new_with_parentheses, function_declaration, single_quote, no_superfluous_phpdoc_tags, concat_space, phpdoc_trim, not_operator_with_successor_…  
   ⨯ src/Commands/StatsIndexCommand.php                                                      function_declaration, no_superfluous_phpdoc_tags, phpdoc_trim, blank_line_before_statement  
-  ⨯ src/Contracts/MustFuzzySearch.php                                                                           no_superfluous_phpdoc_tags, phpdoc_trim, ordered_imports, phpdoc_align  
+  ⨯ src/Contracts/MustFuzzySearch.php                                                                                                                                     phpdoc_align  
   ⨯ src/Data/FuzzySearchableData.php                                                                 no_superfluous_phpdoc_tags, braces_position, single_line_empty_body, phpdoc_align  
   ⨯ src/Data/IndexConfigData.php                                                                                                 braces_position, single_line_empty_body, phpdoc_align  
   ⨯ src/Data/SearchOptionsData.php                                                                   no_superfluous_phpdoc_tags, braces_position, single_line_empty_body, phpdoc_align  
-  ⨯ src/Data/SearchResultData.php                                                                                                braces_position, single_line_empty_body, phpdoc_align  
+  ⨯ src/Data/SearchResultData.php                                                             braces_position, not_operator_with_successor_space, single_line_empty_body, phpdoc_align  
   ⨯ src/Exceptions/FuzzySearchException.php                                                                                                   no_superfluous_phpdoc_tags, phpdoc_align  
   ⨯ src/Exceptions/ModelNotSearchableException.php                                                                                                                        phpdoc_align  
   ⨯ src/FuzzySearch.php                                                                                                       no_superfluous_phpdoc_tags, phpdoc_trim, ordered_imports  

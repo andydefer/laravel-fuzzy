@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Fuzzy\Traits;
 
 use Fuzzy\Contracts\MustFuzzySearch;
-use Fuzzy\Data\FuzzySearchableData;
 use Illuminate\Support\Collection;
 
 /**
@@ -81,16 +80,6 @@ trait FuzzySearchable
     }
 
     /**
-     * Get the display name for search results.
-     *
-     * @return string
-     */
-    public function getSearchableName(): string
-    {
-        return $this->getAttribute('name') ?? class_basename($this);
-    }
-
-    /**
      * Get the identifier used for indexing.
      *
      * @return string|int
@@ -108,31 +97,6 @@ trait FuzzySearchable
     public function getSearchableType(): string
     {
         return class_basename($this);
-    }
-
-    /**
-     * Convert the model to searchable data.
-     *
-     * Uses a custom format class if specified, otherwise creates a standard
-     * FuzzySearchableData instance.
-     *
-     * @return FuzzySearchableData|null
-     */
-    public function toSearchableData(): ?FuzzySearchableData
-    {
-        $formatClass = $this->getFuzzyFormat();
-
-        if ($formatClass && class_exists($formatClass)) {
-            return $formatClass::from($this);
-        }
-
-        return FuzzySearchableData::from([
-            'id' => $this->getIndexableId(),
-            'name' => $this->getSearchableName(),
-            'type' => $this->getSearchableType(),
-            'model' => $this,
-            'data' => $this->toArray(),
-        ]);
     }
 
     /**

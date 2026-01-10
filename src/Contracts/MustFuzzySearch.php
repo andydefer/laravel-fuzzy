@@ -5,67 +5,58 @@ declare(strict_types=1);
 namespace Fuzzy\Contracts;
 
 use Illuminate\Database\Eloquent\Model;
-use Fuzzy\Data\FuzzySearchableData;
 
+/**
+ * Interface defining the contract for models that support fuzzy search indexing.
+ *
+ * Models implementing this interface can be indexed and searched
+ * through the package's fuzzy search system.
+ */
 interface MustFuzzySearch
 {
     /**
-     * Get the searchable fields configuration for the model.
+     * Get the list of model fields that should be indexed for search.
      *
-     * Should return an array where keys are field names and values are their weights.
-     * Example: ['name', 'description']
-     *
-     * @return array
+     * @return array<string> The model attribute names to be indexed.
      */
     public function getSearchableFields(): array;
 
     /**
-     * Get the output formatter class for custom search result formatting.
+     * Specify a custom formatting class to transform the model during indexing.
      *
-     * @return class-string|null The fully qualified class name of the formatter,
-     *                           or null to use default formatting.
+     * The returned class must implement a static `fromModel($model)` method.
+     * If null is returned, the default formatting will be used.
+     *
+     * @return class-string|null The FQCN of the formatting class or null.
      */
     public function getFuzzyFormat(): ?string;
 
     /**
-     * Get the display name for this model in search results.
+     * Get the unique identifier used for model indexing.
      *
-     * @return string The human-readable name to display in search results.
-     */
-    public function getSearchableName(): string;
-
-    /**
-     * Get the unique identifier for this model used in indexing.
-     *
-     * @return string|int The model's unique identifier (typically primary key).
+     * @return string|int The unique identifier (typically the primary key).
      */
     public function getIndexableId(): string|int;
 
     /**
-     * Get the model's type/category for grouping and filtering search results.
+     * Get the model type/category for indexing purposes.
      *
-     * @return string The model type (e.g., 'user', 'product', 'article').
+     * This type is used to group search results by model.
+     * Typically the table name or a business identifier.
+     *
+     * @return string The type of the indexable item.
      */
     public function getSearchableType(): string;
 
     /**
-     * Determine if this specific model instance should be indexed.
+     * Determine whether the model should be included in the search index.
      *
-     * Useful for excluding soft-deleted, draft, or unpublished models.
+     * Allows dynamic exclusion of certain models from indexing
+     * (e.g., inactive models, drafts, archived items).
      *
      * @return bool True if the model should be indexed, false otherwise.
      */
     public function shouldBeIndexed(): bool;
-
-    /**
-     * Convert the model to searchable data for custom transformation.
-     *
-     * Allows models to provide custom data transformation before indexing.
-     * Return null to use default transformation.
-     *
-     * @return FuzzySearchableData|null Custom searchable data or null for default.
-     */
-    public function toSearchableData(): ?FuzzySearchableData;
 
     /**
      * Get a model attribute value.
