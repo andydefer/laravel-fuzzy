@@ -13,6 +13,7 @@ use Fuzzy\Tests\Fixtures\Product;
 use Illuminate\Support\Collection;
 use Fuzzy\Data\SearchResultData;
 use Fuzzy\Models\FuzzyIndex;
+use Fuzzy\Tests\Fixtures\UserSearchData;
 
 /**
  * Unit tests for FuzzySearchService.
@@ -158,7 +159,7 @@ class FuzzySearchServiceTest extends TestCase
         // Assert: Should find John Doe as a User
         $johnDoeResult = $this->findResultByName($results, 'John Doe');
         $this->assertNotNull($johnDoeResult);
-        $this->assertEquals(User::class, get_class($johnDoeResult->item));
+        $this->assertEquals(UserSearchData::class, get_class($johnDoeResult->item));
     }
 
     /**

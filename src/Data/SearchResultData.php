@@ -27,7 +27,11 @@ class SearchResultData extends Data
         public string $modelType,
         public ?string $matchedField = null,
         public ?string $matchedValue = null,
-    ) {}
+    ) {
+        if ($this->attemptCustomFormatting()) {
+            $this->item = $this->attemptCustomFormatting();
+        }
+    }
 
     /**
      * Convert the search result to a standardized array format for API responses.

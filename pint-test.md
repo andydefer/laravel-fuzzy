@@ -1,5 +1,5 @@
 # Pint Formatting Test Report
-*Generated: sam. 10 janv. 2026 17:41:51 WAT*
+*Generated: sam. 10 janv. 2026 18:03:44 WAT*
 
 
   ⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯.⨯⨯⨯⨯⨯⨯⨯
@@ -15,7 +15,7 @@
   ⨯ src/Data/FuzzySearchableData.php                                                                 no_superfluous_phpdoc_tags, braces_position, single_line_empty_body, phpdoc_align  
   ⨯ src/Data/IndexConfigData.php                                                                                                 braces_position, single_line_empty_body, phpdoc_align  
   ⨯ src/Data/SearchOptionsData.php                                                                   no_superfluous_phpdoc_tags, braces_position, single_line_empty_body, phpdoc_align  
-  ⨯ src/Data/SearchResultData.php                                                             braces_position, not_operator_with_successor_space, single_line_empty_body, phpdoc_align  
+  ⨯ src/Data/SearchResultData.php                                                                                                      not_operator_with_successor_space, phpdoc_align  
   ⨯ src/Exceptions/FuzzySearchException.php                                                                                                   no_superfluous_phpdoc_tags, phpdoc_align  
   ⨯ src/Exceptions/ModelNotSearchableException.php                                                                                                                        phpdoc_align  
   ⨯ src/FuzzySearch.php                                                                                                       no_superfluous_phpdoc_tags, phpdoc_trim, ordered_imports  
