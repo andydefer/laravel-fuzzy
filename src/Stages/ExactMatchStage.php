@@ -135,7 +135,7 @@ class ExactMatchStage
 
             $context->results[$resultKey] = new SearchResultData(
                 item: $model,
-                score: $score,
+                score: round($score, 2),
                 modelType: $match['indexable_type'],
                 matchedField: $match['field'],
                 matchedValue: $match['original_value']

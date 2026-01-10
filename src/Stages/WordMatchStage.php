@@ -76,7 +76,7 @@ class WordMatchStage
         if ($model) {
             $context->results[$resultKey] = new SearchResultData(
                 item: $model,
-                score: $exactMatchScore,
+                score: round($exactMatchScore, 2),
                 modelType: $match['indexable_type'],
                 matchedField: $match['field'],
                 matchedValue: $match['original_value']
