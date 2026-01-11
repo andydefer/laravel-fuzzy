@@ -2,10 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Fuzzy\Services\Scoring;
+namespace Fuzzy\Services\Scoring\ScoringStrategies;
 
 use Fuzzy\SearchContext;
 use Fuzzy\Services\AdvancedScoringCalculator;
+use Fuzzy\Services\Scoring\ScoringStrategy;
 
 class ExactMatchStrategy implements ScoringStrategy
 {

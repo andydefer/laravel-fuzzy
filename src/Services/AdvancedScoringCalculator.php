@@ -6,6 +6,10 @@ namespace Fuzzy\Services;
 
 use Fuzzy\SearchContext;
 
+/**
+ * Calculateur de scoring avancé pour les bonus/penalties.
+ * Maintenant utilisé uniquement par les stratégies de scoring.
+ */
 class AdvancedScoringCalculator
 {
     private const CONSECUTIVE_BONUS = [
@@ -16,7 +20,7 @@ class AdvancedScoringCalculator
     ];
 
     /**
-     * Calcule le score final avec tous les bonus/penalties
+     * Calcule le score final avec tous les bonus/penalties.
      */
     public function calculateFinalScore(
         float $baseScore,
@@ -48,62 +52,6 @@ class AdvancedScoringCalculator
         return min(max($score, 0.0), 1.0);
     }
 
-    /**
-     * Score spécialisé pour les requêtes multi-mots
-     */
-    public function calculateMultiWordScore(array $indexEntries, SearchContext $context): float
-    {
-        if (empty($indexEntries) || !$context->hasMultipleWords()) {
-            return 0.0;
-        }
-
-        $queryWords = $context->getQueryWords();
-        $wordScores = [];
-
-        foreach ($queryWords as $queryWord) {
-            $bestWordScore = 0.0;
-
-            foreach ($indexEntries as $indexEntry) {
-                foreach ($indexEntry['normalized_words'] as $targetWord) {
-                    $similarity = $context->similarityCalculator->calculateWordSimilarity(
-                        $queryWord,
-                        (string) $targetWord
-                    );
-
-                    if ($similarity >= $context->options->threshold) {
-                        if ($this->isCrossWordMatch($queryWord, (string) $targetWord)) {
-                            $similarity *= 0.7; // -30% pénalité
-                        }
-
-                        $bestWordScore = max($bestWordScore, $similarity);
-                    }
-                }
-            }
-
-            if ($bestWordScore > 0) {
-                $wordScores[] = $bestWordScore;
-            }
-        }
-
-        if (empty($wordScores)) {
-            return 0.0;
-        }
-
-        // Score moyen avec bonus de couverture
-        $averageScore = array_sum($wordScores) / count($wordScores);
-        $coverage = count($wordScores) / count($queryWords);
-        $coverageBonus = $this->calculateCoverageBonus($coverage);
-
-        $finalScore = $averageScore * (1 + $coverage) + $coverageBonus;
-
-        // Appliquer la pondération du champ
-        $firstEntry = reset($indexEntries);
-        $finalScore = $this->applyFieldWeighting($finalScore, $firstEntry);
-
-        return min(max($finalScore, 0.0), 1.0);
-    }
-
-    // ... [garder toutes les méthodes privées existantes] ...
     private function applyFieldWeighting(float $score, array $match): float
     {
         $fieldWeights = config('fuzzy.scoring.field_weights', [
@@ -156,8 +104,13 @@ class AdvancedScoringCalculator
         $wordLength = strlen((string) $firstWord);
         $relativePosition = $position / max(1, $textLength - $wordLength);
 
-        if ($relativePosition < 0.2) return $score * 1.2;
-        if ($relativePosition < 0.4) return $score * 1.1;
+        if ($relativePosition < 0.2) {
+            return $score * (1 + config('fuzzy.scoring.bonuses.early_position', 0.2));
+        }
+
+        if ($relativePosition < 0.4) {
+            return $score * 1.1;
+        }
 
         return $score;
     }
@@ -176,28 +129,8 @@ class AdvancedScoringCalculator
 
     private function applyCoverageBonus(float $score, SearchContext $context, array $match): float
     {
-        // Cette méthode peut être appelée si besoin spécifique
+        // Implémentation spécifique si nécessaire
         return $score;
-    }
-
-    private function calculateCoverageBonus(float $coverage): float
-    {
-        if ($coverage === 1.0) return 0.3;
-        if ($coverage >= 0.75) return 0.15;
-        return 0.0;
-    }
-
-    private function isCrossWordMatch(string $queryWord, string $targetWord): bool
-    {
-        if (abs(strlen($queryWord) - strlen($targetWord)) > 3) return true;
-        if (str_contains($targetWord, $queryWord) || str_contains($queryWord, $targetWord)) {
-            return false;
-        }
-
-        $lcsLength = $this->findLongestCommonSubstring($queryWord, $targetWord);
-        $minLength = min(strlen($queryWord), strlen($targetWord));
-
-        return ($lcsLength / $minLength) < 0.5;
     }
 
     private function findLongestCommonSubstring(string $str1, string $str2): int

@@ -16,6 +16,14 @@ return [
         ],
     ],
 
+    'pipeline' => [ // NOUVEAU : configuration du pipeline
+        'stages' => [
+            \Fuzzy\Stages\NormalizeQueryStage::class,
+            \Fuzzy\Stages\MatchDiscoveryStage::class,
+            \Fuzzy\Stages\ScoringStage::class,
+            \Fuzzy\Stages\SortAndLimitStage::class,
+        ],
+    ],
 
     'stop_words' => [
         'the',
@@ -119,11 +127,11 @@ return [
             'cross_word_match_multi' => 0.3,
         ],
         'bonuses' => [
-            'full_coverage' => 0.3,      // ✅ BONUS COUVERTURE 100%
-            'high_coverage' => 0.15,     // ✅ BONUS COUVERTURE ≥75%
-            'early_position' => 0.2,     // ✅ BONUS POSITION DÉBUT TEXTE
+            'full_coverage' => 0.3,
+            'high_coverage' => 0.15,
+            'early_position' => 0.2,
         ],
-        'consecutive_bonus' => [         // ✅ BONUS CARACTÈRES CONSÉCUTIFS
+        'consecutive_bonus' => [
             2 => 1.05,
             3 => 1.15,
             4 => 1.30,

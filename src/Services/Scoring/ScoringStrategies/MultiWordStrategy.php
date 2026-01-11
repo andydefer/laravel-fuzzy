@@ -2,10 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Fuzzy\Services\Scoring;
+namespace Fuzzy\Services\Scoring\ScoringStrategies;
 
 use Fuzzy\SearchContext;
 use Fuzzy\Services\AdvancedScoringCalculator;
+use Fuzzy\Services\Scoring\ScoringStrategy;
 
 class MultiWordStrategy implements ScoringStrategy
 {
@@ -20,8 +21,9 @@ class MultiWordStrategy implements ScoringStrategy
 
     public function calculate(SearchContext $context, array $indexEntry): float
     {
-        // Utilise directement la méthode multi-mots du calculator
-        return $this->advancedCalculator->calculateMultiWordScore([$indexEntry], $context);
+        // Cette stratégie délègue au ScoringEngine pour le calcul multi-mots
+        // car il nécessite plusieurs entrées d'index
+        return 0.0; // Le ScoringEngine gère le multi-mots différemment
     }
 
     public function getPriority(): int

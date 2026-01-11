@@ -12,11 +12,8 @@ use Fuzzy\Services\IndexBuilder;
 use Fuzzy\Services\SimilarityCalculator;
 use Fuzzy\Services\StringNormalizer;
 use Fuzzy\Services\AdvancedScoringCalculator;
-use Fuzzy\Services\Scoring\UnifiedScoringOrchestrator;
-use Fuzzy\Services\Scoring\ExactMatchStrategy;
-use Fuzzy\Services\Scoring\WordMatchStrategy;
-use Fuzzy\Services\Scoring\FuzzyMatchStrategy;
-use Fuzzy\Services\Scoring\MultiWordStrategy;
+use Fuzzy\Services\Scoring\ScoringEngine;
+use Fuzzy\Services\Scoring\ScoringStrategies;
 use Fuzzy\Repositories\IndexRepository;
 use Fuzzy\Contracts\IndexRepositoryInterface;
 use Illuminate\Pipeline\Pipeline;
@@ -37,35 +34,32 @@ class FuzzySearchServiceProvider extends ServiceProvider
     {
         $this->app->singleton(
             'laravel-fuzzy.normalizer',
-            fn($app): StringNormalizer =>
-            new StringNormalizer()
+            fn($app): StringNormalizer => new StringNormalizer()
         );
 
         $this->app->singleton(
             'laravel-fuzzy.similarity',
-            fn($app): SimilarityCalculator =>
-            new SimilarityCalculator()
+            fn($app): SimilarityCalculator => new SimilarityCalculator()
         );
 
         $this->app->singleton(
             'laravel-fuzzy.index-builder',
-            fn($app): IndexBuilder =>
-            new IndexBuilder($app->make('laravel-fuzzy.normalizer'))
+            fn($app): IndexBuilder => new IndexBuilder($app->make('laravel-fuzzy.normalizer'))
         );
 
         $this->app->singleton(
-            'laravel-fuzzy.advanced-scoring',
-            fn($app): AdvancedScoringCalculator =>
-            new AdvancedScoringCalculator()
+            AdvancedScoringCalculator::class,
+            fn($app): AdvancedScoringCalculator => new AdvancedScoringCalculator()
         );
+
+        $this->app->alias(AdvancedScoringCalculator::class, 'laravel-fuzzy.advanced-scoring');
     }
 
     private function registerRepository(): void
     {
         $this->app->singleton(
             IndexRepositoryInterface::class,
-            fn($app): IndexRepository =>
-            new IndexRepository()
+            fn($app): IndexRepository => new IndexRepository()
         );
 
         $this->app->alias(IndexRepositoryInterface::class, 'laravel-fuzzy.repository');
@@ -79,7 +73,8 @@ class FuzzySearchServiceProvider extends ServiceProvider
                 normalizer: $app->make('laravel-fuzzy.normalizer'),
                 similarityCalculator: $app->make('laravel-fuzzy.similarity'),
                 indexBuilder: $app->make('laravel-fuzzy.index-builder'),
-                indexRepository: $app->make(IndexRepositoryInterface::class)
+                indexRepository: $app->make(IndexRepositoryInterface::class),
+                scoringEngine: $app->make(ScoringEngine::class)
             );
         });
 
@@ -88,17 +83,19 @@ class FuzzySearchServiceProvider extends ServiceProvider
 
     private function registerScoringSystem(): void
     {
-        // AdvancedScoringCalculator (cœur des calculs)
-        $this->app->singleton(AdvancedScoringCalculator::class, function ($app) {
-            return new AdvancedScoringCalculator();
-        });
+        // Scoring Engine unifié
+        $this->app->singleton(ScoringEngine::class, function ($app) {
+            $advancedCalculator = $app->make(AdvancedScoringCalculator::class);
 
-        // UnifiedScoringOrchestrator (orchestration intelligente)
-        $this->app->singleton(UnifiedScoringOrchestrator::class, function ($app) {
-            return new UnifiedScoringOrchestrator(
-                $app->make(AdvancedScoringCalculator::class)
+            return new ScoringEngine(
+                new ScoringStrategies\ExactMatchStrategy($advancedCalculator),
+                new ScoringStrategies\WordMatchStrategy($advancedCalculator),
+                new ScoringStrategies\FuzzyMatchStrategy($advancedCalculator),
+                new ScoringStrategies\MultiWordStrategy($advancedCalculator)
             );
         });
+
+        $this->app->alias(ScoringEngine::class, 'laravel-fuzzy.scoring');
     }
 
     public function boot(): void
@@ -138,8 +135,10 @@ class FuzzySearchServiceProvider extends ServiceProvider
             'laravel-fuzzy.normalizer',
             'laravel-fuzzy.similarity',
             'laravel-fuzzy.index-builder',
+            'laravel-fuzzy.advanced-scoring',
+            'laravel-fuzzy.scoring',
             IndexRepositoryInterface::class,
-            UnifiedScoringOrchestrator::class,
+            ScoringEngine::class,
             AdvancedScoringCalculator::class,
         ];
     }

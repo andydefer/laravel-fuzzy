@@ -178,6 +178,7 @@ class FuzzySearchServiceTest extends TestCase
         ];
 
         // Act: Search with custom options
+        /** @var Collection<int, SearchResultData> $results  */
         $results = $this->service->search('laptop', $options);
 
         // Assert: Results should respect options
@@ -292,6 +293,7 @@ class FuzzySearchServiceTest extends TestCase
         config(['fuzzy.default_options.min_score' => 0.8]);
 
         // Act: Search with configured minimum score
+        /** @var Collection<int, SearchResultData> $results  */
         $results = $this->service->search('laptop');
 
         // Assert: All results should meet minimum score
@@ -313,6 +315,7 @@ class FuzzySearchServiceTest extends TestCase
         config(['fuzzy.default_options.min_score' => 0.1]);
 
         // Act: Search with high minimum score override
+        /** @var Collection<int, SearchResultData> $results  */
         $results = $this->service->search('laptop', ['min_score' => 0.9]);
 
         // Assert: All results should meet overridden score
@@ -379,6 +382,7 @@ class FuzzySearchServiceTest extends TestCase
         // Arrange: Service is ready
 
         // Act: Search in User model with high minimum score
+        /** @var Collection<int, SearchResultData> $results  */
         $results = $this->service->searchInModel(
             User::class,
             'joh',
@@ -403,6 +407,7 @@ class FuzzySearchServiceTest extends TestCase
         // Arrange: Service is ready
 
         // Act: Search with multi-word query
+        /** @var Collection<int, SearchResultData> $results  */
         $results = $this->service->search('high end laptop', [
             'min_score' => 0.6,
             'fuzzy' => true,
@@ -460,6 +465,7 @@ class FuzzySearchServiceTest extends TestCase
         $this->service->reindexModel(User::class);
 
         // Act: Search with limits and minimum score
+        /** @var Collection<int, SearchResultData> $results  */
         $results = $this->service->search('test', [
             'min_score' => 0.3,
             'max_results' => 5,
@@ -499,6 +505,7 @@ class FuzzySearchServiceTest extends TestCase
         $this->assertEquals(2.0, $options3->minScore);
 
         // Act: Search with minimum score above 1.0
+        /** @var Collection<int, SearchResultData> $results  */
         $results = $this->service->search('john', ['min_score' => 2.0]);
 
         // Assert: All results should meet the unrealistic score

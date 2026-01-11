@@ -10,6 +10,7 @@ use Fuzzy\Data\SearchOptionsData;
 use Fuzzy\Services\StringNormalizer;
 use Fuzzy\Services\SimilarityCalculator;
 use Fuzzy\Services\IndexBuilder;
+use Fuzzy\Services\Scoring\ScoringEngine;
 use Fuzzy\Contracts\IndexRepositoryInterface;
 use Illuminate\Support\Collection;
 
@@ -21,6 +22,7 @@ class SearchContext
     public SearchQuery $query;
     public IndexData $indexData;
     public Collection $finalResults;
+    public array $potentialMatches = []; // NOUVEAU : matches bruts avant scoring
     public array $results = [];
     public array $seen = [];
     public array $preloadedModels = [];
@@ -32,6 +34,7 @@ class SearchContext
         public SimilarityCalculator $similarityCalculator,
         public IndexBuilder $indexBuilder,
         public IndexRepositoryInterface $indexRepository,
+        public ScoringEngine $scoringEngine, // AJOUTÉ
         array $indexDataArray
     ) {
         $this->query = $query;
@@ -117,6 +120,14 @@ class SearchContext
     }
 
     /**
+     * Get model index.
+     */
+    public function getModelIndex(): array
+    {
+        return $this->indexData->getModelIndex();
+    }
+
+    /**
      * Get index entries for a model.
      */
     public function getIndexEntriesForModel(string $modelType, $modelId): array
@@ -130,5 +141,47 @@ class SearchContext
     public function getModelClass(): string
     {
         return $this->indexData->getModelClass();
+    }
+
+    /**
+     * Add a potential match (before scoring).
+     * NOUVEAU : Méthode pour ajouter des matches bruts
+     */
+    public function addPotentialMatch(array $match): void
+    {
+        $key = $match['indexable_type'] . '_' . $match['indexable_id'];
+
+        if (!isset($this->potentialMatches[$key])) {
+            $this->potentialMatches[$key] = [];
+        }
+
+        $this->potentialMatches[$key][] = $match;
+    }
+
+    /**
+     * Get all potential matches for a model.
+     * NOUVEAU : Méthode pour récupérer les matches bruts
+     */
+    public function getPotentialMatchesForModel(string $key): array
+    {
+        return $this->potentialMatches[$key] ?? [];
+    }
+
+    /**
+     * Get all potential matches.
+     * NOUVEAU : Méthode pour récupérer tous les matches bruts
+     */
+    public function getAllPotentialMatches(): array
+    {
+        return $this->potentialMatches;
+    }
+
+    /**
+     * Check if a model has potential matches.
+     * NOUVEAU : Méthode utilitaire
+     */
+    public function hasPotentialMatches(string $key): bool
+    {
+        return !empty($this->potentialMatches[$key]);
     }
 }
