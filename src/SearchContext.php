@@ -8,6 +8,7 @@ use Fuzzy\Data\SearchOptionsData;
 use Fuzzy\Services\StringNormalizer;
 use Fuzzy\Services\SimilarityCalculator;
 use Fuzzy\Services\IndexBuilder;
+use Fuzzy\Contracts\IndexRepositoryInterface;
 use Illuminate\Support\Collection;
 
 /**
@@ -25,6 +26,7 @@ class SearchContext
     public StringNormalizer $normalizer;
     public SimilarityCalculator $similarityCalculator;
     public IndexBuilder $indexBuilder;
+    public IndexRepositoryInterface $indexRepository;
     public array $indexData;
     public string $normalizedQuery = '';
     public array $queryWords = [];
@@ -34,17 +36,10 @@ class SearchContext
     public array $seen = [];
     public bool $hasMultipleWords = false;
     public Collection $finalResults;
+    public array $preloadedModels = [];
 
     /**
      * Initialize a new search context.
-     *
-     * @param string $modelClass The model class being searched
-     * @param string $query The original search query
-     * @param SearchOptionsData $options Configuration options for the search
-     * @param StringNormalizer $normalizer Service to normalize strings
-     * @param SimilarityCalculator $similarityCalculator Service to calculate similarity scores
-     * @param IndexBuilder $indexBuilder Service to build search indexes
-     * @param array $indexData Precomputed search index data
      */
     public function __construct(
         string $modelClass,
@@ -53,6 +48,7 @@ class SearchContext
         StringNormalizer $normalizer,
         SimilarityCalculator $similarityCalculator,
         IndexBuilder $indexBuilder,
+        IndexRepositoryInterface $indexRepository,
         array $indexData
     ) {
         $this->modelClass = $modelClass;
@@ -61,28 +57,50 @@ class SearchContext
         $this->normalizer = $normalizer;
         $this->similarityCalculator = $similarityCalculator;
         $this->indexBuilder = $indexBuilder;
+        $this->indexRepository = $indexRepository;
         $this->indexData = $indexData;
         $this->wordIndex = $indexData['wordIndex'] ?? [];
         $this->itemMap = $indexData['itemMap'] ?? [];
         $this->finalResults = collect();
+
+        // Précharger les modèles pour éviter N+1
+        $this->preloadModels();
     }
 
     /**
-     * Retrieve a model instance from the item map by its key.
-     *
-     * @param string $key The unique identifier for the indexed item
-     * @return object|null The retrieved model instance or null if not found
+     * Précharger tous les modèles nécessaires.
+     */
+    private function preloadModels(): void
+    {
+        if (empty($this->itemMap)) {
+            return;
+        }
+
+        $this->indexRepository->preloadModels($this);
+        $this->preloadedModels = $this->indexRepository->getPreloadedModelsMap();
+    }
+
+    /**
+     * Retrieve a model instance from the preloaded models.
      */
     public function getModelInstance(string $key): ?object
     {
-        if (!isset($this->itemMap[$key])) {
+        if (!isset($this->preloadedModels[$key])) {
             return null;
         }
 
-        $item = $this->itemMap[$key];
-        $modelClass = $item['indexable_type'] ?? $this->modelClass;
-        $modelId = $item['indexable_id'];
+        return $this->preloadedModels[$key];
+    }
 
-        return $modelClass::find($modelId);
+    /**
+     * Get all model IDs from item map.
+     */
+    public function getAllModelIds(): array
+    {
+        $ids = [];
+        foreach ($this->itemMap as $key => $item) {
+            $ids[] = $item['indexable_id'];
+        }
+        return array_unique($ids);
     }
 }

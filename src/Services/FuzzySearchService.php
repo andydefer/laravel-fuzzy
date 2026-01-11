@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Fuzzy\Services;
 
 use Fuzzy\Contracts\MustFuzzySearch;
+use Fuzzy\Contracts\IndexRepositoryInterface;
 use Fuzzy\Data\SearchOptionsData;
 use Fuzzy\Data\SearchResultData;
 use Fuzzy\Exceptions\ModelNotSearchableException;
@@ -46,23 +47,31 @@ class FuzzySearchService
     protected IndexBuilder $indexBuilder;
 
     /**
+     * @var IndexRepositoryInterface Repository for optimized index operations
+     */
+    protected IndexRepositoryInterface $indexRepository;
+
+    /**
      * Create a new fuzzy search service instance.
      *
      * @param Pipeline $pipeline
      * @param StringNormalizer $normalizer
      * @param SimilarityCalculator $similarityCalculator
      * @param IndexBuilder $indexBuilder
+     * @param IndexRepositoryInterface $indexRepository
      */
     public function __construct(
         Pipeline $pipeline,
         StringNormalizer $normalizer,
         SimilarityCalculator $similarityCalculator,
-        IndexBuilder $indexBuilder
+        IndexBuilder $indexBuilder,
+        IndexRepositoryInterface $indexRepository
     ) {
         $this->pipeline = $pipeline;
         $this->normalizer = $normalizer;
         $this->similarityCalculator = $similarityCalculator;
         $this->indexBuilder = $indexBuilder;
+        $this->indexRepository = $indexRepository;
     }
 
     /**
@@ -101,7 +110,9 @@ class FuzzySearchService
         $this->validateModel($modelClass);
 
         $searchOptions = SearchOptionsData::fromConfig($options);
-        $indexData = $this->getIndexDataForModel($modelClass);
+
+        // Utiliser le repository optimisé pour éviter N+1
+        $indexData = $this->indexRepository->getIndexDataForModel($modelClass);
 
         $context = new SearchContext(
             modelClass: $modelClass,
@@ -110,6 +121,7 @@ class FuzzySearchService
             normalizer: $this->normalizer,
             similarityCalculator: $this->similarityCalculator,
             indexBuilder: $this->indexBuilder,
+            indexRepository: $this->indexRepository,
             indexData: $indexData
         );
 
@@ -264,24 +276,13 @@ class FuzzySearchService
     }
 
     /**
-     * Get search index statistics.
+     * Get search index statistics using the optimized repository.
      *
      * @return array Statistics including total entries and per-model counts
      */
     public function getStats(): array
     {
-        $stats = [
-            'total_entries' => FuzzyIndex::count(),
-            'models' => [],
-        ];
-
-        $models = $this->getSearchableModels();
-
-        foreach ($models as $modelClass) {
-            $stats['models'][$modelClass] = $this->getModelStats($modelClass);
-        }
-
-        return $stats;
+        return $this->indexRepository->getStats();
     }
 
     /**
@@ -388,65 +389,6 @@ class FuzzySearchService
     }
 
     /**
-     * Get index data for a specific model from the database.
-     *
-     * @param string $modelClass Model class name
-     * @return array Index data including word index and item map
-     */
-    protected function getIndexDataForModel(string $modelClass): array
-    {
-        /** @var Collection<int, FuzzyIndex> $indexEntries */
-        $indexEntries = FuzzyIndex::forModel($modelClass)->get();
-
-        $wordIndex = [];
-        $itemMap = [];
-
-        foreach ($indexEntries as $entry) {
-            $this->processIndexEntry($entry, $wordIndex, $itemMap);
-        }
-
-        return [
-            'wordIndex' => $wordIndex,
-            'itemMap' => $itemMap,
-        ];
-    }
-
-    /**
-     * Process a single index entry and update word index and item map.
-     *
-     * @param FuzzyIndex $entry Index entry to process
-     * @param array &$wordIndex Reference to word index array
-     * @param array &$itemMap Reference to item map array
-     */
-    private function processIndexEntry(FuzzyIndex $entry, array &$wordIndex, array &$itemMap): void
-    {
-        foreach ($entry->words as $word) {
-            if (strlen($word) >= 2) {
-                if (!isset($wordIndex[$word])) {
-                    $wordIndex[$word] = [];
-                }
-
-                $wordIndex[$word][] = [
-                    'indexable_type' => $entry->indexable_type,
-                    'indexable_id' => $entry->indexable_id,
-                    'field' => $entry->field,
-                    'original_value' => $entry->original_value,
-                    'normalized_words' => $entry->words,
-                    'weight' => $entry->weight,
-                ];
-            }
-        }
-
-        $key = $entry->indexable_type . '_' . $entry->indexable_id;
-        if (!isset($itemMap[$key])) {
-            $itemMap[$key] = [
-                'indexable_type' => $entry->indexable_type,
-                'indexable_id' => $entry->indexable_id,
-            ];
-        }
-    }
-
-    /**
      * Get the pipeline stages for search processing.
      *
      * @return array<string> Array of pipeline stage class names
@@ -458,6 +400,8 @@ class FuzzySearchService
             Stages\ExactMatchStage::class,
             Stages\WordMatchStage::class,
             Stages\FuzzyMatchStage::class,
+            Stages\MultiWordProcessingStage::class,
+            Stages\ScoreAggregationStage::class,
             Stages\SortAndLimitStage::class,
         ];
     }
@@ -475,24 +419,5 @@ class FuzzySearchService
             ->filter(fn($result) => $result !== null && $result->score >= $minScore)
             ->sortByDesc('score')
             ->values();
-    }
-
-    /**
-     * Get statistics for a specific model.
-     *
-     * @param string $modelClass Model class name
-     * @return array Model statistics including count and field distribution
-     */
-    private function getModelStats(string $modelClass): array
-    {
-        return [
-            'count' => FuzzyIndex::forModel($modelClass)->count(),
-            'fields' => FuzzyIndex::forModel($modelClass)
-                ->selectRaw('field, COUNT(*) as count')
-                ->groupBy('field')
-                ->get()
-                ->pluck('count', 'field')
-                ->toArray(),
-        ];
     }
 }

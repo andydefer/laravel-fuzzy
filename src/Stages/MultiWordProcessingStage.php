@@ -11,21 +11,11 @@ use Illuminate\Support\Collection;
 
 /**
  * Pipeline stage for processing multi-word queries.
- *
- * Calculates scores based on word coverage, cross-word matches,
- * and applies penalties for short queries and cross-word matches.
  */
-class MultiWordProcessingStage
+class MultiWordProcessingStage extends BaseScoringStage
 {
-    private const SHORT_QUERY_PENALTY = 0.4;
-    private const CROSS_WORD_MATCH_PENALTY_MULTI = 0.3;
-
     /**
      * Process search context for multi-word queries.
-     *
-     * @param SearchContext $context The search context containing query data and results
-     * @param Closure $next The next pipeline handler
-     * @return mixed Result from the next handler
      */
     public function handle(SearchContext $context, Closure $next)
     {
@@ -35,34 +25,20 @@ class MultiWordProcessingStage
         }
 
         $this->processMultiWordResults($context);
-
         return $next($context);
     }
 
     /**
      * Filter single word results by minimum score.
-     *
-     * @param SearchContext $context The search context
-     * @return void
      */
     private function filterSingleWordResults(SearchContext $context): void
     {
-        $filteredResults = [];
-
-        foreach ($context->results as $key => $result) {
-            if ($this->isValidResult($result, $context->options->minScore)) {
-                $filteredResults[$key] = $result;
-            }
-        }
-
+        $filteredResults = $this->filterResultsByScore($context->results, $context->options->minScore);
         $context->finalResults = new Collection($filteredResults);
     }
 
     /**
      * Process multi-word query results.
-     *
-     * @param SearchContext $context The search context
-     * @return void
      */
     private function processMultiWordResults(SearchContext $context): void
     {
@@ -78,11 +54,10 @@ class MultiWordProcessingStage
                 continue;
             }
 
-            $score = $this->calculateMultiWordScoreForModel(
+            $score = $this->calculateMultiWordScore(
                 $context,
                 $result->modelType,
-                $model->getIndexableId(),
-                $context->queryWords
+                $model->getIndexableId()
             );
 
             if ($score >= $context->options->minScore) {
@@ -95,100 +70,47 @@ class MultiWordProcessingStage
     }
 
     /**
-     * Check if a result is valid.
-     *
-     * @param SearchResultData|null $result The result to check
-     * @param float $minScore Minimum score threshold
-     * @return bool True if valid
+     * Calculate multi-word score for a model.
      */
-    private function isValidResult(?SearchResultData $result, float $minScore = 0.0): bool
-    {
-        return $result !== null && $result->score >= $minScore;
-    }
-
-    /**
-     * Calculate multi-word score for a specific model.
-     *
-     * @param SearchContext $context The search context
-     * @param string $modelType The model type
-     * @param mixed $modelId The model ID
-     * @param array $queryWords Array of query words
-     * @return float Calculated score
-     */
-    private function calculateMultiWordScoreForModel(
+    private function calculateMultiWordScore(
         SearchContext $context,
         string $modelType,
-        $modelId,
-        array $queryWords
+        $modelId
     ): float {
-        $indexEntries = $this->getModelIndexEntries($context, $modelType, $modelId);
+        $indexEntries = $this->getIndexEntriesForModel($context, $modelType, $modelId);
 
         if (empty($indexEntries)) {
             return 0.0;
         }
 
-        return $this->calculateScoreFromIndex($context, $indexEntries, $queryWords);
-    }
-
-    /**
-     * Get all index entries for a specific model.
-     *
-     * @param SearchContext $context The search context
-     * @param string $modelType The model type
-     * @param mixed $modelId The model ID
-     * @return array Array of index entries
-     */
-    private function getModelIndexEntries(SearchContext $context, string $modelType, $modelId): array
-    {
-        $indexEntries = [];
-
-        foreach ($context->wordIndex as $word => $matches) {
-            /** @var array<int, array> $matches */
-            foreach ($matches as $match) {
-                if ($match['indexable_type'] === $modelType && $match['indexable_id'] == $modelId) {
-                    $indexEntries[] = $match;
-                }
-            }
-        }
-
-        return $indexEntries;
+        return $this->calculateScoreFromIndex($context, $indexEntries);
     }
 
     /**
      * Calculate score from index entries.
-     *
-     * @param SearchContext $context The search context
-     * @param array $indexEntries Array of index entries
-     * @param array $queryWords Array of query words
-     * @return float Calculated score
      */
-    private function calculateScoreFromIndex(SearchContext $context, array $indexEntries, array $queryWords): float
+    private function calculateScoreFromIndex(SearchContext $context, array $indexEntries): float
     {
-        $matchMetrics = $this->calculateMatchMetrics($context, $indexEntries, $queryWords);
+        $matchMetrics = $this->calculateMatchMetrics($context, $indexEntries);
 
         if ($matchMetrics['matchedWordsCount'] === 0) {
             return 0.0;
         }
 
-        return $this->computeFinalScore($matchMetrics, count($queryWords));
+        return $this->computeFinalScore($matchMetrics, count($context->queryWords));
     }
 
     /**
-     * Calculate match metrics for query words against index entries.
-     *
-     * @param SearchContext $context The search context
-     * @param array $indexEntries Array of index entries
-     * @param array $queryWords Array of query words
-     * @return array Metrics including matched words, scores, and penalties
+     * Calculate match metrics for query words.
      */
-    private function calculateMatchMetrics(SearchContext $context, array $indexEntries, array $queryWords): array
+    private function calculateMatchMetrics(SearchContext $context, array $indexEntries): array
     {
         $matchedWordsCount = 0;
         $totalWordScore = 0.0;
         $hasShortQuery = false;
         $crossWordMatchCount = 0;
 
-        foreach ($queryWords as $queryWord) {
+        foreach ($context->queryWords as $queryWord) {
             $wordMetrics = $this->calculateWordMetrics($context, $indexEntries, $queryWord);
 
             if ($wordMetrics['bestWordScore'] > 0) {
@@ -215,23 +137,21 @@ class MultiWordProcessingStage
 
     /**
      * Calculate metrics for a single query word.
-     *
-     * @param SearchContext $context The search context
-     * @param array $indexEntries Array of index entries
-     * @param string $queryWord The query word to evaluate
-     * @return array Word metrics
      */
-    private function calculateWordMetrics(SearchContext $context, array $indexEntries, string $queryWord): array
-    {
+    private function calculateWordMetrics(
+        SearchContext $context,
+        array $indexEntries,
+        string $queryWord
+    ): array {
         $bestWordScore = 0.0;
         $isCrossWordMatch = false;
 
         foreach ($indexEntries as $entry) {
-            /** @var array<int, string> $normalizedWords */
-            $normalizedWords = $entry['normalized_words'];
-
-            foreach ($normalizedWords as $targetWord) {
-                $wordScore = $context->similarityCalculator->calculateWordSimilarity($queryWord, (string) $targetWord);
+            foreach ($entry['normalized_words'] as $targetWord) {
+                $wordScore = $context->similarityCalculator->calculateWordSimilarity(
+                    $queryWord,
+                    (string) $targetWord
+                );
 
                 if ($wordScore > 0 && $this->isLikelyCrossWordMatch($queryWord, (string) $targetWord)) {
                     $isCrossWordMatch = true;
@@ -250,10 +170,6 @@ class MultiWordProcessingStage
 
     /**
      * Compute final score from match metrics.
-     *
-     * @param array $matchMetrics Match metrics
-     * @param int $totalWords Total number of query words
-     * @return float Final score
      */
     private function computeFinalScore(array $matchMetrics, int $totalWords): float
     {
@@ -270,10 +186,7 @@ class MultiWordProcessingStage
     }
 
     /**
-     * Calculate coverage bonus based on word coverage.
-     *
-     * @param float $coverage Word coverage ratio
-     * @return float Coverage bonus
+     * Calculate coverage bonus.
      */
     private function calculateCoverageBonus(float $coverage): float
     {
@@ -286,15 +199,16 @@ class MultiWordProcessingStage
 
     /**
      * Calculate penalties for short queries and cross-word matches.
-     *
-     * @param array $matchMetrics Match metrics
-     * @param int $totalWords Total number of query words
-     * @return array Penalties
      */
     private function calculatePenalties(array $matchMetrics, int $totalWords): array
     {
-        $shortQueryPenalty = $matchMetrics['hasShortQuery'] ? self::SHORT_QUERY_PENALTY : 0.0;
-        $crossWordPenalty = ($matchMetrics['crossWordMatchCount'] / $totalWords) * self::CROSS_WORD_MATCH_PENALTY_MULTI;
+        $config = config('fuzzy.scoring.penalties', [
+            'short_query' => 0.4,
+            'cross_word_match_multi' => 0.3,
+        ]);
+
+        $shortQueryPenalty = $matchMetrics['hasShortQuery'] ? $config['short_query'] : 0.0;
+        $crossWordPenalty = ($matchMetrics['crossWordMatchCount'] / $totalWords) * $config['cross_word_match_multi'];
 
         return [
             'shortQuery' => $shortQueryPenalty,
@@ -304,10 +218,6 @@ class MultiWordProcessingStage
 
     /**
      * Determine if a match is likely a cross-word match.
-     *
-     * @param string $queryWord The query word
-     * @param string $targetWord The target word from index
-     * @return bool True if likely cross-word match
      */
     private function isLikelyCrossWordMatch(string $queryWord, string $targetWord): bool
     {
@@ -319,36 +229,11 @@ class MultiWordProcessingStage
         }
 
         if (!str_contains($targetWord, $queryWord) && !str_contains($queryWord, $targetWord)) {
-            $commonLength = $this->getCommonSubstringLength($queryWord, $targetWord);
-            $maxLength = max($queryLength, $targetLength);
-
-            return ($commonLength / $maxLength) < 0.5;
+            $lcsAlgorithm = new \Fuzzy\Services\Algorithms\LongestCommonSubstringAlgorithm();
+            $similarity = $lcsAlgorithm->calculate($queryWord, $targetWord);
+            return $similarity < 0.5;
         }
 
         return false;
-    }
-
-    /**
-     * Get length of longest common substring between two strings.
-     *
-     * @param string $str1 First string
-     * @param string $str2 Second string
-     * @return int Length of longest common substring
-     */
-    private function getCommonSubstringLength(string $str1, string $str2): int
-    {
-        $maxLength = 0;
-        $str1Length = strlen($str1);
-
-        for ($i = 0; $i < $str1Length; $i++) {
-            for ($j = $i + 1; $j <= $str1Length; $j++) {
-                $substring = substr($str1, $i, $j - $i);
-                if (str_contains($str2, $substring) && strlen($substring) > $maxLength) {
-                    $maxLength = strlen($substring);
-                }
-            }
-        }
-
-        return $maxLength;
     }
 }

@@ -11,21 +11,18 @@ use Fuzzy\Services\FuzzySearchService;
 use Fuzzy\Services\IndexBuilder;
 use Fuzzy\Services\SimilarityCalculator;
 use Fuzzy\Services\StringNormalizer;
+use Fuzzy\Repositories\IndexRepository;
+use Fuzzy\Contracts\IndexRepositoryInterface;
 use Illuminate\Pipeline\Pipeline;
 use Illuminate\Support\ServiceProvider;
 
 /**
  * Service provider for the Fuzzy Search package.
- *
- * Registers services and configurations required for fuzzy search functionality
- * in Laravel applications, including console commands and migrations.
  */
 class FuzzySearchServiceProvider extends ServiceProvider
 {
     /**
      * Register package services.
-     *
-     * @return void
      */
     public function register(): void
     {
@@ -34,6 +31,16 @@ class FuzzySearchServiceProvider extends ServiceProvider
             'fuzzy'
         );
 
+        $this->registerCoreServices();
+        $this->registerRepository();
+        $this->registerSearchService();
+    }
+
+    /**
+     * Register core services.
+     */
+    private function registerCoreServices(): void
+    {
         $this->app->singleton('laravel-fuzzy.normalizer', function ($app): StringNormalizer {
             return new StringNormalizer();
         });
@@ -47,13 +54,32 @@ class FuzzySearchServiceProvider extends ServiceProvider
                 normalizer: $app->make('laravel-fuzzy.normalizer')
             );
         });
+    }
 
+    /**
+     * Register repository.
+     */
+    private function registerRepository(): void
+    {
+        $this->app->singleton(IndexRepositoryInterface::class, function ($app): IndexRepository {
+            return new IndexRepository();
+        });
+
+        $this->app->alias(IndexRepositoryInterface::class, 'laravel-fuzzy.repository');
+    }
+
+    /**
+     * Register search service.
+     */
+    private function registerSearchService(): void
+    {
         $this->app->singleton('laravel-fuzzy.search', function ($app): FuzzySearchService {
             return new FuzzySearchService(
                 pipeline: $app->make(Pipeline::class),
                 normalizer: $app->make('laravel-fuzzy.normalizer'),
                 similarityCalculator: $app->make('laravel-fuzzy.similarity'),
-                indexBuilder: $app->make('laravel-fuzzy.index-builder')
+                indexBuilder: $app->make('laravel-fuzzy.index-builder'),
+                indexRepository: $app->make(IndexRepositoryInterface::class)
             );
         });
 
@@ -62,8 +88,6 @@ class FuzzySearchServiceProvider extends ServiceProvider
 
     /**
      * Bootstrap package services.
-     *
-     * @return void
      */
     public function boot(): void
     {
@@ -77,8 +101,6 @@ class FuzzySearchServiceProvider extends ServiceProvider
 
     /**
      * Publish package resources.
-     *
-     * @return void
      */
     private function publishResources(): void
     {
@@ -93,8 +115,6 @@ class FuzzySearchServiceProvider extends ServiceProvider
 
     /**
      * Register console commands.
-     *
-     * @return void
      */
     private function registerCommands(): void
     {
@@ -107,8 +127,6 @@ class FuzzySearchServiceProvider extends ServiceProvider
 
     /**
      * Get the services provided by the provider.
-     *
-     * @return array<string>
      */
     public function provides(): array
     {
@@ -117,6 +135,7 @@ class FuzzySearchServiceProvider extends ServiceProvider
             'laravel-fuzzy.normalizer',
             'laravel-fuzzy.similarity',
             'laravel-fuzzy.index-builder',
+            IndexRepositoryInterface::class,
         ];
     }
 }
