@@ -16,6 +16,7 @@ use Fuzzy\Stages;
 use Fuzzy\Services\Scoring\ScoringEngine;
 use Illuminate\Pipeline\Pipeline;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use ReflectionClass;
 
 /**
@@ -23,6 +24,11 @@ use ReflectionClass;
  */
 class FuzzySearchService
 {
+    /**
+     * Liste des clés de cache générées (pour invalidation sélective)
+     */
+    private array $generatedCacheKeys = [];
+
     /**
      * @param Pipeline $pipeline Laravel pipeline for processing search stages
      * @param StringNormalizer $normalizer Service for normalizing strings and queries
@@ -45,13 +51,30 @@ class FuzzySearchService
      */
     public function search(string $query, array $options = []): Collection
     {
+        if (!$this->isCacheEnabled()) {
+            return $this->performSearch($query, $options);
+        }
+
+        $cacheKey = $this->generateCacheKey('search', $query, $options);
+        $ttl = config('fuzzy.cache.ttl.search', 3600);
+
+        return $this->cacheRemember($cacheKey, $ttl, function () use ($query, $options) {
+            return $this->performSearch($query, $options);
+        });
+    }
+
+    /**
+     * Recherche réelle (sans cache).
+     */
+    private function performSearch(string $query, array $options = []): Collection
+    {
         $searchOptions = SearchOptionsData::fromConfig($options);
         $models = $this->getSearchableModels();
 
         $allResults = collect();
 
         foreach ($models as $modelClass) {
-            $modelResults = $this->searchInModel($modelClass, $query, $options);
+            $modelResults = $this->performSearchInModel($modelClass, $query, $options);
             $allResults = $allResults->merge($modelResults);
         }
 
@@ -62,6 +85,23 @@ class FuzzySearchService
      * Search within a specific model.
      */
     public function searchInModel(string $modelClass, string $query, array $options = []): Collection
+    {
+        if (!$this->isCacheEnabled()) {
+            return $this->performSearchInModel($modelClass, $query, $options);
+        }
+
+        $cacheKey = $this->generateCacheKey('search_in_model', $modelClass, $query, $options);
+        $ttl = config('fuzzy.cache.ttl.search_in_model', 3600);
+
+        return $this->cacheRemember($cacheKey, $ttl, function () use ($modelClass, $query, $options) {
+            return $this->performSearchInModel($modelClass, $query, $options);
+        });
+    }
+
+    /**
+     * Recherche dans un modèle (sans cache).
+     */
+    private function performSearchInModel(string $modelClass, string $query, array $options = []): Collection
     {
         $this->validateModel($modelClass);
         $searchOptions = SearchOptionsData::fromConfig($options);
@@ -79,7 +119,7 @@ class FuzzySearchService
             similarityCalculator: $this->similarityCalculator,
             indexBuilder: $this->indexBuilder,
             indexRepository: $this->indexRepository,
-            scoringEngine: $this->scoringEngine, // Ajouté
+            scoringEngine: $this->scoringEngine,
             indexDataArray: $indexData
         );
 
@@ -96,11 +136,28 @@ class FuzzySearchService
      */
     public function searchInModels(array $modelClasses, string $query, array $options = []): Collection
     {
+        if (!$this->isCacheEnabled()) {
+            return $this->performSearchInModels($modelClasses, $query, $options);
+        }
+
+        $cacheKey = $this->generateCacheKey('search_in_models', $modelClasses, $query, $options);
+        $ttl = config('fuzzy.cache.ttl.search_in_models', 3600);
+
+        return $this->cacheRemember($cacheKey, $ttl, function () use ($modelClasses, $query, $options) {
+            return $this->performSearchInModels($modelClasses, $query, $options);
+        });
+    }
+
+    /**
+     * Recherche dans plusieurs modèles (sans cache).
+     */
+    private function performSearchInModels(array $modelClasses, string $query, array $options = []): Collection
+    {
         $results = collect();
 
         foreach ($modelClasses as $modelClass) {
             if ($this->isModelSearchable($modelClass)) {
-                $modelResults = $this->searchInModel($modelClass, $query, $options);
+                $modelResults = $this->performSearchInModel($modelClass, $query, $options);
                 $results = $results->merge($modelResults);
             }
         }
@@ -115,6 +172,10 @@ class FuzzySearchService
     {
         if ($model->shouldBeIndexed()) {
             $this->indexBuilder->indexModel($model);
+
+            if ($this->shouldInvalidateCacheOnIndex()) {
+                $this->invalidateCacheForModel(get_class($model));
+            }
         }
     }
 
@@ -136,6 +197,10 @@ class FuzzySearchService
         $modelId = $model->getIndexableId();
 
         FuzzyIndex::forModelInstance($modelType, $modelId)->delete();
+
+        if ($this->shouldInvalidateCacheOnDelete()) {
+            $this->invalidateCacheForModel($modelType);
+        }
     }
 
     /**
@@ -147,6 +212,10 @@ class FuzzySearchService
 
         foreach ($models as $modelClass) {
             $this->reindexModel($modelClass);
+        }
+
+        if ($this->shouldInvalidateCacheOnIndex()) {
+            $this->invalidateAllCache();
         }
     }
 
@@ -166,6 +235,10 @@ class FuzzySearchService
                 }
             }
         });
+
+        if ($this->shouldInvalidateCacheOnIndex()) {
+            $this->invalidateCacheForModel($modelClass);
+        }
     }
 
     /**
@@ -205,13 +278,61 @@ class FuzzySearchService
      */
     public function getStats(): array
     {
-        return $this->indexRepository->getStats();
+        if (!$this->isCacheEnabled()) {
+            return $this->indexRepository->getStats();
+        }
+
+        $cacheKey = $this->generateCacheKey('stats');
+        $ttl = config('fuzzy.cache.ttl.stats', 30); // 30 secondes
+
+        return $this->cacheRemember($cacheKey, $ttl, function () {
+            return $this->indexRepository->getStats();
+        });
+    }
+
+    /**
+     * Invalide tout le cache de recherche.
+     * Solution SAFE: Stocker et supprimer uniquement nos propres clés.
+     */
+    public function invalidateAllCache(): void
+    {
+        if (!$this->isCacheEnabled()) {
+            return;
+        }
+
+        $this->deleteStoredCacheKeys();
+    }
+
+    /**
+     * Invalide le cache pour un modèle spécifique.
+     */
+    public function invalidateCacheForModel(string $modelClass): void
+    {
+        if (!$this->isCacheEnabled()) {
+            return;
+        }
+
+        $this->deleteCacheKeysForModel($modelClass);
     }
 
     /**
      * Get all searchable models.
      */
     protected function getSearchableModels(): array
+    {
+        if (!$this->isCacheEnabled()) {
+            return $this->fetchSearchableModels();
+        }
+
+        $cacheKey = $this->generateCacheKey('searchable_models');
+        $ttl = config('fuzzy.cache.ttl.search', 3600);
+
+        return $this->cacheRemember($cacheKey, $ttl, function () {
+            return $this->fetchSearchableModels();
+        });
+    }
+
+    private function fetchSearchableModels(): array
     {
         $configuredModels = config('fuzzy.searchable_models', []);
 
@@ -302,12 +423,12 @@ class FuzzySearchService
      */
     protected function getPipelineStages(): array
     {
-        return [
+        return config('fuzzy.pipeline.stages', [
             Stages\NormalizeQueryStage::class,
-            Stages\MatchDiscoveryStage::class,    // NOUVEAU : fusion des 4 anciens stages
-            Stages\ScoringStage::class,           // NOUVEAU : scoring unifié
+            Stages\MatchDiscoveryStage::class,
+            Stages\ScoringStage::class,
             Stages\SortAndLimitStage::class,
-        ];
+        ]);
     }
 
     /**
@@ -319,5 +440,134 @@ class FuzzySearchService
             ->filter(fn($result) => $result !== null && $result->score >= $minScore)
             ->sortByDesc('score')
             ->values();
+    }
+
+    // ==================== MÉTHODES CACHE SIMPLIFIÉES ====================
+
+    /**
+     * Vérifie si le cache est activé.
+     */
+    private function isCacheEnabled(): bool
+    {
+        return config('fuzzy.cache.enabled', true);
+    }
+
+    /**
+     * Vérifie si le cache doit être invalidé sur indexation.
+     */
+    private function shouldInvalidateCacheOnIndex(): bool
+    {
+        return config('fuzzy.cache.invalidation.on_index', true);
+    }
+
+    /**
+     * Vérifie si le cache doit être invalidé sur suppression.
+     */
+    private function shouldInvalidateCacheOnDelete(): bool
+    {
+        return config('fuzzy.cache.invalidation.on_delete', true);
+    }
+
+    /**
+     * Méthode wrapper pour Cache::remember avec suivi des clés.
+     */
+    private function cacheRemember(string $key, int $ttl, callable $callback)
+    {
+        // Stocker la clé pour invalidation future
+        $this->storeCacheKey($key);
+
+        return Cache::remember($key, $ttl, $callback);
+    }
+
+    /**
+     * Génère une clé de cache unique.
+     */
+    private function generateCacheKey(string $type, ...$params): string
+    {
+        $prefix = config('fuzzy.cache.prefix', 'fuzzy_search:');
+
+        // Simplification: ne pas faire d'hypothèses sur le contenu
+        $hash = md5(json_encode($params));
+        $key = "{$prefix}{$type}:{$hash}";
+
+        // Limiter la longueur de la clé
+        if (strlen($key) > 250) {
+            $key = "{$prefix}{$type}:" . md5($key);
+        }
+
+        return $key;
+    }
+
+    /**
+     * Stocke une clé de cache générée pour invalidation future.
+     */
+    private function storeCacheKey(string $key): void
+    {
+        $storageKey = $this->getStorageKeyName();
+        $storedKeys = Cache::get($storageKey, []);
+
+        if (!in_array($key, $storedKeys, true)) {
+            $storedKeys[] = $key;
+            // Stocker pour 1 jour de plus que le TTL max
+            $maxTtl = max(array_values(config('fuzzy.cache.ttl', []))) + 86400;
+            Cache::put($storageKey, $storedKeys, $maxTtl);
+        }
+    }
+
+    /**
+     * Supprime toutes les clés de cache stockées.
+     */
+    private function deleteStoredCacheKeys(): void
+    {
+        $storageKey = $this->getStorageKeyName();
+        $storedKeys = Cache::get($storageKey, []);
+
+        foreach ($storedKeys as $key) {
+            Cache::forget($key);
+        }
+
+        Cache::forget($storageKey);
+    }
+
+    /**
+     * Supprime les clés de cache pour un modèle spécifique.
+     */
+    private function deleteCacheKeysForModel(string $modelClass): void
+    {
+        $storageKey = $this->getStorageKeyName();
+        $storedKeys = Cache::get($storageKey, []);
+        $modelHash = md5($modelClass);
+
+        $keysToDelete = [];
+        $keysToKeep = [];
+
+        foreach ($storedKeys as $key) {
+            // Si la clé contient le hash du modèle, on la supprime
+            if (str_contains($key, $modelHash)) {
+                $keysToDelete[] = $key;
+            } else {
+                $keysToKeep[] = $key;
+            }
+        }
+
+        // Supprimer les clés concernées
+        foreach ($keysToDelete as $key) {
+            Cache::forget($key);
+        }
+
+        // Mettre à jour la liste stockée
+        if (!empty($keysToDelete)) {
+            $maxTtl = max(array_values(config('fuzzy.cache.ttl', []))) + 86400;
+            Cache::put($storageKey, $keysToKeep, $maxTtl);
+        }
+    }
+
+    /**
+     * Retourne le nom de la clé de stockage des clés de cache.
+     */
+    private function getStorageKeyName(): string
+    {
+        $prefix = config('fuzzy.cache.prefix', 'fuzzy_search:');
+        return $prefix . 'cache_keys';
     }
 }

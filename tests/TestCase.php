@@ -29,6 +29,8 @@ abstract class TestCase extends Orchestra
         $this->loadPackageMigrations();
         $this->loadTestMigrations();
         $this->configureMemoryCache();
+
+        config(['fuzzy.cache.enabled' => false]);
     }
 
     /**
@@ -88,6 +90,16 @@ abstract class TestCase extends Orchestra
             'database' => ':memory:',
             'prefix' => '',
         ]);
+
+        // Ajoutez cette configuration
+        $app['config']->set('fuzzy.scoring.field_weights', [
+            'name' => 1.0,
+            'title' => 0.9,
+            'email' => 0.8,
+            'description' => 0.7,
+            'default' => 0.5,
+        ]);
+        $app['config']->set('fuzzy.eager_load', []);
 
         $app['config']->set('fuzzy.searchable_models', [
             \Fuzzy\Tests\Fixtures\User::class,

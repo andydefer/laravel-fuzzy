@@ -16,12 +16,28 @@ return [
         ],
     ],
 
-    'pipeline' => [ // NOUVEAU : configuration du pipeline
+    'pipeline' => [
         'stages' => [
             \Fuzzy\Stages\NormalizeQueryStage::class,
             \Fuzzy\Stages\MatchDiscoveryStage::class,
             \Fuzzy\Stages\ScoringStage::class,
             \Fuzzy\Stages\SortAndLimitStage::class,
+        ],
+    ],
+
+    'cache' => [
+        'enabled' => env('FUZZY_SEARCH_CACHE_ENABLED', true),
+        'prefix' => 'fuzzy_search:',
+        'ttl' => [
+            'search' => env('FUZZY_SEARCH_CACHE_TTL', 3600),
+            'search_in_model' => env('FUZZY_SEARCH_MODEL_CACHE_TTL', 3600),
+            'search_in_models' => env('FUZZY_SEARCH_MODELS_CACHE_TTL', 3600),
+            'stats' => env('FUZZY_SEARCH_STATS_CACHE_TTL', 30), // 30s pour stats
+        ],
+        'invalidation' => [
+            'on_index' => true,
+            'on_update' => true,
+            'on_delete' => true,
         ],
     ],
 
@@ -82,6 +98,7 @@ return [
         'very',
         'can',
         'will',
+        'over',
         'just',
         'should',
         'now',

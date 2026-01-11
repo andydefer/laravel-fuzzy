@@ -7,6 +7,7 @@ namespace Fuzzy;
 use Fuzzy\Commands\IndexSearchCommand;
 use Fuzzy\Commands\ClearIndexCommand;
 use Fuzzy\Commands\StatsIndexCommand;
+use Fuzzy\Commands\ClearCacheCommand; // AJOUTÉ
 use Fuzzy\Services\FuzzySearchService;
 use Fuzzy\Services\IndexBuilder;
 use Fuzzy\Services\SimilarityCalculator;
@@ -125,6 +126,7 @@ class FuzzySearchServiceProvider extends ServiceProvider
             IndexSearchCommand::class,
             ClearIndexCommand::class,
             StatsIndexCommand::class,
+            ClearCacheCommand::class, // AJOUTÉ
         ]);
     }
 

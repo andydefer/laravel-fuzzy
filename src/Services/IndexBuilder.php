@@ -97,7 +97,7 @@ class IndexBuilder
      * @param string $field The field name
      * @return float Weight between 0.0 and 1.0
      */
-    protected function calculateFieldWeight(string $field): float
+    public function calculateFieldWeight(string $field): float
     {
         $weights = config('fuzzy.scoring.field_weights', [
             'name' => 1.0,

@@ -147,6 +147,9 @@ class SearchContext
      * Add a potential match (before scoring).
      * NOUVEAU : Méthode pour ajouter des matches bruts
      */
+    /**
+     * Add a potential match (before scoring).
+     */
     public function addPotentialMatch(array $match): void
     {
         $key = $match['indexable_type'] . '_' . $match['indexable_id'];
@@ -155,7 +158,30 @@ class SearchContext
             $this->potentialMatches[$key] = [];
         }
 
+        // VÉRIFIER SI LE MATCH EXISTE DÉJÀ
+        $matchSignature = $this->createMatchSignature($match);
+
+        foreach ($this->potentialMatches[$key] as $existingMatch) {
+            if ($this->createMatchSignature($existingMatch) === $matchSignature) {
+                return; // Déjà présent, on ignore
+            }
+        }
+
         $this->potentialMatches[$key][] = $match;
+    }
+
+    /**
+     * Crée une signature unique pour un match.
+     */
+    private function createMatchSignature(array $match): string
+    {
+        // Signature basée sur les données clés du match
+        return md5(serialize([
+            'type' => $match['indexable_type'],
+            'id' => $match['indexable_id'],
+            'field' => $match['field'] ?? null,
+            'original_value' => $match['original_value'] ?? null,
+        ]));
     }
 
     /**

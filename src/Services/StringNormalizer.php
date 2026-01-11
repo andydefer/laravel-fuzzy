@@ -85,11 +85,21 @@ class StringNormalizer
         $stopWords = config('fuzzy.stop_words', []);
         $keywords = array_filter(
             $words,
-            fn($word) => strlen($word) >= 3 && !in_array($word, $stopWords)
+            fn($word) => strlen($word) >= 3 && !in_array($word, $stopWords, true)
         );
 
         $frequencies = array_count_values($keywords);
-        arsort($frequencies);
+
+        // Trier par fréquence décroissante, puis alphabétiquement
+        uksort($frequencies, function ($a, $b) use ($frequencies) {
+            // Priorité 1: Fréquence (plus haute d'abord)
+            $freqCompare = $frequencies[$b] <=> $frequencies[$a];
+            if ($freqCompare !== 0) {
+                return $freqCompare;
+            }
+            // Priorité 2: Ordre alphabétique
+            return strcmp($a, $b);
+        });
 
         return array_slice(array_keys($frequencies), 0, $maxKeywords);
     }

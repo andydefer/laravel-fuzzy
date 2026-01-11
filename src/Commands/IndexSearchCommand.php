@@ -173,13 +173,14 @@ class IndexSearchCommand extends Command
     private function executeBatchIndexing(string $modelClass, FuzzySearchService $searchService, int $chunkSize): void
     {
         /** @var Model&MustFuzzySearch $modelClass */
-        $modelClass::chunk($chunkSize, function ($models) use ($searchService) {
+        $modelClass::chunk($chunkSize, function ($models) use ($searchService, $modelClass) {
             $progressBar = $this->output->createProgressBar(count($models));
             $progressBar->start();
 
             /** @var Model&MustFuzzySearch $model */
             foreach ($models as $model) {
-                if ($model->shouldBeIndexed()) {
+                // AJOUTER : Vérifier que le modèle est du bon type
+                if (get_class($model) === $modelClass && $model->shouldBeIndexed()) {
                     $searchService->indexModel($model);
                 }
                 $progressBar->advance();
