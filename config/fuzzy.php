@@ -3,15 +3,6 @@
 declare(strict_types=1);
 
 return [
-    /*
-    |--------------------------------------------------------------------------
-    | Auto-Discovery Settings
-    |--------------------------------------------------------------------------
-    |
-    | When searchable_models is empty, the package will automatically
-    | discover models in the app/Models directory.
-    |
-    */
     'auto_discovery' => [
         'enabled' => true,
         'directories' => [
@@ -25,33 +16,7 @@ return [
         ],
     ],
 
-    /*
-    |--------------------------------------------------------------------------
-    | Field Weights
-    |--------------------------------------------------------------------------
-    |
-    | Weight multipliers for different field types.
-    | Higher weight = more important in search results.
-    |
-    */
-    'field_weights' => [
-        'name' => 1.0,
-        'title' => 0.9,
-        'email' => 0.8,
-        'description' => 0.7,
-        'content' => 0.6,
-        'default' => 0.5,
-    ],
 
-    /*
-    |--------------------------------------------------------------------------
-    | Stop Words
-    |--------------------------------------------------------------------------
-    |
-    | Common words to ignore during search.
-    | These words are removed from queries and not indexed.
-    |
-    */
     'stop_words' => [
         'the',
         'and',
@@ -114,15 +79,6 @@ return [
         'now',
     ],
 
-    /*
-    |--------------------------------------------------------------------------
-    | Default Search Options
-    |--------------------------------------------------------------------------
-    |
-    | Default options for search queries.
-    | These can be overridden per query.
-    |
-    */
     'default_options' => [
         'min_score' => 0.1,
         'max_results' => 20,
@@ -130,14 +86,6 @@ return [
         'threshold' => 0.3,
     ],
 
-    /*
-    |--------------------------------------------------------------------------
-    | Index Configuration
-    |--------------------------------------------------------------------------
-    |
-    | Configuration for the search index.
-    |
-    */
     'index' => [
         'min_word_length' => 2,
         'max_word_length' => 50,
@@ -146,14 +94,6 @@ return [
         'queue_name' => env('FUZZY_SEARCH_QUEUE_NAME', 'default'),
     ],
 
-    /*
-    |--------------------------------------------------------------------------
-    | Similarity Configuration
-    |--------------------------------------------------------------------------
-    |
-    | Configuration for similarity calculations.
-    |
-    */
     'similarity' => [
         'min_query_length' => 2,
         'min_similarity_threshold' => 0.1,
@@ -163,7 +103,27 @@ return [
             'ngrams' => 0.2,
             'lcs' => 0.1,
         ],
-        'consecutive_bonus' => [
+    ],
+
+    'scoring' => [
+        'field_weights' => [
+            'name' => 1.3,
+            'title' => 1.2,
+            'email' => 1.0,
+            'description' => 0.8,
+            'content' => 0.7,
+            'default' => 0.6,
+        ],
+        'penalties' => [
+            'short_query' => 0.4,
+            'cross_word_match_multi' => 0.3,
+        ],
+        'bonuses' => [
+            'full_coverage' => 0.3,      // ✅ BONUS COUVERTURE 100%
+            'high_coverage' => 0.15,     // ✅ BONUS COUVERTURE ≥75%
+            'early_position' => 0.2,     // ✅ BONUS POSITION DÉBUT TEXTE
+        ],
+        'consecutive_bonus' => [         // ✅ BONUS CARACTÈRES CONSÉCUTIFS
             2 => 1.05,
             3 => 1.15,
             4 => 1.30,

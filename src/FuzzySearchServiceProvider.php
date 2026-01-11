@@ -11,66 +11,66 @@ use Fuzzy\Services\FuzzySearchService;
 use Fuzzy\Services\IndexBuilder;
 use Fuzzy\Services\SimilarityCalculator;
 use Fuzzy\Services\StringNormalizer;
+use Fuzzy\Services\AdvancedScoringCalculator;
+use Fuzzy\Services\Scoring\UnifiedScoringOrchestrator;
+use Fuzzy\Services\Scoring\ExactMatchStrategy;
+use Fuzzy\Services\Scoring\WordMatchStrategy;
+use Fuzzy\Services\Scoring\FuzzyMatchStrategy;
+use Fuzzy\Services\Scoring\MultiWordStrategy;
 use Fuzzy\Repositories\IndexRepository;
 use Fuzzy\Contracts\IndexRepositoryInterface;
 use Illuminate\Pipeline\Pipeline;
 use Illuminate\Support\ServiceProvider;
 
-/**
- * Service provider for the Fuzzy Search package.
- */
 class FuzzySearchServiceProvider extends ServiceProvider
 {
-    /**
-     * Register package services.
-     */
     public function register(): void
     {
-        $this->mergeConfigFrom(
-            __DIR__ . '/../config/fuzzy.php',
-            'fuzzy'
-        );
-
+        $this->mergeConfigFrom(__DIR__ . '/../config/fuzzy.php', 'fuzzy');
         $this->registerCoreServices();
         $this->registerRepository();
         $this->registerSearchService();
+        $this->registerScoringSystem();
     }
 
-    /**
-     * Register core services.
-     */
     private function registerCoreServices(): void
     {
-        $this->app->singleton('laravel-fuzzy.normalizer', function ($app): StringNormalizer {
-            return new StringNormalizer();
-        });
+        $this->app->singleton(
+            'laravel-fuzzy.normalizer',
+            fn($app): StringNormalizer =>
+            new StringNormalizer()
+        );
 
-        $this->app->singleton('laravel-fuzzy.similarity', function ($app): SimilarityCalculator {
-            return new SimilarityCalculator();
-        });
+        $this->app->singleton(
+            'laravel-fuzzy.similarity',
+            fn($app): SimilarityCalculator =>
+            new SimilarityCalculator()
+        );
 
-        $this->app->singleton('laravel-fuzzy.index-builder', function ($app): IndexBuilder {
-            return new IndexBuilder(
-                normalizer: $app->make('laravel-fuzzy.normalizer')
-            );
-        });
+        $this->app->singleton(
+            'laravel-fuzzy.index-builder',
+            fn($app): IndexBuilder =>
+            new IndexBuilder($app->make('laravel-fuzzy.normalizer'))
+        );
+
+        $this->app->singleton(
+            'laravel-fuzzy.advanced-scoring',
+            fn($app): AdvancedScoringCalculator =>
+            new AdvancedScoringCalculator()
+        );
     }
 
-    /**
-     * Register repository.
-     */
     private function registerRepository(): void
     {
-        $this->app->singleton(IndexRepositoryInterface::class, function ($app): IndexRepository {
-            return new IndexRepository();
-        });
+        $this->app->singleton(
+            IndexRepositoryInterface::class,
+            fn($app): IndexRepository =>
+            new IndexRepository()
+        );
 
         $this->app->alias(IndexRepositoryInterface::class, 'laravel-fuzzy.repository');
     }
 
-    /**
-     * Register search service.
-     */
     private function registerSearchService(): void
     {
         $this->app->singleton('laravel-fuzzy.search', function ($app): FuzzySearchService {
@@ -86,9 +86,21 @@ class FuzzySearchServiceProvider extends ServiceProvider
         $this->app->alias('laravel-fuzzy.search', FuzzySearchService::class);
     }
 
-    /**
-     * Bootstrap package services.
-     */
+    private function registerScoringSystem(): void
+    {
+        // AdvancedScoringCalculator (cœur des calculs)
+        $this->app->singleton(AdvancedScoringCalculator::class, function ($app) {
+            return new AdvancedScoringCalculator();
+        });
+
+        // UnifiedScoringOrchestrator (orchestration intelligente)
+        $this->app->singleton(UnifiedScoringOrchestrator::class, function ($app) {
+            return new UnifiedScoringOrchestrator(
+                $app->make(AdvancedScoringCalculator::class)
+            );
+        });
+    }
+
     public function boot(): void
     {
         $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
@@ -99,9 +111,6 @@ class FuzzySearchServiceProvider extends ServiceProvider
         }
     }
 
-    /**
-     * Publish package resources.
-     */
     private function publishResources(): void
     {
         $this->publishes([
@@ -113,9 +122,6 @@ class FuzzySearchServiceProvider extends ServiceProvider
         ], 'fuzzy-migrations');
     }
 
-    /**
-     * Register console commands.
-     */
     private function registerCommands(): void
     {
         $this->commands([
@@ -125,9 +131,6 @@ class FuzzySearchServiceProvider extends ServiceProvider
         ]);
     }
 
-    /**
-     * Get the services provided by the provider.
-     */
     public function provides(): array
     {
         return [
@@ -136,6 +139,8 @@ class FuzzySearchServiceProvider extends ServiceProvider
             'laravel-fuzzy.similarity',
             'laravel-fuzzy.index-builder',
             IndexRepositoryInterface::class,
+            UnifiedScoringOrchestrator::class,
+            AdvancedScoringCalculator::class,
         ];
     }
 }

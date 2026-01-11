@@ -99,7 +99,7 @@ class IndexBuilder
      */
     protected function calculateFieldWeight(string $field): float
     {
-        $weights = config('fuzzy.field_weights', [
+        $weights = config('fuzzy.scoring.field_weights', [
             'name' => 1.0,
             'title' => 0.9,
             'email' => 0.8,

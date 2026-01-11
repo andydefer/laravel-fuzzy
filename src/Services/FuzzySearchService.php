@@ -8,9 +8,11 @@ use Fuzzy\Contracts\MustFuzzySearch;
 use Fuzzy\Contracts\IndexRepositoryInterface;
 use Fuzzy\Data\SearchOptionsData;
 use Fuzzy\Data\SearchResultData;
+use Fuzzy\ValueObjects\SearchQuery;
 use Fuzzy\Exceptions\ModelNotSearchableException;
 use Fuzzy\Models\FuzzyIndex;
 use Fuzzy\SearchContext;
+use Fuzzy\Services\Scoring\ScoreConsolidator;
 use Fuzzy\Stages;
 use Illuminate\Pipeline\Pipeline;
 use Illuminate\Support\Collection;
@@ -108,21 +110,22 @@ class FuzzySearchService
     public function searchInModel(string $modelClass, string $query, array $options = []): Collection
     {
         $this->validateModel($modelClass);
-
         $searchOptions = SearchOptionsData::fromConfig($options);
+        $searchQuery = SearchQuery::create($query, $this->normalizer);
 
-        // Utiliser le repository optimisé pour éviter N+1
+        if ($searchQuery->isEmpty()) {
+            return collect();
+        }
+
         $indexData = $this->indexRepository->getIndexDataForModel($modelClass);
-
         $context = new SearchContext(
-            modelClass: $modelClass,
-            query: $query,
+            query: $searchQuery,
             options: $searchOptions,
             normalizer: $this->normalizer,
             similarityCalculator: $this->similarityCalculator,
             indexBuilder: $this->indexBuilder,
             indexRepository: $this->indexRepository,
-            indexData: $indexData
+            indexDataArray: $indexData
         );
 
         $results = $this->pipeline
@@ -132,6 +135,7 @@ class FuzzySearchService
 
         return $this->filterAndSortResults(collect($results), $searchOptions->minScore);
     }
+
 
     /**
      * Search across multiple specific models.
@@ -393,19 +397,18 @@ class FuzzySearchService
      *
      * @return array<string> Array of pipeline stage class names
      */
+    // Dans la classe FuzzySearchService, modifier la méthode :
     protected function getPipelineStages(): array
     {
         return [
             Stages\NormalizeQueryStage::class,
-            Stages\ExactMatchStage::class,
-            Stages\WordMatchStage::class,
-            Stages\FuzzyMatchStage::class,
-            Stages\MultiWordProcessingStage::class,
-            Stages\ScoreAggregationStage::class,
-            Stages\SortAndLimitStage::class,
+            Stages\ExactMatchStage::class,        // Matching basique
+            Stages\WordMatchStage::class,         // Matching basique
+            Stages\FuzzyMatchStage::class,        // Matching basique
+            Stages\UnifiedScoringStage::class,    // SEUL stage de scoring avancé
+            Stages\SortAndLimitStage::class,      // Tri final
         ];
     }
-
     /**
      * Filter and sort search results.
      *

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Fuzzy\Data;
 
 use Spatie\LaravelData\Data;
+use Illuminate\Database\Eloquent\Model;
 
 /**
  * Represents a single search result with its relevance score and match details.
@@ -28,9 +29,48 @@ class SearchResultData extends Data
         public ?string $matchedField = null,
         public ?string $matchedValue = null,
     ) {
-        if ($this->attemptCustomFormatting()) {
-            $this->item = $this->attemptCustomFormatting();
+        // Constructeur PUR : seulement initialise les propriétés
+        // Aucun effet secondaire ici
+    }
+
+    /**
+     * Factory method pour créer un résultat avec formatting personnalisé
+     */
+    public static function create(
+        object $item,
+        float $score,
+        string $modelType,
+        ?string $matchedField = null,
+        ?string $matchedValue = null
+    ): self {
+        $formattedItem = self::attemptCustomFormatting($item);
+
+        return new self(
+            item: $formattedItem ?? $item,
+            score: $score,
+            modelType: $modelType,
+            matchedField: $matchedField,
+            matchedValue: $matchedValue
+        );
+    }
+
+    /**
+     * Tentative de formatting personnalisé si disponible
+     */
+    private static function attemptCustomFormatting(object $item): ?object
+    {
+        // Vérification de la propriété fuzzyFormat
+        if (!property_exists($item, 'fuzzyFormat') || !$item->fuzzyFormat) {
+            return null;
         }
+
+        $formatterClass = $item->fuzzyFormat;
+
+        if (class_exists($formatterClass) && method_exists($formatterClass, 'fromModel')) {
+            return $formatterClass::fromModel($item);
+        }
+
+        return null;
     }
 
     /**
@@ -59,37 +99,56 @@ class SearchResultData extends Data
     }
 
     /**
-     * Format the item for API output, respecting custom formatters when available.
-     *
-     * @return array The formatted item data
+     * Format the item for API output.
      */
     private function formatItemForOutput(): array
     {
-        $formattedItem = $this->attemptCustomFormatting()
-            ?? FuzzySearchableData::fromModel($this->item);
+        // Si l'item a déjà été formaté dans le factory method
+        if ($this->item instanceof Data) {
+            return $this->item->toArray();
+        }
 
-        return $formattedItem instanceof Data
-            ? $formattedItem->toArray()
-            : $formattedItem;
+        // Fallback au formatting par défaut
+        return FuzzySearchableData::fromModel($this->item)->toArray();
     }
 
     /**
-     * Attempt to apply custom formatting if the item defines a formatter.
-     *
-     * @return mixed|null The custom formatted data or null if no custom formatter exists
+     * Factory method pour créer à partir d'un modèle (méthode d'usine)
      */
-    private function attemptCustomFormatting(): mixed
-    {
-        if (!property_exists($this->item, 'fuzzyFormat') || !$this->item->fuzzyFormat) {
-            return null;
-        }
+    public static function fromModel(
+        Model $model,
+        float $score,
+        ?string $matchedField = null,
+        ?string $matchedValue = null
+    ): self {
+        return self::create(
+            item: $model,
+            score: $score,
+            modelType: class_basename($model),
+            matchedField: $matchedField,
+            matchedValue: $matchedValue
+        );
+    }
 
-        $formatterClass = $this->item->fuzzyFormat;
+    /**
+     * Factory method pour un formatting spécifique
+     */
+    public static function withFormatter(
+        object $item,
+        float $score,
+        string $modelType,
+        callable $formatter,
+        ?string $matchedField = null,
+        ?string $matchedValue = null
+    ): self {
+        $formattedItem = $formatter($item);
 
-        if (class_exists($formatterClass) && method_exists($formatterClass, 'fromModel')) {
-            return $formatterClass::fromModel($this->item);
-        }
-
-        return null;
+        return new self(
+            item: $formattedItem,
+            score: $score,
+            modelType: $modelType,
+            matchedField: $matchedField,
+            matchedValue: $matchedValue
+        );
     }
 }

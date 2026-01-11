@@ -25,14 +25,10 @@ class NormalizeQueryStage
      */
     public function handle(SearchContext $context, Closure $next)
     {
-        $context->normalizedQuery = $context->normalizer->normalizeQuery($context->query);
-
-        if (empty($context->normalizedQuery) || strlen($context->normalizedQuery) < 1) {
+        // Le contexte a déjà normalisé la requête via SearchQuery Value Object
+        if ($context->query->isEmpty()) {
             return collect();
         }
-
-        $context->queryWords = $context->normalizer->splitIntoWords($context->normalizedQuery);
-        $context->hasMultipleWords = count($context->queryWords) > 1;
 
         return $next($context);
     }

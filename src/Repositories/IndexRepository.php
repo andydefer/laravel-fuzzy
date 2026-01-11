@@ -35,20 +35,55 @@ class IndexRepository implements IndexRepositoryInterface
 
         $wordIndex = [];
         $itemMap = [];
+        $modelIndex = []; // NOUVEAU: Index inversé pour éviter O(n²)
 
         foreach ($indexEntries as $entry) {
-            $this->processIndexEntry($entry, $wordIndex, $itemMap);
+            $modelKey = $entry->indexable_type . '_' . $entry->indexable_id;
+
+            foreach ($entry->words as $word) {
+                if (strlen($word) >= 2) {
+                    if (!isset($wordIndex[$word])) {
+                        $wordIndex[$word] = [];
+                    }
+
+                    $matchData = [
+                        'indexable_type' => $entry->indexable_type,
+                        'indexable_id' => $entry->indexable_id,
+                        'field' => $entry->field,
+                        'original_value' => $entry->original_value,
+                        'normalized_words' => $entry->words,
+                        'weight' => $entry->weight,
+                    ];
+
+                    $wordIndex[$word][] = $matchData;
+
+                    // Construire l'index inversé en même temps
+                    if (!isset($modelIndex[$modelKey])) {
+                        $modelIndex[$modelKey] = [];
+                    }
+                    $modelIndex[$modelKey][] = $matchData;
+                }
+            }
+
+            if (!isset($itemMap[$modelKey])) {
+                $itemMap[$modelKey] = [
+                    'indexable_type' => $entry->indexable_type,
+                    'indexable_id' => $entry->indexable_id,
+                ];
+            }
         }
 
         return [
             'wordIndex' => $wordIndex,
             'itemMap' => $itemMap,
+            'modelIndex' => $modelIndex, // NOUVEAU: Index inversé
             'rawEntries' => $indexEntries->toArray(),
         ];
     }
 
     /**
      * Get models in batch to avoid N+1 queries.
+     * OPTIMISÉ: Ajout de l'eager loading
      */
     public function getModelsBatch(string $modelClass, array $ids): Collection
     {
@@ -56,7 +91,18 @@ class IndexRepository implements IndexRepositoryInterface
             return collect();
         }
 
-        return $modelClass::whereIn((new $modelClass)->getKeyName(), $ids)->get();
+        $modelInstance = new $modelClass;
+
+        // Charger avec eager loading des relations configurées
+        $eagerLoadRelations = config('fuzzy.eager_load.' . $modelClass, []);
+
+        $query = $modelClass::whereIn($modelInstance->getKeyName(), $ids);
+
+        if (!empty($eagerLoadRelations)) {
+            $query->with($eagerLoadRelations);
+        }
+
+        return $query->get();
     }
 
     /**
@@ -70,11 +116,24 @@ class IndexRepository implements IndexRepositoryInterface
             $this->preloadedModelsMap = [];
             return;
         }
-        /** @var Collection<int, Model> $models  */
-        $models = $this->getModelsBatch($context->modelClass, $modelIds);
 
+        // Utiliser getItemMap() au lieu d'accéder directement à la propriété
+        $itemMap = $context->getItemMap();
+        if (empty($itemMap)) {
+            $this->preloadedModelsMap = [];
+            return;
+        }
+
+        $modelClass = $context->getModelClass();
+
+        // Charger tous les modèles en une seule requête
+        /** @var Collection<int, Model> $models */
+        $models = $this->getModelsBatch($modelClass, $modelIds);
+
+        // Indexer pour un accès O(1)
+        $keyName = (new $modelClass)->getKeyName();
         foreach ($models as $model) {
-            $key = $context->modelClass . '_' . $model->getKey();
+            $key = $modelClass . '_' . $model->{$keyName};
             $this->preloadedModelsMap[$key] = $model;
         }
     }

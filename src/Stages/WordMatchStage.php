@@ -26,8 +26,10 @@ class WordMatchStage
      */
     public function handle(SearchContext $context, Closure $next)
     {
-        foreach ($context->queryWords as $queryWord) {
-            if (strlen($queryWord) >= 2 && isset($context->wordIndex[$queryWord])) {
+        $wordIndex = $context->getWordIndex();
+
+        foreach ($context->getQueryWords() as $queryWord) {
+            if (strlen($queryWord) >= 2 && isset($wordIndex[$queryWord])) {
                 $this->processExactMatches($context, $queryWord);
             }
         }
@@ -43,7 +45,8 @@ class WordMatchStage
      */
     private function processExactMatches(SearchContext $context, string $queryWord): void
     {
-        $matches = $context->wordIndex[$queryWord];
+        $wordIndex = $context->getWordIndex();
+        $matches = $wordIndex[$queryWord];
 
         foreach ($matches as $match) {
             $resultKey = $match['indexable_type'] . '_' . $match['indexable_id'];
@@ -70,13 +73,15 @@ class WordMatchStage
         string $resultKey,
         string $matchedWord
     ): void {
-        $exactMatchScore = 0.9 * $match['weight'];
+        $baseScore = 0.9 * $match['weight'];
         $model = $context->getModelInstance($resultKey);
 
         if ($model) {
-            $context->results[$resultKey] = new SearchResultData(
+
+
+            $context->results[$resultKey] = SearchResultData::create(
                 item: $model,
-                score: round($exactMatchScore, 2),
+                score: round($baseScore, 2),  // <-- Utilisez finalScore
                 modelType: $match['indexable_type'],
                 matchedField: $match['field'],
                 matchedValue: $match['original_value']

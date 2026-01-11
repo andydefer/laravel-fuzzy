@@ -42,7 +42,7 @@ class FuzzyMatchStage
      */
     private function shouldSkipFuzzyMatching(SearchContext $context): bool
     {
-        return !$context->options->fuzzy || empty($context->queryWords);
+        return !$context->options->fuzzy || $context->query->isEmpty();
     }
 
     /**
@@ -53,7 +53,7 @@ class FuzzyMatchStage
      */
     private function processAllQueryWords(SearchContext $context): void
     {
-        foreach ($context->queryWords as $queryWord) {
+        foreach ($context->getQueryWords() as $queryWord) {
             if (strlen($queryWord) >= 2) {
                 $this->findAndProcessFuzzyMatches($context, $queryWord);
             }
@@ -69,7 +69,9 @@ class FuzzyMatchStage
      */
     private function findAndProcessFuzzyMatches(SearchContext $context, string $queryWord): void
     {
-        foreach ($context->wordIndex as $indexedWord => $matches) {
+        $wordIndex = $context->getWordIndex();
+
+        foreach ($wordIndex as $indexedWord => $matches) {
             $similarity = $context->similarityCalculator->calculateWordSimilarity(
                 $queryWord,
                 (string) $indexedWord
@@ -91,7 +93,6 @@ class FuzzyMatchStage
      */
     private function processMatchingEntries(SearchContext $context, array $matches, float $similarity): void
     {
-        /** @var array<int, array> $matches */
         foreach ($matches as $match) {
             $this->addFuzzyMatchToResults($context, $match, $similarity);
         }
@@ -107,7 +108,7 @@ class FuzzyMatchStage
      */
     private function addFuzzyMatchToResults(SearchContext $context, array $match, float $similarity): void
     {
-        $resultKey = $this->buildResultKey($match['indexable_type'], $match['indexable_id']);
+        $resultKey = $match['indexable_type'] . '_' . $match['indexable_id'];
 
         if (isset($context->seen[$resultKey])) {
             return;
@@ -115,11 +116,14 @@ class FuzzyMatchStage
 
         $model = $context->getModelInstance($resultKey);
         if ($model) {
-            $score = $similarity * ($match['weight'] ?? 1.0);
+            $baseScore = $similarity * ($match['weight'] ?? 1.0);
 
-            $context->results[$resultKey] = new SearchResultData(
+            // AJOUTEZ CES 2 LIGNES :
+
+
+            $context->results[$resultKey] = SearchResultData::create(
                 item: $model,
-                score: round($score, 2),
+                score: round($baseScore, 2),  // <-- Utilisez finalScore
                 modelType: $match['indexable_type'],
                 matchedField: $match['field'],
                 matchedValue: $match['original_value']
