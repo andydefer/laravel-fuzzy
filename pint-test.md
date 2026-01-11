@@ -1,5 +1,5 @@
 # Pint Formatting Test Report
-*Generated: dim. 11 janv. 2026 19:59:12 WAT*
+*Generated: dim. 11 janv. 2026 20:28:17 WAT*
 
 
   ⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯.⨯..⨯.⨯.⨯⨯⨯⨯.⨯.⨯⨯⨯⨯⨯.⨯⨯⨯.⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯
