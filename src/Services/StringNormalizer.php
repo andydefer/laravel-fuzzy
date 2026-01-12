@@ -8,6 +8,9 @@ use Illuminate\Support\Str;
 
 /**
  * Service for normalizing text strings for indexing and search operations.
+ *
+ * Provides consistent text processing across the fuzzy search system,
+ * including normalization, tokenization, and keyword extraction.
  */
 class StringNormalizer
 {
@@ -15,16 +18,16 @@ class StringNormalizer
      * Normalize a string by removing special characters, converting to lowercase,
      * and standardizing whitespace.
      *
-     * @param string $str The input string to normalize
-     * @return string Normalized string
+     * @param string $input The input string to normalize
+     * @return string Normalized string or empty string for invalid input
      */
-    public function normalize(string $str): string
+    public function normalize(string $input): string
     {
-        if ($str === '' || $str === '0') {
+        if ($input === '' || $input === '0') {
             return '';
         }
 
-        return (string) Str::of($str)
+        return (string) Str::of($input)
             ->trim()
             ->lower()
             ->ascii()
@@ -34,53 +37,55 @@ class StringNormalizer
     }
 
     /**
-     * Split a string into individual words.
+     * Split a normalized string into individual words.
      *
-     * @param string $str The string to split
-     * @return array<int, string> Array of words
+     * @param string $input The string to split into words
+     * @return array<int, string> Array of non-empty words
      */
-    public function splitIntoWords(string $str): array
+    public function splitIntoWords(string $input): array
     {
-        if ($str === '' || $str === '0') {
+        if ($input === '' || $input === '0') {
             return [];
         }
 
-        $str = str_replace(['_', '-'], ' ', $str);
-        $words = preg_split('/\s+/', $str, -1, PREG_SPLIT_NO_EMPTY);
+        $normalized = str_replace(['_', '-'], ' ', $input);
+        $words = preg_split('/\s+/', $normalized, -1, PREG_SPLIT_NO_EMPTY);
 
         return array_values(array_filter($words, fn($word): bool => (string) $word !== ''));
     }
 
     /**
-     * Normalize a search query by removing stop words from longer queries.
+     * Normalize a search query by applying full normalization and removing stop words.
+     * Stop words are only removed from queries longer than 3 words.
      *
      * @param string $query The search query to normalize
-     * @return string Normalized query without stop words
+     * @return string Normalized query with stop words removed when applicable
      */
     public function normalizeQuery(string $query): string
     {
-        $query = $this->normalize($query);
-        $words = $this->splitIntoWords($query);
+        $normalizedQuery = $this->normalize($query);
+        $words = $this->splitIntoWords($normalizedQuery);
 
         if (count($words) > 3) {
             $stopWords = config('fuzzy.stop_words', []);
-            $words = array_filter($words, fn($word): bool => !in_array($word, $stopWords));
+            $filteredWords = array_filter($words, fn($word): bool => !in_array($word, $stopWords, true));
+            $words = array_values($filteredWords);
         }
 
         return implode(' ', $words);
     }
 
     /**
-     * Extract the most relevant keywords from a string.
+     * Extract the most relevant keywords from a string based on frequency and relevance.
      *
-     * @param string $str The string to analyze
-     * @param int $maxKeywords Maximum number of keywords to return
-     * @return array<int, string> Extracted keywords sorted by frequency
+     * @param string $input The string to analyze for keywords
+     * @param int $maxKeywords Maximum number of keywords to return (default: 10)
+     * @return array<int, string> Extracted keywords sorted by frequency (descending) then alphabetically
      */
-    public function extractKeywords(string $str, int $maxKeywords = 10): array
+    public function extractKeywords(string $input, int $maxKeywords = 10): array
     {
-        $normalized = $this->normalize($str);
-        $words = $this->splitIntoWords($normalized);
+        $normalizedText = $this->normalize($input);
+        $words = $this->splitIntoWords($normalizedText);
 
         $stopWords = config('fuzzy.stop_words', []);
         $keywords = array_filter(
@@ -88,20 +93,16 @@ class StringNormalizer
             fn(string $word): bool => strlen($word) >= 3 && !in_array($word, $stopWords, true)
         );
 
-        $frequencies = array_count_values($keywords);
+        $wordFrequencies = array_count_values($keywords);
 
-        // Trier par fréquence décroissante, puis alphabétiquement
-        uksort($frequencies, function ($a, $b) use ($frequencies): int {
-            // Priorité 1: Fréquence (plus haute d'abord)
-            $freqCompare = $frequencies[$b] <=> $frequencies[$a];
-            if ($freqCompare !== 0) {
-                return $freqCompare;
-            }
+        uksort($wordFrequencies, function (string $wordA, string $wordB) use ($wordFrequencies): int {
+            $frequencyComparison = $wordFrequencies[$wordB] <=> $wordFrequencies[$wordA];
 
-            // Priorité 2: Ordre alphabétique
-            return strcmp($a, $b);
+            return $frequencyComparison !== 0
+                ? $frequencyComparison
+                : strcmp($wordA, $wordB);
         });
 
-        return array_slice(array_keys($frequencies), 0, $maxKeywords);
+        return array_slice(array_keys($wordFrequencies), 0, $maxKeywords);
     }
 }

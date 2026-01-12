@@ -10,11 +10,11 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     /**
-     * Create the fuzzy search index table.
+     * Run the migration to create the fuzzy search index table.
      *
-     * This table stores normalized search data for fuzzy matching across
-     * various models and fields. It supports weighted searches and
-     * database-optimized indexing strategies.
+     * This table stores normalized search data for efficient fuzzy matching
+     * across different Eloquent models and fields. It supports weighted
+     * searches and database-optimized indexing strategies.
      *
      * @return void
      */
@@ -39,7 +39,7 @@ return new class extends Migration
     }
 
     /**
-     * Create base indexes for the fuzzy index table.
+     * Create essential indexes for query optimization.
      *
      * @param Blueprint $table
      * @return void
@@ -56,6 +56,9 @@ return new class extends Migration
     /**
      * Create database-specific indexes for optimal performance.
      *
+     * Different database systems require different indexing strategies
+     * for text and JSON fields.
+     *
      * @return void
      */
     private function createDatabaseSpecificIndexes(): void
@@ -65,9 +68,11 @@ return new class extends Migration
     }
 
     /**
-     * Create MySQL-specific index for normalized_value.
+     * Create MySQL-specific index for the normalized_value field.
      *
-     * MySQL requires specifying length for text field indexes.
+     * MySQL requires specifying a length when indexing text fields.
+     * The length of 191 characters is chosen for compatibility with
+     * older MySQL versions and utf8mb4 encoding.
      *
      * @return void
      */
@@ -81,9 +86,10 @@ return new class extends Migration
     }
 
     /**
-     * Create PostgreSQL-specific index for words JSON array.
+     * Create PostgreSQL-specific index for the words JSON array.
      *
-     * PostgreSQL can index JSON array elements for faster lookups.
+     * PostgreSQL supports indexing JSON array elements for faster
+     * lookups and query performance.
      *
      * @return void
      */
@@ -99,7 +105,7 @@ return new class extends Migration
     }
 
     /**
-     * Drop the fuzzy search index table.
+     * Reverse the migration by dropping the fuzzy search index table.
      *
      * @return void
      */

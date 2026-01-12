@@ -4,26 +4,29 @@ declare(strict_types=1);
 
 namespace Fuzzy\Services;
 
-use Symfony\Component\Finder\Finder;
-use Fuzzy\Stages\NormalizeQueryStage;
-use Fuzzy\Stages\MatchDiscoveryStage;
-use Fuzzy\Stages\ScoringStage;
-use Fuzzy\Stages\SortAndLimitStage;
-use Fuzzy\Contracts\MustFuzzySearch;
 use Fuzzy\Contracts\IndexRepositoryInterface;
+use Fuzzy\Contracts\MustFuzzySearch;
 use Fuzzy\Data\SearchOptionsData;
-use Fuzzy\ValueObjects\SearchQuery;
 use Fuzzy\Exceptions\ModelNotSearchableException;
 use Fuzzy\Models\FuzzyIndex;
 use Fuzzy\SearchContext;
 use Fuzzy\Services\Scoring\ScoringEngine;
+use Fuzzy\Stages\MatchDiscoveryStage;
+use Fuzzy\Stages\NormalizeQueryStage;
+use Fuzzy\Stages\ScoringStage;
+use Fuzzy\Stages\SortAndLimitStage;
+use Fuzzy\ValueObjects\SearchQuery;
 use Illuminate\Pipeline\Pipeline;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use ReflectionClass;
+use Symfony\Component\Finder\Finder;
 
 /**
  * Main service for fuzzy search operations.
+ *
+ * Provides search capabilities across searchable models with caching,
+ * indexing, and similarity calculations.
  */
 class FuzzySearchService
 {
@@ -46,25 +49,28 @@ class FuzzySearchService
 
     /**
      * Search across all searchable models.
+     *
+     * @param string $query The search query
+     * @param array<string, mixed> $options Search options to override defaults
+     * @return Collection<array-key, mixed> Collection of search results with scores
      */
     public function search(string $query, array $options = []): Collection
     {
-        if (!$this->isCacheEnabled()) {
-            return $this->performSearch($query, $options);
-        }
-
-        $cacheKey = $this->generateCacheKey('search', $query, $options);
-        $ttl = config('fuzzy.cache.ttl.search', 3600);
-
-        return $this->cacheRemember($cacheKey, $ttl, function () use ($query, $options): Collection {
-            return $this->performSearch($query, $options);
-        });
+        return $this->executeWithCache(
+            cacheType: 'search',
+            callback: fn() => $this->executeSearch($query, $options),
+            parameters: [$query, $options]
+        );
     }
 
     /**
-     * Recherche réelle (sans cache).
+     * Execute search without caching.
+     *
+     * @param string $query The search query
+     * @param array<string, mixed> $options Search options
+     * @return Collection<array-key, mixed> Collection of search results
      */
-    private function performSearch(string $query, array $options = []): Collection
+    private function executeSearch(string $query, array $options = []): Collection
     {
         $searchOptions = SearchOptionsData::fromConfig($options);
         $models = $this->getSearchableModels();
@@ -72,7 +78,7 @@ class FuzzySearchService
         $allResults = collect();
 
         foreach ($models as $modelClass) {
-            $modelResults = $this->performSearchInModel($modelClass, $query, $options);
+            $modelResults = $this->searchInModelWithoutCache($modelClass, $query, $options);
             $allResults = $allResults->merge($modelResults);
         }
 
@@ -81,25 +87,32 @@ class FuzzySearchService
 
     /**
      * Search within a specific model.
+     *
+     * @param string $modelClass Fully qualified model class name
+     * @param string $query The search query
+     * @param array<string, mixed> $options Search options
+     * @return Collection<array-key, mixed> Search results for the specified model
+     * @throws ModelNotSearchableException If model does not implement MustFuzzySearch
      */
     public function searchInModel(string $modelClass, string $query, array $options = []): Collection
     {
-        if (!$this->isCacheEnabled()) {
-            return $this->performSearchInModel($modelClass, $query, $options);
-        }
-
-        $cacheKey = $this->generateCacheKey('search_in_model', $modelClass, $query, $options);
-        $ttl = config('fuzzy.cache.ttl.search_in_model', 3600);
-
-        return $this->cacheRemember($cacheKey, $ttl, function () use ($modelClass, $query, $options): Collection {
-            return $this->performSearchInModel($modelClass, $query, $options);
-        });
+        return $this->executeWithCache(
+            cacheType: 'search_in_model',
+            callback: fn() => $this->searchInModelWithoutCache($modelClass, $query, $options),
+            parameters: [$modelClass, $query, $options]
+        );
     }
 
     /**
-     * Recherche dans un modèle (sans cache).
+     * Search within a model without caching.
+     *
+     * @param string $modelClass Fully qualified model class name
+     * @param string $query The search query
+     * @param array<string, mixed> $options Search options
+     * @return Collection<array-key, mixed> Search results
+     * @throws ModelNotSearchableException If model does not implement MustFuzzySearch
      */
-    private function performSearchInModel(string $modelClass, string $query, array $options = []): Collection
+    private function searchInModelWithoutCache(string $modelClass, string $query, array $options = []): Collection
     {
         $this->validateModel($modelClass);
         $searchOptions = SearchOptionsData::fromConfig($options);
@@ -110,7 +123,27 @@ class FuzzySearchService
         }
 
         $indexData = $this->indexRepository->getIndexDataForModel($modelClass);
-        $context = new SearchContext(
+        $context = $this->createSearchContext($searchQuery, $searchOptions, $indexData);
+
+        $results = $this->processSearchPipeline($context);
+
+        return $this->filterAndSortResults(collect($results), $searchOptions->minScore);
+    }
+
+    /**
+     * Create a search context for pipeline processing.
+     *
+     * @param SearchQuery $searchQuery Normalized search query
+     * @param SearchOptionsData $searchOptions Search configuration
+     * @param array<string, mixed> $indexData Preloaded index data
+     * @return SearchContext Configured search context
+     */
+    private function createSearchContext(
+        SearchQuery $searchQuery,
+        SearchOptionsData $searchOptions,
+        array $indexData
+    ): SearchContext {
+        return new SearchContext(
             query: $searchQuery,
             options: $searchOptions,
             normalizer: $this->normalizer,
@@ -120,42 +153,54 @@ class FuzzySearchService
             scoringEngine: $this->scoringEngine,
             indexDataArray: $indexData
         );
+    }
 
-        $results = $this->pipeline
+    /**
+     * Execute the search pipeline with the given context.
+     *
+     * @param SearchContext $context Search context
+     * @return array<int, mixed> Raw search results
+     */
+    private function processSearchPipeline(SearchContext $context): array
+    {
+        return $this->pipeline
             ->send($context)
             ->through($this->getPipelineStages())
             ->then(fn(SearchContext $context): array => $context->results);
-
-        return $this->filterAndSortResults(collect($results), $searchOptions->minScore);
     }
 
     /**
      * Search across multiple specific models.
+     *
+     * @param array<int, string> $modelClasses Array of fully qualified model class names
+     * @param string $query The search query
+     * @param array<string, mixed> $options Search options
+     * @return Collection<array-key, mixed> Combined search results
      */
     public function searchInModels(array $modelClasses, string $query, array $options = []): Collection
     {
-        if (!$this->isCacheEnabled()) {
-            return $this->performSearchInModels($modelClasses, $query, $options);
-        }
-
-        $cacheKey = $this->generateCacheKey('search_in_models', $modelClasses, $query, $options);
-        $ttl = config('fuzzy.cache.ttl.search_in_models', 3600);
-
-        return $this->cacheRemember($cacheKey, $ttl, function () use ($modelClasses, $query, $options): Collection {
-            return $this->performSearchInModels($modelClasses, $query, $options);
-        });
+        return $this->executeWithCache(
+            cacheType: 'search_in_models',
+            callback: fn() => $this->searchInModelsWithoutCache($modelClasses, $query, $options),
+            parameters: [$modelClasses, $query, $options]
+        );
     }
 
     /**
-     * Recherche dans plusieurs modèles (sans cache).
+     * Search across multiple models without caching.
+     *
+     * @param array<int, string> $modelClasses Array of model class names
+     * @param string $query The search query
+     * @param array<string, mixed> $options Search options
+     * @return Collection<array-key, mixed> Combined search results
      */
-    private function performSearchInModels(array $modelClasses, string $query, array $options = []): Collection
+    private function searchInModelsWithoutCache(array $modelClasses, string $query, array $options = []): Collection
     {
         $results = collect();
 
         foreach ($modelClasses as $modelClass) {
             if ($this->isModelSearchable($modelClass)) {
-                $modelResults = $this->performSearchInModel($modelClass, $query, $options);
+                $modelResults = $this->searchInModelWithoutCache($modelClass, $query, $options);
                 $results = $results->merge($modelResults);
             }
         }
@@ -165,6 +210,9 @@ class FuzzySearchService
 
     /**
      * Index a specific model instance for search.
+     *
+     * @param MustFuzzySearch $model The model instance to index
+     * @return void
      */
     public function indexModel(MustFuzzySearch $model): void
     {
@@ -179,6 +227,9 @@ class FuzzySearchService
 
     /**
      * Update the search index for a model instance.
+     *
+     * @param MustFuzzySearch $model The model instance to update
+     * @return void
      */
     public function updateModelIndex(MustFuzzySearch $model): void
     {
@@ -188,6 +239,9 @@ class FuzzySearchService
 
     /**
      * Remove a model instance from the search index.
+     *
+     * @param MustFuzzySearch $model The model instance to remove
+     * @return void
      */
     public function removeModelFromIndex(MustFuzzySearch $model): void
     {
@@ -203,6 +257,8 @@ class FuzzySearchService
 
     /**
      * Reindex all searchable models.
+     *
+     * @return void
      */
     public function reindexAll(): void
     {
@@ -219,6 +275,10 @@ class FuzzySearchService
 
     /**
      * Reindex all instances of a specific model.
+     *
+     * @param string $modelClass Fully qualified model class name
+     * @return void
+     * @throws ModelNotSearchableException If model does not implement MustFuzzySearch
      */
     public function reindexModel(string $modelClass): void
     {
@@ -241,6 +301,10 @@ class FuzzySearchService
 
     /**
      * Calculate similarity score between two strings.
+     *
+     * @param string $firstString First string to compare
+     * @param string $secondString Second string to compare
+     * @return float Similarity score between 0 and 1
      */
     public function calculateSimilarity(string $firstString, string $secondString): float
     {
@@ -249,6 +313,9 @@ class FuzzySearchService
 
     /**
      * Normalize a string for search operations.
+     *
+     * @param string $string String to normalize
+     * @return string Normalized string
      */
     public function normalize(string $string): string
     {
@@ -257,6 +324,9 @@ class FuzzySearchService
 
     /**
      * Split a string into individual words.
+     *
+     * @param string $string String to split
+     * @return array<int, string> Array of words
      */
     public function splitIntoWords(string $string): array
     {
@@ -265,6 +335,9 @@ class FuzzySearchService
 
     /**
      * Normalize a search query.
+     *
+     * @param string $query Search query to normalize
+     * @return string Normalized query
      */
     public function normalizeQuery(string $query): string
     {
@@ -273,24 +346,22 @@ class FuzzySearchService
 
     /**
      * Get search index statistics.
+     *
+     * @return array<string, mixed> Statistics about the search index
      */
     public function getStats(): array
     {
-        if (!$this->isCacheEnabled()) {
-            return $this->indexRepository->getStats();
-        }
-
-        $cacheKey = $this->generateCacheKey('stats');
-        $ttl = config('fuzzy.cache.ttl.stats', 30); // 30 secondes
-
-        return $this->cacheRemember($cacheKey, $ttl, function (): array {
-            return $this->indexRepository->getStats();
-        });
+        return $this->executeWithCache(
+            cacheType: 'stats',
+            callback: fn() => $this->indexRepository->getStats(),
+            parameters: []
+        );
     }
 
     /**
-     * Invalide tout le cache de recherche.
-     * Solution SAFE: Stocker et supprimer uniquement nos propres clés.
+     * Invalidate all search cache.
+     *
+     * @return void
      */
     public function invalidateAllCache(): void
     {
@@ -302,7 +373,10 @@ class FuzzySearchService
     }
 
     /**
-     * Invalide le cache pour un modèle spécifique.
+     * Invalidate cache for a specific model.
+     *
+     * @param string $modelClass Fully qualified model class name
+     * @return void
      */
     public function invalidateCacheForModel(string $modelClass): void
     {
@@ -315,57 +389,65 @@ class FuzzySearchService
 
     /**
      * Get all searchable models.
+     *
+     * @return array<int, string> Array of fully qualified model class names
      */
     public function getSearchableModels(): array
     {
-        if (!$this->isCacheEnabled()) {
-            return $this->fetchSearchableModels();
-        }
-
-        $cacheKey = $this->generateCacheKey('searchable_models');
-        $ttl = config('fuzzy.cache.ttl.search', 3600);
-
-        return $this->cacheRemember($cacheKey, $ttl, function (): array {
-            return $this->fetchSearchableModels();
-        });
+        return $this->executeWithCache(
+            cacheType: 'searchable_models',
+            callback: fn() => $this->fetchSearchableModels(),
+            parameters: []
+        );
     }
 
+    /**
+     * Fetch searchable models from configuration or auto-discovery.
+     *
+     * @return array<int, string> Array of model class names
+     */
     private function fetchSearchableModels(): array
     {
         $configuredModels = config('fuzzy.searchable_models', []);
 
         if (!empty($configuredModels)) {
-            return array_filter($configuredModels, function (string $modelClass): bool {
-                return $this->isModelSearchable($modelClass);
-            });
+            return $this->filterValidModels($configuredModels);
         }
 
         return $this->discoverSearchableModels();
     }
 
     /**
+     * Filter array to only include valid searchable models.
+     *
+     * @param array<int, string> $modelClasses Array of model class names
+     * @return array<int, string> Filtered array of valid models
+     */
+    private function filterValidModels(array $modelClasses): array
+    {
+        return array_filter($modelClasses, function (string $modelClass): bool {
+            return $this->isModelSearchable($modelClass);
+        });
+    }
+
+    /**
      * Discover models implementing MustFuzzySearch interface.
+     *
+     * @return array<int, string> Array of discovered model class names
      */
     private function discoverSearchableModels(): array
     {
         $models = [];
         $finder = new Finder();
 
-        $paths = [
-            app_path('Models'),
-        ];
-
-        if (config('fuzzy.auto_discovery.enabled')) {
-            $paths[] = dirname(__DIR__, 2) . '/tests/Fixtures';
-        }
+        $paths = $this->getDiscoveryPaths();
 
         $finder->files()
             ->in($paths)
             ->name('*.php');
 
-
         foreach ($finder as $file) {
-            $modelClass = $this->getClassNameFromFile($file->getRealPath());
+            $modelClass = $this->extractClassNameFromFile($file->getRealPath());
 
             if ($modelClass && $this->isModelSearchable($modelClass)) {
                 $models[] = $modelClass;
@@ -376,9 +458,30 @@ class FuzzySearchService
     }
 
     /**
-     * Extract fully qualified class name from a file.
+     * Get paths for model discovery.
+     *
+     * @return array<int, string> Array of directory paths
      */
-    private function getClassNameFromFile(string $filePath): ?string
+    private function getDiscoveryPaths(): array
+    {
+        $paths = [
+            app_path('Models'),
+        ];
+
+        if (config('fuzzy.auto_discovery.enabled')) {
+            $paths[] = dirname(__DIR__, 2) . '/tests/Fixtures';
+        }
+
+        return $paths;
+    }
+
+    /**
+     * Extract fully qualified class name from a file.
+     *
+     * @param string $filePath Path to PHP file
+     * @return string|null Fully qualified class name or null if not found
+     */
+    private function extractClassNameFromFile(string $filePath): ?string
     {
         $content = file_get_contents($filePath);
         $namespace = '';
@@ -402,6 +505,9 @@ class FuzzySearchService
 
     /**
      * Check if a model implements the MustFuzzySearch interface.
+     *
+     * @param string $modelClass Fully qualified model class name
+     * @return bool True if model is searchable
      */
     protected function isModelSearchable(string $modelClass): bool
     {
@@ -415,6 +521,10 @@ class FuzzySearchService
 
     /**
      * Validate that a model implements MustFuzzySearch interface.
+     *
+     * @param string $modelClass Fully qualified model class name
+     * @throws ModelNotSearchableException If model does not implement MustFuzzySearch
+     * @return void
      */
     protected function validateModel(string $modelClass): void
     {
@@ -427,6 +537,8 @@ class FuzzySearchService
 
     /**
      * Get the pipeline stages for search processing.
+     *
+     * @return array<int, string> Array of pipeline stage class names
      */
     protected function getPipelineStages(): array
     {
@@ -440,6 +552,10 @@ class FuzzySearchService
 
     /**
      * Filter and sort search results.
+     *
+     * @param Collection<array-key, mixed> $results Collection of search results
+     * @param float $minScore Minimum score threshold
+     * @return Collection<array-key, mixed> Filtered and sorted results
      */
     private function filterAndSortResults(Collection $results, float $minScore): Collection
     {
@@ -449,10 +565,10 @@ class FuzzySearchService
             ->values();
     }
 
-    // ==================== MÉTHODES CACHE SIMPLIFIÉES ====================
-
     /**
-     * Vérifie si le cache est activé.
+     * Check if cache is enabled.
+     *
+     * @return bool True if caching is enabled
      */
     private function isCacheEnabled(): bool
     {
@@ -460,7 +576,9 @@ class FuzzySearchService
     }
 
     /**
-     * Vérifie si le cache doit être invalidé sur indexation.
+     * Check if cache should be invalidated on index operations.
+     *
+     * @return bool True if cache should be invalidated
      */
     private function shouldInvalidateCacheOnIndex(): bool
     {
@@ -468,7 +586,9 @@ class FuzzySearchService
     }
 
     /**
-     * Vérifie si le cache doit être invalidé sur suppression.
+     * Check if cache should be invalidated on delete operations.
+     *
+     * @return bool True if cache should be invalidated
      */
     private function shouldInvalidateCacheOnDelete(): bool
     {
@@ -476,28 +596,38 @@ class FuzzySearchService
     }
 
     /**
-     * Méthode wrapper pour Cache::remember avec suivi des clés.
+     * Execute operation with caching.
+     *
+     * @param string $cacheType Type of cache operation
+     * @param callable $callback Operation to execute
+     * @param array<int, mixed> $parameters Parameters for cache key generation
+     * @return mixed Result of the operation
      */
-    private function cacheRemember(string $key, int $ttl, callable $callback)
+    private function executeWithCache(string $cacheType, callable $callback, array $parameters)
     {
-        // Stocker la clé pour invalidation future
-        $this->storeCacheKey($key);
+        if (!$this->isCacheEnabled()) {
+            return $callback();
+        }
 
-        return Cache::remember($key, $ttl, $callback);
+        $cacheKey = $this->generateCacheKey($cacheType, ...$parameters);
+        $ttl = config("fuzzy.cache.ttl.{$cacheType}", 3600);
+
+        return $this->cacheRemember($cacheKey, $ttl, $callback);
     }
 
     /**
-     * Génère une clé de cache unique.
+     * Generate a unique cache key.
+     *
+     * @param string $type Type of cache key
+     * @param string|array<int, mixed> ...$parameters Parameters to include in key
+     * @return string Generated cache key
      */
-    private function generateCacheKey(string $type, string|array ...$params): string
+    private function generateCacheKey(string $type, string|array ...$parameters): string
     {
         $prefix = config('fuzzy.cache.prefix', 'fuzzy_search:');
-
-        // Simplification: ne pas faire d'hypothèses sur le contenu
-        $hash = md5(json_encode($params));
+        $hash = md5(json_encode($parameters));
         $key = sprintf('%s%s:%s', $prefix, $type, $hash);
 
-        // Limiter la longueur de la clé
         if (strlen($key) > 250) {
             return sprintf('%s%s:', $prefix, $type) . md5($key);
         }
@@ -506,27 +636,46 @@ class FuzzySearchService
     }
 
     /**
-     * Stocke une clé de cache générée pour invalidation future.
+     * Cache operation with key tracking.
+     *
+     * @param string $key Cache key
+     * @param int $ttl Time to live in seconds
+     * @param callable $callback Operation to cache
+     * @return mixed Result of the operation
+     */
+    private function cacheRemember(string $key, int $ttl, callable $callback)
+    {
+        $this->storeCacheKey($key);
+
+        return Cache::remember($key, $ttl, $callback);
+    }
+
+    /**
+     * Store a cache key for future invalidation.
+     *
+     * @param string $key Cache key to store
+     * @return void
      */
     private function storeCacheKey(string $key): void
     {
-        $storageKey = $this->getStorageKeyName();
+        $storageKey = $this->getCacheKeysStorageKey();
         $storedKeys = Cache::get($storageKey, []);
 
         if (!in_array($key, $storedKeys, true)) {
             $storedKeys[] = $key;
-            // Stocker pour 1 jour de plus que le TTL max
             $maxTtl = max(array_values(config('fuzzy.cache.ttl', []))) + 86400;
             Cache::put($storageKey, $storedKeys, $maxTtl);
         }
     }
 
     /**
-     * Supprime toutes les clés de cache stockées.
+     * Delete all stored cache keys.
+     *
+     * @return void
      */
     private function deleteStoredCacheKeys(): void
     {
-        $storageKey = $this->getStorageKeyName();
+        $storageKey = $this->getCacheKeysStorageKey();
         $storedKeys = Cache::get($storageKey, []);
 
         foreach ($storedKeys as $key) {
@@ -537,11 +686,14 @@ class FuzzySearchService
     }
 
     /**
-     * Supprime les clés de cache pour un modèle spécifique.
+     * Delete cache keys for a specific model.
+     *
+     * @param string $modelClass Fully qualified model class name
+     * @return void
      */
     private function deleteCacheKeysForModel(string $modelClass): void
     {
-        $storageKey = $this->getStorageKeyName();
+        $storageKey = $this->getCacheKeysStorageKey();
         $storedKeys = Cache::get($storageKey, []);
         $modelHash = md5($modelClass);
 
@@ -549,7 +701,6 @@ class FuzzySearchService
         $keysToKeep = [];
 
         foreach ($storedKeys as $key) {
-            // Si la clé contient le hash du modèle, on la supprime
             if (str_contains($key, $modelHash)) {
                 $keysToDelete[] = $key;
             } else {
@@ -557,12 +708,10 @@ class FuzzySearchService
             }
         }
 
-        // Supprimer les clés concernées
         foreach ($keysToDelete as $key) {
             Cache::forget($key);
         }
 
-        // Mettre à jour la liste stockée
         if ($keysToDelete !== []) {
             $maxTtl = max(array_values(config('fuzzy.cache.ttl', []))) + 86400;
             Cache::put($storageKey, $keysToKeep, $maxTtl);
@@ -570,9 +719,11 @@ class FuzzySearchService
     }
 
     /**
-     * Retourne le nom de la clé de stockage des clés de cache.
+     * Get the storage key name for cache keys tracking.
+     *
+     * @return string Storage key name
      */
-    private function getStorageKeyName(): string
+    private function getCacheKeysStorageKey(): string
     {
         $prefix = config('fuzzy.cache.prefix', 'fuzzy_search:');
         return $prefix . 'cache_keys';

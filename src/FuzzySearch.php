@@ -9,13 +9,11 @@ use Illuminate\Support\Collection;
 use Fuzzy\Contracts\MustFuzzySearch;
 
 /**
- * Facade for the fuzzy search service.
+ * Facade for the fuzzy search service
  *
- * Provides static access to all fuzzy search functionality including:
- * - Full-text search across searchable models
- * - Model-specific searching
- * - Index management operations
- * - String similarity calculations
+ * Provides static access to fuzzy search functionality throughout the application.
+ * This facade acts as the primary interface for search operations, index management,
+ * and similarity calculations.
  *
  * @method static Collection search(string $query, array $options = []) Search across all searchable models
  * @method static Collection searchInModel(string $modelClass, string $query, array $options = []) Search within a specific model
@@ -35,7 +33,9 @@ use Fuzzy\Contracts\MustFuzzySearch;
 class FuzzySearch extends Facade
 {
     /**
-     * Get the registered name of the component.
+     * Get the registered name of the component
+     *
+     * @return string The service container binding key
      */
     protected static function getFacadeAccessor(): string
     {

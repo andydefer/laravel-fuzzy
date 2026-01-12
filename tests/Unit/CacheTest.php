@@ -4,38 +4,38 @@ declare(strict_types=1);
 
 namespace Fuzzy\Tests\Unit;
 
-use Fuzzy\Tests\TestCase;
 use Fuzzy\Services\FuzzySearchService;
+use Fuzzy\Models\FuzzyIndex;
+use Fuzzy\Tests\TestCase;
 use Fuzzy\Tests\Fixtures\User;
 use Fuzzy\Tests\Fixtures\Product;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Collection;
-use Fuzzy\Models\FuzzyIndex;
 
 final class CacheTest extends TestCase
 {
+    /**
+     * Setup test environment.
+     */
     protected function setUp(): void
     {
         parent::setUp();
 
-        // Utiliser le cache array pour les tests (plus propre)
         config(['cache.default' => 'array']);
-
-        // Nettoyer avant chaque test
         Cache::flush();
 
-        // Créer des données de test minimales
         $this->createTestData();
     }
 
+    /**
+     * Create minimal test data and reindex.
+     */
     protected function createTestData(): void
     {
-        // Clean up
         FuzzyIndex::query()->truncate();
         User::query()->delete();
         Product::query()->delete();
 
-        // Créer quelques données de test
         User::create([
             'name' => 'John Doe',
             'email' => 'john@example.com',
@@ -54,198 +54,184 @@ final class CacheTest extends TestCase
             'price' => 1299.99,
         ]);
 
-        // Réindexer
-        $searchService = app(FuzzySearchService::class);
-        $searchService->reindexAll();
+        app(FuzzySearchService::class)->reindexAll();
     }
 
+    /**
+     * Test that search results are properly cached.
+     */
     public function test_search_results_are_cached(): void
     {
-        // Arrange: Activer le cache
+        // Arrange: Enable caching
         config(['fuzzy.cache.enabled' => true]);
-
-        // Spy sur Cache pour vérifier les appels
         Cache::spy();
 
         $searchService = app(FuzzySearchService::class);
 
-        // Act: Premier appel
-        $results1 = $searchService->search('john');
+        // Act: Perform first search
+        $results = $searchService->search('john');
 
-        // Assert: Cache::remember doit être appelé au moins une fois
+        // Assert: Cache::remember should be called at least once
         Cache::shouldHaveReceived('remember')->atLeast()->once();
-
-        $this->assertInstanceOf(Collection::class, $results1);
-        $this->assertGreaterThan(0, $results1->count());
+        $this->assertInstanceOf(Collection::class, $results);
+        $this->assertGreaterThan(0, $results->count());
     }
 
+    /**
+     * Test that cache invalidation does not affect other application caches.
+     */
     public function test_cache_does_not_flush_entire_application_cache(): void
     {
-        // Arrange: Activer le cache
+        // Arrange: Enable caching and store unrelated cache data
         config(['fuzzy.cache.enabled' => true]);
 
-        $searchService = app(FuzzySearchService::class);
-
-        // Mettre d'autres données en cache
         Cache::put('session_data', 'user123', 60);
         Cache::put('config_cache', 'value', 3600);
 
-        // Mettre en cache une recherche
+        $searchService = app(FuzzySearchService::class);
         $searchService->search('john');
 
-        // Vérifier que nos caches existent
         $this->assertTrue(Cache::has('session_data'));
         $this->assertTrue(Cache::has('config_cache'));
 
-        // Act: Invalider le cache fuzzy SEULEMENT
+        // Act: Invalidate fuzzy cache only
         $searchService->invalidateAllCache();
 
-        // Assert: Les autres caches doivent toujours exister
+        // Assert: Other caches should remain intact
         $this->assertTrue(
             Cache::has('session_data'),
-            'Les sessions ne doivent pas être supprimées'
+            'Session cache should not be cleared'
         );
         $this->assertTrue(
             Cache::has('config_cache'),
-            'La config ne doit pas être supprimée'
+            'Config cache should not be cleared'
         );
 
-        // Vérifier que la recherche fuzzy est bien invalidée
-        // en faisant une nouvelle recherche
+        // Verify fuzzy search cache is regenerated
         Cache::spy();
         $searchService->search('john');
         Cache::shouldHaveReceived('remember')->atLeast()->once();
     }
 
+    /**
+     * Test that cache is invalidated after indexing new data.
+     */
     public function test_cache_is_invalidated_after_indexing(): void
     {
-        // Arrange: Activer le cache
-        config(['fuzzy.cache.enabled' => true]);
-        config(['fuzzy.cache.invalidation.on_index' => true]);
+        // Arrange: Enable caching with index invalidation
+        config([
+            'fuzzy.cache.enabled' => true,
+            'fuzzy.cache.invalidation.on_index' => true,
+        ]);
 
         $searchService = app(FuzzySearchService::class);
-
-        // Premier appel (mise en cache)
         $initialResults = $searchService->search('john');
         $initialCount = $initialResults->count();
 
-        // Indexer un nouveau modèle (devrait invalider le cache)
         $newUser = User::create([
             'name' => 'Johnny New',
             'email' => 'johnny@example.com',
             'type' => 'user',
         ]);
 
-        // Spy pour voir si le cache est régénéré
         Cache::spy();
 
-        // Act: Indexer le nouveau user
+        // Act: Index new user and search again
         $searchService->indexModel($newUser);
-
-        // Faire une recherche (devrait régénérer le cache)
         $newResults = $searchService->search('john');
 
-        // Assert: Le cache doit être régénéré (remember appelé)
+        // Assert: Cache should be regenerated
         Cache::shouldHaveReceived('remember')->atLeast()->once();
-
-        // Les résultats devraient être différents
-        // (un utilisateur de plus devrait être trouvé)
         $this->assertGreaterThanOrEqual(
             $initialCount,
             $newResults->count(),
-            'La recherche après indexation devrait trouver au moins autant de résultats'
+            'Search after indexing should find at least as many results'
         );
     }
 
+    /**
+     * Test that search works correctly when caching is disabled.
+     */
     public function test_cache_disabled_works(): void
     {
-        // Arrange: Désactiver le cache
+        // Arrange: Disable caching
         config(['fuzzy.cache.enabled' => false]);
 
         $searchService = app(FuzzySearchService::class);
 
-        // Act: Faire une recherche
+        // Act: Perform search
         $results = $searchService->search('test');
 
-        // Assert: Doit retourner des résultats (même si vides)
+        // Assert: Should return results even if empty
         $this->assertInstanceOf(Collection::class, $results);
 
-        // Vérifier qu'on peut faire plusieurs recherches sans erreur
-        $results2 = $searchService->search('test');
-        $this->assertInstanceOf(Collection::class, $results2);
+        // Verify multiple searches work without error
+        $secondResults = $searchService->search('test');
+        $this->assertInstanceOf(Collection::class, $secondResults);
     }
 
+    /**
+     * Test that stats cache has short TTL and expires correctly.
+     */
     public function test_stats_cache_has_short_ttl(): void
     {
-        // Arrange: Activer le cache avec TTL court pour les stats
-        config(['fuzzy.cache.enabled' => true]);
-        config(['fuzzy.cache.ttl.stats' => 2]); // 2 secondes pour le test
+        // Arrange: Enable caching with short TTL for stats
+        config([
+            'fuzzy.cache.enabled' => true,
+            'fuzzy.cache.ttl.stats' => 2,
+        ]);
 
         $searchService = app(FuzzySearchService::class);
 
-        // Premier appel stats (mise en cache)
-        $stats1 = $searchService->getStats();
-        $initialCount = $stats1['models'][User::class]['count'] ?? 0;
+        // First stats call (cache population)
+        $initialStats = $searchService->getStats();
+        $initialUserCount = $initialStats['models'][User::class]['count'] ?? 0;
 
-        // Ajouter un nouvel utilisateur SANS l'indexer encore
-        // (pour que les stats de l'index ne changent pas)
+        // Create and index new user after cache should expire
         $newUser = User::create([
             'name' => 'Stats Test User',
             'email' => 'stats@example.com',
             'type' => 'user',
         ]);
 
-        // Attendre que le cache expire (2 secondes + marge)
         sleep(3);
-
-        // Maintenant indexer le nouvel utilisateur
         $searchService->indexModel($newUser);
 
-        // Deuxième appel stats (devrait être rafraîchi car cache expiré)
-        $stats2 = $searchService->getStats();
-        $newCount = $stats2['models'][User::class]['count'] ?? 0;
+        // Act: Get stats after cache expiration
+        $newStats = $searchService->getStats();
+        $newUserCount = $newStats['models'][User::class]['count'] ?? 0;
 
-        // Debug si nécessaire
-        if ($initialCount === $newCount) {
-            // Afficher pour debug
-            echo "\nDebug stats cache test:\n";
-            echo sprintf('Initial count: %s%s', $initialCount, PHP_EOL);
-            echo sprintf('New count: %s%s', $newCount, PHP_EOL);
-            echo "Stats1: " . json_encode($stats1) . "\n";
-            echo "Stats2: " . json_encode($stats2) . "\n";
-
-            // Vérifier manuellement
-            $directStats = $searchService->getStats();
-            echo "Direct stats count: " . ($directStats['models'][User::class]['count'] ?? 0) . "\n";
-        }
-
-        // Assert: Les stats devraient être différentes car le cache a expiré
+        // Assert: Stats should be different due to cache expiration
         $this->assertNotEquals(
-            $initialCount,
-            $newCount,
+            $initialUserCount,
+            $newUserCount,
             sprintf(
-                'Les stats doivent être rafraîchies après expiration du cache (TTL: 2s). ' .
-                    'Initial: %d, Nouveau: %d. ' .
-                    'Cela indique que le cache stats fonctionne avec le TTL configuré.',
-                $initialCount,
-                $newCount
+                'Stats should refresh after cache TTL expires (TTL: 2s). ' .
+                    'Initial: %d, New: %d',
+                $initialUserCount,
+                $newUserCount
             )
         );
     }
 
+    /**
+     * Test that model-specific cache invalidation works correctly.
+     */
     public function test_model_specific_cache_invalidation(): void
     {
-        // Arrange: Activer le cache
-        config(['fuzzy.cache.enabled' => true]);
-        config(['fuzzy.cache.invalidation.on_index' => true]);
+        // Arrange: Enable caching with index invalidation
+        config([
+            'fuzzy.cache.enabled' => true,
+            'fuzzy.cache.invalidation.on_index' => true,
+        ]);
 
         $searchService = app(FuzzySearchService::class);
 
-        // Recherche dans User uniquement (mise en cache)
-        $results1 = $searchService->searchInModel(User::class, 'john');
-        $initialCount = $results1->count();
+        // Cache user search
+        $initialResults = $searchService->searchInModel(User::class, 'john');
+        $initialCount = $initialResults->count();
 
-        // Créer et indexer un Product (ne devrait pas invalider le cache User)
+        // Create and index product (should not affect user cache)
         $product = Product::create([
             'name' => 'Test Product',
             'description' => 'Test description',
@@ -253,88 +239,81 @@ final class CacheTest extends TestCase
         ]);
 
         $searchService->indexModel($product);
-
-        // Spy pour vérifier si le cache User est utilisé
         Cache::spy();
 
-        // Recherche User à nouveau
-        $results2 = $searchService->searchInModel(User::class, 'john');
+        // Act: Search users again
+        $newResults = $searchService->searchInModel(User::class, 'john');
 
-        // Assert: Les résultats devraient être les mêmes
+        // Assert: User cache should remain valid
         $this->assertCount(
             $initialCount,
-            $results2,
-            'Le cache User ne devrait pas être affecté par l\'indexation d\'un Product'
+            $newResults,
+            'User cache should not be affected by Product indexing'
         );
 
-        // Vérifier que le cache a été utilisé (remember appelé pour le cache User)
-        // Note: Il peut y avoir d'autres appels de cache, mais on s'assure au moins
-        // que la recherche a fonctionné
         Cache::shouldHaveReceived('remember')->atLeast()->once();
     }
 
+    /**
+     * Test that cache can be invalidated for specific models only.
+     */
     public function test_invalidate_cache_for_specific_model(): void
     {
-        // Arrange: Activer le cache
+        // Arrange: Enable caching
         config(['fuzzy.cache.enabled' => true]);
 
         $searchService = app(FuzzySearchService::class);
 
-        // Mettre en cache des recherches pour deux modèles
+        // Cache searches for two models
         $searchService->searchInModel(User::class, 'john');
         $searchService->searchInModel(Product::class, 'laptop');
 
-        // Act: Invalider seulement le cache User
+        // Act: Invalidate only User cache
         $searchService->invalidateCacheForModel(User::class);
-
-        // Spy pour voir ce qui se passe
         Cache::spy();
 
-        // Rechercher à nouveau
-        $userResults2 = $searchService->searchInModel(User::class, 'john');
-        $productResults2 = $searchService->searchInModel(Product::class, 'laptop');
+        // Perform searches again
+        $userResults = $searchService->searchInModel(User::class, 'john');
+        $productResults = $searchService->searchInModel(Product::class, 'laptop');
 
-        // Assert: Le cache User doit être régénéré (remember appelé)
-        // Le cache Product devrait être réutilisé (si non expiré)
-
-        // On s'assure au moins que les recherches fonctionnent
-        $this->assertInstanceOf(Collection::class, $userResults2);
-        $this->assertInstanceOf(Collection::class, $productResults2);
-
-        // Vérifier que Cache::remember a été appelé (pour la régénération)
+        // Assert: Searches should work and cache should be used
+        $this->assertInstanceOf(Collection::class, $userResults);
+        $this->assertInstanceOf(Collection::class, $productResults);
         Cache::shouldHaveReceived('remember')->atLeast()->once();
     }
 
+    /**
+     * Test that cache keys are properly managed and cleaned up.
+     */
     public function test_cache_keys_are_properly_managed(): void
     {
-        // Arrange: Activer le cache
+        // Arrange: Enable caching
         config(['fuzzy.cache.enabled' => true]);
 
         $searchService = app(FuzzySearchService::class);
 
-        // Faire plusieurs recherches pour générer des clés
+        // Generate cache keys through various operations
         $searchService->search('test1');
         $searchService->search('test2');
         $searchService->searchInModel(User::class, 'test3');
         $searchService->getStats();
 
-        // Récupérer toutes les clés stockées
         $storageKey = config('fuzzy.cache.prefix', 'fuzzy_search:') . 'cache_keys';
         $storedKeys = Cache::get($storageKey, []);
 
-        // Assert: Des clés devraient être stockées
+        // Assert: Keys should be stored
         $this->assertNotEmpty(
             $storedKeys,
-            'Les clés de cache devraient être stockées pour invalidation future'
+            'Cache keys should be stored for future invalidation'
         );
 
-        // Act: Invalider tout le cache
+        // Act: Invalidate all cache
         $searchService->invalidateAllCache();
 
-        // Assert: Les clés stockées devraient être supprimées
+        // Assert: Stored keys should be removed
         $this->assertFalse(
             Cache::has($storageKey),
-            'La liste des clés de cache devrait être supprimée après invalidateAllCache'
+            'Cache keys list should be cleared after invalidateAllCache'
         );
     }
 }

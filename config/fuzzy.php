@@ -3,39 +3,41 @@
 declare(strict_types=1);
 
 return [
-    /*
-    |--------------------------------------------------------------------------
-    | Configuration de la recherche floue
-    |--------------------------------------------------------------------------
-    |
-    | Ce fichier vous permet de configurer le comportement de la recherche floue.
-    | Certaines sections sont protégées pour assurer le bon fonctionnement.
-    |
-    */
+    /**
+     * Fuzzy search package configuration for Laravel applications
+     *
+     * This file allows configuration of fuzzy search behavior.
+     * Some sections are protected to ensure proper operation.
+     *
+     * @var array<string, mixed>
+     */
 
-    /*
-    |--------------------------------------------------------------------------
-    | Stop Words (AJOUTABLE SEULEMENT)
-    |--------------------------------------------------------------------------
-    |
-    | Vous pouvez ajouter des mots à ignorer mais pas en supprimer.
-    | Les mots de base sont toujours présents.
-    |
-    */
+    /**
+     * Stop words to ignore during indexing and searching
+     *
+     * You can add words to this list but cannot remove existing ones.
+     * The base words are always present for consistency.
+     *
+     * Example usage:
+     * // Add your custom stop words here
+     * // 'your_word',
+     * // 'another_word',
+     *
+     * @var array<int, string>
+     */
     'stop_words' => [
-        // Ajoutez vos mots ici
-        // 'votre_mot',
-        // 'autre_mot',
+        // Add your custom stop words here
+        // 'your_word',
+        // 'another_word',
     ],
 
-    /*
-    |--------------------------------------------------------------------------
-    | Configuration du cache
-    |--------------------------------------------------------------------------
-    |
-    | Contrôle le comportement de mise en cache.
-    |
-    */
+    /**
+     * Cache configuration for performance optimization
+     *
+     * Controls caching behavior to improve search performance.
+     *
+     * @var array<string, mixed>
+     */
     'cache' => [
         'enabled' => env('FUZZY_SEARCH_CACHE_ENABLED', true),
         'prefix' => 'fuzzy_search:',
@@ -52,14 +54,13 @@ return [
         ],
     ],
 
-    /*
-    |--------------------------------------------------------------------------
-    | Auto-discovery
-    |--------------------------------------------------------------------------
-    |
-    | Configuration de la découverte automatique des modèles.
-    |
-    */
+    /**
+     * Auto-discovery configuration for model detection
+     *
+     * Automatically discovers searchable models in specified directories.
+     *
+     * @var array<string, mixed>
+     */
     'auto_discovery' => [
         'enabled' => true,
         'directories' => [
@@ -73,14 +74,13 @@ return [
         ],
     ],
 
-    /*
-    |--------------------------------------------------------------------------
-    | Options par défaut
-    |--------------------------------------------------------------------------
-    |
-    | Paramètres par défaut pour les recherches.
-    |
-    */
+    /**
+     * Default search options applied when not explicitly specified
+     *
+     * These settings are used as fallback when search options are not provided.
+     *
+     * @var array<string, mixed>
+     */
     'default_options' => [
         'min_score' => 0.1,
         'max_results' => 20,
@@ -88,14 +88,13 @@ return [
         'threshold' => 0.3,
     ],
 
-    /*
-    |--------------------------------------------------------------------------
-    | Configuration de l'index
-    |--------------------------------------------------------------------------
-    |
-    | Paramètres pour la construction de l'index.
-    |
-    */
+    /**
+     * Indexing configuration
+     *
+     * Controls how content is indexed for searching.
+     *
+     * @var array<string, mixed>
+     */
     'index' => [
         'min_word_length' => 2,
         'max_word_length' => 50,
@@ -104,14 +103,13 @@ return [
         'queue_name' => env('FUZZY_SEARCH_QUEUE_NAME', 'default'),
     ],
 
-    /*
-    |--------------------------------------------------------------------------
-    | Similarité
-    |--------------------------------------------------------------------------
-    |
-    | Configuration des algorithmes de similarité.
-    |
-    */
+    /**
+     * Similarity algorithm configuration
+     *
+     * Defines thresholds and weights for different similarity algorithms.
+     *
+     * @var array<string, mixed>
+     */
     'similarity' => [
         'min_query_length' => 2,
         'min_similarity_threshold' => 0.1,
@@ -123,17 +121,23 @@ return [
         ],
     ],
 
-    /*
-    |--------------------------------------------------------------------------
-    | Scoring (PARTIELLEMENT MODIFIABLE)
-    |--------------------------------------------------------------------------
-    |
-    | Configuration du système de scoring. Certaines parties sont protégées.
-    |
-    */
+    /**
+     * Scoring configuration for result ranking
+     *
+     * Partially customizable scoring system for search results.
+     * Note: The 'consecutive_bonus' section cannot be modified.
+     *
+     * @var array<string, mixed>
+     */
     'scoring' => [
+        /**
+         * Field weights for scoring (customizable)
+         *
+         * You can add or modify field weights to prioritize specific fields.
+         *
+         * @var array<string, float>
+         */
         'field_weights' => [
-            // Vous pouvez ajouter ou modifier les poids de champs
             'name' => 1.3,
             'title' => 1.2,
             'email' => 1.0,
@@ -141,17 +145,44 @@ return [
             'content' => 0.7,
             'default' => 0.6,
         ],
+
+        /**
+         * Penalty configuration (customizable)
+         *
+         * You can adjust penalty values for specific scenarios.
+         *
+         * @var array<string, float>
+         */
         'penalties' => [
-            // Vous pouvez ajuster les pénalités
             'short_query' => 0.4,
             'cross_word_match_multi' => 0.3,
         ],
+
+        /**
+         * Bonus configuration (customizable)
+         *
+         * You can adjust bonus values for specific match qualities.
+         *
+         * @var array<string, float>
+         */
         'bonuses' => [
-            // Vous pouvez ajuster les bonus
             'full_coverage' => 0.3,
             'high_coverage' => 0.15,
             'early_position' => 0.2,
         ],
-        // ATTENTION: 'consecutive_bonus' ne peut pas être modifié
+
+        /**
+         * Consecutive match bonus (NON-MODIFIABLE)
+         *
+         * WARNING: This section cannot be modified to ensure consistent scoring.
+         *
+         * @var array<int, float>
+         */
+        'consecutive_bonus' => [
+            2 => 1.05,
+            3 => 1.15,
+            4 => 1.30,
+            5 => 1.50,
+        ],
     ],
 ];

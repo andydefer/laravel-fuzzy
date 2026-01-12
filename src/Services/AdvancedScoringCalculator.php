@@ -7,11 +7,18 @@ namespace Fuzzy\Services;
 use Fuzzy\SearchContext;
 
 /**
- * Calculateur de scoring avancé pour les bonus/penalties.
- * Maintenant utilisé uniquement par les stratégies de scoring.
+ * Advanced scoring calculator for bonus/penalty application
+ *
+ * Used exclusively by scoring strategies to calculate final match scores
+ * with field weighting, positional bonuses, and query-based adjustments.
  */
 class AdvancedScoringCalculator
 {
+    /**
+     * Bonus multipliers for consecutive character matches
+     *
+     * @var array<int, float>
+     */
     private const CONSECUTIVE_BONUS = [
         2 => 1.05,
         3 => 1.15,
@@ -20,7 +27,16 @@ class AdvancedScoringCalculator
     ];
 
     /**
-     * Calcule le score final avec tous les bonus/penalties.
+     * Calculate final score with all applicable bonuses and penalties
+     *
+     * Applies field weighting, consecutive character bonuses, positional bonuses,
+     * short query penalties, and coverage bonuses to produce the final score.
+     *
+     * @param float $baseScore The initial similarity score
+     * @param array<string, mixed> $match The match data including field and words
+     * @param SearchContext $context The search context with query information
+     * @param string|null $queryWord The specific query word being scored (optional)
+     * @return float The final score clamped between 0.0 and 1.0
      */
     public function calculateFinalScore(
         float $baseScore,
@@ -30,21 +46,15 @@ class AdvancedScoringCalculator
     ): float {
         $score = $baseScore;
 
-        // 1. Pondération par champ
         $score = $this->applyFieldWeighting($score, $match);
 
-        // 2. Bonus caractères consécutifs
-        if ($queryWord) {
+        if ($queryWord !== null) {
             $score = $this->applyConsecutiveBonus($score, $queryWord, $match);
         }
 
-        // 3. Bonus position
         $score = $this->applyPositionBonus($score, $match);
-
-        // 4. Pénalités requêtes courtes
         $score = $this->applyShortQueryPenalty($score, $context);
 
-        // 5. Bonus couverture (pour multi-mots)
         if ($context->hasMultipleWords()) {
             $score = $this->applyCoverageBonus($score);
         }
@@ -53,7 +63,11 @@ class AdvancedScoringCalculator
     }
 
     /**
-     * @param array<string, mixed> $match
+     * Apply field-specific weighting to the score
+     *
+     * @param float $score The current score
+     * @param array<string, mixed> $match The match data containing the field name
+     * @return float The score multiplied by the field weight
      */
     private function applyFieldWeighting(float $score, array $match): float
     {
@@ -71,50 +85,53 @@ class AdvancedScoringCalculator
     }
 
     /**
-     * @param array<string, mixed> $match
+     * Apply bonus for consecutive character matches between query and target
+     *
+     * @param float $score The current score
+     * @param string $queryWord The query word being matched
+     * @param array<string, mixed> $match The match data containing target words
+     * @return float The score with consecutive match bonus applied
      */
     private function applyConsecutiveBonus(float $score, string $queryWord, array $match): float
     {
-        $maxConsecutive = 0;
+        $maxConsecutiveLength = $this->findMaxConsecutiveLength($queryWord, $match['normalized_words']);
 
-        foreach ($match['normalized_words'] as $targetWord) {
-            $consecutive = $this->findLongestCommonSubstring($queryWord, (string) $targetWord);
-            $maxConsecutive = max($maxConsecutive, $consecutive);
-        }
-
-        if ($maxConsecutive >= 2) {
-            $bonus = self::CONSECUTIVE_BONUS[min($maxConsecutive, 5)] ?? 1.0;
-            return $score * $bonus;
+        if ($maxConsecutiveLength >= 2) {
+            $bonusMultiplier = self::CONSECUTIVE_BONUS[min($maxConsecutiveLength, 5)] ?? 1.0;
+            return $score * $bonusMultiplier;
         }
 
         return $score;
     }
 
     /**
-     * @param array<string, mixed> $match
+     * Apply bonus based on the position of the match within the text
+     *
+     * @param float $score The current score
+     * @param array<string, mixed> $match The match data containing the original text
+     * @return float The score with positional bonus applied
      */
     private function applyPositionBonus(float $score, array $match): float
     {
-        $fullText = strtolower($match['original_value'] ?? '');
+        $normalizedText = strtolower((string) ($match['original_value'] ?? ''));
         $words = $match['normalized_words'] ?? [];
 
         if (empty($words)) {
             return $score;
         }
 
-        $firstWord = reset($words);
-        $position = strpos($fullText, (string) $firstWord);
+        $firstWord = (string) reset($words);
+        $position = strpos($normalizedText, $firstWord);
 
         if ($position === false) {
             return $score;
         }
 
-        $textLength = strlen($fullText);
-        $wordLength = strlen((string) $firstWord);
-        $relativePosition = $position / max(1, $textLength - $wordLength);
+        $relativePosition = $this->calculateRelativePosition($normalizedText, $firstWord, $position);
 
         if ($relativePosition < 0.2) {
-            return $score * (1 + config('fuzzy.scoring.bonuses.early_position', 0.2));
+            $earlyPositionBonus = config('fuzzy.scoring.bonuses.early_position', 0.2);
+            return $score * (1 + $earlyPositionBonus);
         }
 
         if ($relativePosition < 0.4) {
@@ -124,6 +141,13 @@ class AdvancedScoringCalculator
         return $score;
     }
 
+    /**
+     * Apply penalty for short query words
+     *
+     * @param float $score The current score
+     * @param SearchContext $context The search context containing query words
+     * @return float The score with short query penalty applied if applicable
+     */
     private function applyShortQueryPenalty(float $score, SearchContext $context): float
     {
         foreach ($context->getQueryWords() as $word) {
@@ -136,21 +160,70 @@ class AdvancedScoringCalculator
         return $score;
     }
 
+    /**
+     * Apply bonus for multi-word query coverage
+     *
+     * @param float $score The current score
+     * @return float The score with coverage bonus applied
+     */
     private function applyCoverageBonus(float $score): float
     {
-        // Implémentation spécifique si nécessaire
+        // Implementation specific logic can be added here
         return $score;
     }
 
-    private function findLongestCommonSubstring(string $str1, string $str2): int
+    /**
+     * Find the maximum consecutive substring length between query and target words
+     *
+     * @param string $queryWord The query word to search for
+     * @param array<int, string|mixed> $targetWords The target words to search in
+     * @return int The maximum consecutive substring length found
+     */
+    private function findMaxConsecutiveLength(string $queryWord, array $targetWords): int
     {
-        $len1 = strlen($str1);
+        $maxConsecutiveLength = 0;
+
+        foreach ($targetWords as $targetWord) {
+            $consecutiveLength = $this->findLongestCommonSubstring($queryWord, (string) $targetWord);
+            $maxConsecutiveLength = max($maxConsecutiveLength, $consecutiveLength);
+        }
+
+        return $maxConsecutiveLength;
+    }
+
+    /**
+     * Calculate the relative position of a word within text
+     *
+     * @param string $text The full normalized text
+     * @param string $word The word to find position for
+     * @param int $position The character position of the word
+     * @return float The relative position (0.0 = start, 1.0 = end)
+     */
+    private function calculateRelativePosition(string $text, string $word, int $position): float
+    {
+        $textLength = strlen($text);
+        $wordLength = strlen($word);
+        $availableSpace = max(1, $textLength - $wordLength);
+
+        return $position / $availableSpace;
+    }
+
+    /**
+     * Find the length of the longest common substring between two strings
+     *
+     * @param string $firstString The first string to compare
+     * @param string $secondString The second string to compare
+     * @return int The length of the longest common substring
+     */
+    private function findLongestCommonSubstring(string $firstString, string $secondString): int
+    {
+        $firstStringLength = strlen($firstString);
         $maxLength = 0;
 
-        for ($i = 0; $i < $len1; ++$i) {
-            for ($j = $i + 2; $j <= $len1; ++$j) {
-                $substring = substr($str1, $i, $j - $i);
-                if (str_contains($str2, $substring)) {
+        for ($start = 0; $start < $firstStringLength; ++$start) {
+            for ($end = $start + 2; $end <= $firstStringLength; ++$end) {
+                $substring = substr($firstString, $start, $end - $start);
+                if (str_contains($secondString, $substring)) {
                     $maxLength = max($maxLength, strlen($substring));
                 }
             }

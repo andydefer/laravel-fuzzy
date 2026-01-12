@@ -5,56 +5,48 @@ declare(strict_types=1);
 namespace Fuzzy\Contracts;
 
 /**
- * Interface defining the contract for models that support fuzzy search indexing.
+ * Interface for models that support fuzzy search indexing and searching.
  *
- * Models implementing this interface can be indexed and searched
- * through the package's fuzzy search system.
+ * Models implementing this interface can be indexed, searched,
+ * and retrieved through the fuzzy search system with custom configuration.
  */
 interface MustFuzzySearch
 {
     /**
-     * Get the list of model fields that should be indexed for search.
+     * Get the model fields to be indexed for fuzzy searching.
      *
-     * @return array<string> The model attribute names to be indexed.
+     * @return array<int, string> Attribute names to include in search index.
      */
     public function getSearchableFields(): array;
 
     /**
-     * Specify a custom formatting class to transform the model during indexing.
+     * Get the custom formatter class for model data transformation during indexing.
      *
-     * The returned class must implement a static `fromModel($model)` method.
-     * If null is returned, the default formatting will be used.
-     *
-     * @return class-string|null The FQCN of the formatting class or null.
+     * @return class-string|null Fully qualified class name implementing static `fromModel()` method.
      */
     public function getFuzzyFormat(): ?string;
 
     /**
-     * Get the unique identifier used for model indexing.
+     * Get the unique identifier for model indexing.
      *
-     * @return string|int The unique identifier (typically the primary key).
+     * @return string|int Unique identifier, typically model's primary key.
      */
     public function getIndexableId(): string|int;
 
-
     /**
-     * Determine whether the model should be included in the search index.
+     * Determine if the model should be included in search index.
      *
-     * Allows dynamic exclusion of certain models from indexing
-     * (e.g., inactive models, drafts, archived items).
-     *
-     * @return bool True if the model should be indexed, false otherwise.
+     * @return bool True to index model, false to exclude (e.g., inactive, draft, archived).
      */
     public function shouldBeIndexed(): bool;
 
     /**
-     * Get a model attribute value.
+     * Get model attribute value.
      *
-     * This method is inherited from Eloquent Model but declared here
-     * for interface completeness when working with searchable models.
+     * Required for interface completeness with Eloquent Model interaction.
      *
-     * @param string $key The attribute name.
-     * @return mixed The attribute value.
+     * @param string $key Attribute name to retrieve.
+     * @return mixed Attribute value.
      */
     public function getAttribute($key);
 }

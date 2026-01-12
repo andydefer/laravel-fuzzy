@@ -20,22 +20,16 @@ final class CommandsTest extends TestCase
     {
         parent::setUp();
 
-
         FuzzyIndex::query()->truncate();
         User::query()->delete();
         Product::query()->delete();
     }
 
-
     public function test_index_command_with_auto_discovery(): void
     {
-        // Arrange
-
+        // Arrange: Configure auto-discovery with specific models
         Config::set('fuzzy.auto_discovery.enabled', true);
-        Config::set('fuzzy.searchable_models', [
-            User::class,
-            Product::class,
-        ]); // ← SPÉCIFIER EXPLICITEMENT les modèles
+        Config::set('fuzzy.searchable_models', [User::class, Product::class]);
 
         User::create([
             'name' => 'Test User',
@@ -43,82 +37,80 @@ final class CommandsTest extends TestCase
             'type' => 'user',
         ]);
 
-        // Act
+        // Act: Execute the index command
         $exitCode = Artisan::call('fuzzy:index');
 
-        // Assert
+        // Assert: Verify command succeeded and indexing was performed
         $this->assertEquals(0, $exitCode);
 
         $output = Artisan::output();
         $this->assertStringContainsString('Indexing complete', $output);
 
-        // Check that entries were created
         $entries = FuzzyIndex::count();
         $this->assertGreaterThan(0, $entries);
     }
 
     public function test_index_command_with_specific_model(): void
     {
-        // Arrange - VIDER TOUT avant
+        // Arrange: Prepare clean environment with specific models
         FuzzyIndex::query()->truncate();
-
         Config::set('fuzzy.searchable_models', []);
         Config::set('fuzzy.auto_discovery.enabled', false);
 
-        // Créer sans événements
         User::withoutEvents(
-            fn() =>
-            User::create(['name' => 'User One', 'email' => 'user1@example.com'])
+            fn() => User::create([
+                'name' => 'User One',
+                'email' => 'user1@example.com'
+            ])
         );
 
         Product::withoutEvents(
-            fn() =>
-            Product::create(['name' => 'Product One', 'description' => 'Test', 'price' => 100])
+            fn() => Product::create([
+                'name' => 'Product One',
+                'description' => 'Test',
+                'price' => 100
+            ])
         );
 
-        // S'assurer qu'aucune entrée n'existe
         $this->assertEquals(0, FuzzyIndex::count(), 'Index should be empty before indexing');
 
-        // Act
+        // Act: Index only the User model
         $exitCode = Artisan::call('fuzzy:index', ['model' => User::class]);
 
-        // Assert
+        // Assert: Verify only User entries were indexed
         $this->assertEquals(0, $exitCode);
 
         $userEntries = FuzzyIndex::where('indexable_type', User::class)->count();
         $productEntries = FuzzyIndex::where('indexable_type', Product::class)->count();
 
         $this->assertEquals(2, $userEntries); // name + email
-        $this->assertEquals(0, $productEntries); // Doit être 0
+        $this->assertEquals(0, $productEntries); // Should be 0
     }
 
     public function test_index_command_with_force_option(): void
     {
-        // Arrange
+        // Arrange: Create user and initial index
         $user = User::create([
             'name' => 'Test User',
             'email' => 'test@example.com',
             'type' => 'user',
         ]);
 
-        // Create initial index
         Artisan::call('fuzzy:index');
         $initialCount = FuzzyIndex::count();
 
-        // Update user (name changed)
         $user->name = 'Updated User';
         $user->save();
 
-        // Act: Reindex with force
+        // Act: Reindex with force option
         $exitCode = Artisan::call('fuzzy:index', ['--force' => true]);
 
-        // Assert
+        // Assert: Verify index was rebuilt with updated data
         $this->assertEquals(0, $exitCode);
 
         $finalCount = FuzzyIndex::count();
-        $this->assertEquals($initialCount, $finalCount); // Count should be same
+        $this->assertEquals($initialCount, $finalCount);
 
-        // Check that the new name is indexed
         $entry = FuzzyIndex::where('indexable_type', User::class)
             ->where('indexable_id', $user->id)
             ->where('field', 'name')
@@ -130,7 +122,7 @@ final class CommandsTest extends TestCase
 
     public function test_index_command_with_chunk_option(): void
     {
-        // Arrange: Create multiple users
+        // Arrange: Create multiple users for batch processing
         for ($i = 1; $i <= 150; ++$i) {
             User::create([
                 'name' => 'User ' . $i,
@@ -139,10 +131,10 @@ final class CommandsTest extends TestCase
             ]);
         }
 
-        // Act: Index with chunk size 50
+        // Act: Index with specific chunk size
         $exitCode = Artisan::call('fuzzy:index', ['--chunk' => 50]);
 
-        // Assert
+        // Assert: Verify all entries were processed correctly
         $this->assertEquals(0, $exitCode);
 
         $entries = FuzzyIndex::count();
@@ -151,14 +143,14 @@ final class CommandsTest extends TestCase
 
     public function test_index_command_list_option(): void
     {
-        // Arrange
+        // Arrange: Configure models for discovery
         Config::set('fuzzy.searchable_models', [User::class]);
         Config::set('fuzzy.auto_discovery.enabled', true);
 
-        // Act
+        // Act: Execute command with list option
         $exitCode = Artisan::call('fuzzy:index', ['--list' => true]);
 
-        // Assert
+        // Assert: Verify command output contains model information
         $this->assertEquals(0, $exitCode);
 
         $output = Artisan::output();
@@ -169,7 +161,7 @@ final class CommandsTest extends TestCase
 
     public function test_clear_command_with_specific_model(): void
     {
-        // Arrange
+        // Arrange: Create data and build index
         User::create(['name' => 'Test', 'email' => 'test@example.com', 'type' => 'user']);
         Product::create(['name' => 'Product', 'description' => 'Test', 'price' => 100]);
 
@@ -181,25 +173,25 @@ final class CommandsTest extends TestCase
         $this->assertGreaterThan(0, $initialUserEntries);
         $this->assertGreaterThan(0, $initialProductEntries);
 
-        // Act: Clear only User indexes
+        // Act: Clear only User model indexes
         $exitCode = Artisan::call('fuzzy:clear', [
             'model' => User::class,
-            '--force' => true, // Skip confirmation
+            '--force' => true,
         ]);
 
-        // Assert
+        // Assert: Verify only User entries were removed
         $this->assertEquals(0, $exitCode);
 
         $userEntries = FuzzyIndex::where('indexable_type', User::class)->count();
         $productEntries = FuzzyIndex::where('indexable_type', Product::class)->count();
 
         $this->assertEquals(0, $userEntries);
-        $this->assertEquals($initialProductEntries, $productEntries); // Should remain
+        $this->assertEquals($initialProductEntries, $productEntries);
     }
 
     public function test_clear_command_all_models(): void
     {
-        // Arrange
+        // Arrange: Create data and build complete index
         User::create(['name' => 'Test', 'email' => 'test@example.com', 'type' => 'user']);
         Product::create(['name' => 'Product', 'description' => 'Test', 'price' => 100]);
 
@@ -209,11 +201,9 @@ final class CommandsTest extends TestCase
         $this->assertGreaterThan(0, $initialCount);
 
         // Act: Clear all indexes
-        $exitCode = Artisan::call('fuzzy:clear', [
-            '--force' => true, // Skip confirmation
-        ]);
+        $exitCode = Artisan::call('fuzzy:clear', ['--force' => true]);
 
-        // Assert
+        // Assert: Verify all entries were removed
         $this->assertEquals(0, $exitCode);
 
         $finalCount = FuzzyIndex::count();
@@ -222,14 +212,14 @@ final class CommandsTest extends TestCase
 
     public function test_stats_command(): void
     {
-        // Arrange
+        // Arrange: Create data and build index
         User::create(['name' => 'Test', 'email' => 'test@example.com', 'type' => 'user']);
         Artisan::call('fuzzy:index');
 
-        // Act
+        // Act: Execute statistics command
         $exitCode = Artisan::call('fuzzy:stats');
 
-        // Assert
+        // Assert: Verify statistics output contains expected information
         $this->assertEquals(0, $exitCode);
 
         $output = Artisan::output();
@@ -241,10 +231,10 @@ final class CommandsTest extends TestCase
 
     public function test_stats_command_empty_index(): void
     {
-        // Act
+        // Act: Execute statistics command on empty index
         $exitCode = Artisan::call('fuzzy:stats');
 
-        // Assert
+        // Assert: Verify empty index statistics
         $this->assertEquals(0, $exitCode);
 
         $output = Artisan::output();
@@ -254,10 +244,10 @@ final class CommandsTest extends TestCase
 
     public function test_clear_cache_command(): void
     {
-        // Act
+        // Act: Execute cache clearing command
         $exitCode = Artisan::call('fuzzy:clear-cache', ['--force' => true]);
 
-        // Assert
+        // Assert: Verify cache was cleared
         $this->assertEquals(0, $exitCode);
 
         $output = Artisan::output();
@@ -266,36 +256,34 @@ final class CommandsTest extends TestCase
 
     public function test_clear_cache_command_stats_only(): void
     {
-        // Act
+        // Act: Execute cache clearing for statistics only
         $exitCode = Artisan::call('fuzzy:clear-cache', [
             '--stats' => true,
             '--force' => true,
         ]);
 
-        // Assert
+        // Assert: Verify statistics cache was cleared
         $this->assertEquals(0, $exitCode);
 
         $output = Artisan::output();
-        // Either success or warning if not available
         $this->assertTrue(
-            str_contains($output, 'Stats cache cleared') ||
+            str_contains($output, 'Statistics cache cleared successfully.') ||
                 str_contains($output, 'Stats cache clearing not available')
         );
     }
 
     public function test_clear_cache_command_specific_model(): void
     {
-        // Act
+        // Act: Execute cache clearing for specific model
         $exitCode = Artisan::call('fuzzy:clear-cache', [
             '--model' => User::class,
             '--force' => true,
         ]);
 
-        // Assert
+        // Assert: Verify model-specific cache was cleared
         $this->assertEquals(0, $exitCode);
 
         $output = Artisan::output();
-        // Either success or warning if not available
         $this->assertTrue(
             str_contains($output, "Cache cleared for model: " . User::class) ||
                 str_contains($output, 'Model-specific cache clearing not available')
@@ -304,16 +292,16 @@ final class CommandsTest extends TestCase
 
     public function test_index_command_with_auto_option(): void
     {
-        // Arrange
+        // Arrange: Configure auto-discovery with empty config
         Config::set('fuzzy.auto_discovery.enabled', true);
-        Config::set('fuzzy.searchable_models', []); // Empty config
+        Config::set('fuzzy.searchable_models', []);
 
         User::create(['name' => 'Test', 'email' => 'test@example.com', 'type' => 'user']);
 
-        // Act
+        // Act: Execute index command with auto option
         $exitCode = Artisan::call('fuzzy:index', ['--auto' => true]);
 
-        // Assert
+        // Assert: Verify auto-discovery worked
         $this->assertEquals(0, $exitCode);
 
         $entries = FuzzyIndex::count();
@@ -322,16 +310,16 @@ final class CommandsTest extends TestCase
 
     public function test_index_command_invalid_model(): void
     {
-        // Act
+        // Act: Execute command with invalid model name
         $exitCode = Artisan::call('fuzzy:index', [
             'model' => 'Invalid\\Model\\Class',
         ]);
 
-        // Assert
-        $this->assertEquals(0, $exitCode); // Command should handle gracefully
+        // Assert: Verify command handles invalid model gracefully
+        $this->assertEquals(0, $exitCode);
 
         $output = Artisan::output();
-        $this->assertStringContainsString('must exist and implement', $output);
+        $this->assertStringContainsString('must implement', $output);
         $this->assertStringContainsString('Invalid\\Model\\Class', $output);
     }
 }

@@ -4,31 +4,39 @@ declare(strict_types=1);
 
 namespace Fuzzy\Stages;
 
-use InvalidArgumentException;
 use Fuzzy\SearchContext;
 use Fuzzy\Data\SearchResultData;
 use Closure;
 
 /**
- * Stage unique de scoring qui consolide tous les calculs de score.
- * Remplace UnifiedScoringStage, MultiWordConsolidationStage et les stratégies individuelles.
+ * Scoring stage that consolidates all score calculations for search results.
+ *
+ * Replaces UnifiedScoringStage, MultiWordConsolidationStage and individual strategies.
+ * Calculates and assigns scores to potential matches based on various factors
+ * including field weights, similarity algorithms, and multi-word bonuses.
  */
 class ScoringStage
 {
+    /**
+     * Process the search context to calculate and assign scores to potential matches.
+     *
+     * @param SearchContext $context The search context containing queries and potential matches
+     * @param Closure $next The next stage in the pipeline
+     * @return mixed Result from the next pipeline stage
+     */
     public function handle(SearchContext $context, Closure $next)
     {
-        // Traiter tous les matches potentiels
         foreach ($context->getAllPotentialMatches() as $key => $matches) {
             $model = $context->getModelInstance($key);
+
             if ($model === null) {
                 continue;
             }
 
-            // Calculer le meilleur score pour ce modèle
             $bestScore = $this->calculateBestScore($context, $matches);
 
             if ($bestScore >= $context->options->minScore) {
-                $bestMatch = $this->findBestMatch($matches);
+                $bestMatch = $this->extractBestMatchDetails($matches);
 
                 $context->results[$key] = SearchResultData::create(
                     item: $model,
@@ -44,7 +52,11 @@ class ScoringStage
     }
 
     /**
-     * Calcule le meilleur score pour un ensemble de matches.
+     * Calculate the best possible score for a set of matches.
+     *
+     * @param SearchContext $context Search context with configuration and scoring engine
+     * @param array<int, array> $matches Array of potential matches for a model
+     * @return float Best score between 0.0 and 1.0
      */
     private function calculateBestScore(SearchContext $context, array $matches): float
     {
@@ -55,27 +67,49 @@ class ScoringStage
             $bestScore = max($bestScore, $score);
         }
 
-        // Appliquer les bonus multi-mots si nécessaire
-        if ($context->hasMultipleWords() && count($matches) > 1) {
+        if ($this->shouldApplyMultiWordBonus($context, $matches)) {
             $multiWordScore = $context->scoringEngine->calculateMultiWordScore($matches, $context);
             $bestScore = max($bestScore, $multiWordScore);
         }
 
-        return min(max($bestScore, 0.0), 1.0);
+        return $this->normalizeScore($bestScore);
     }
 
     /**
-     * Trouve le meilleur match parmi une liste.
-     * @param array<int, mixed> $matches
+     * Extract details from the best match in the array.
+     *
+     * @param array<int, array> $matches Array of matches with field and value information
+     * @return array{indexable_type: string, field: string, original_value: string} Match details
      */
-    private function findBestMatch(array $matches): array
+    private function extractBestMatchDetails(array $matches): array
     {
         if ($matches === []) {
-            throw new InvalidArgumentException('Matches array cannot be empty');
+            throw new \InvalidArgumentException('Matches array cannot be empty');
         }
 
-        // Retourne le premier match (le détail du match spécifique
-        // est moins important que le score global)
         return $matches[0];
+    }
+
+    /**
+     * Determine if multi-word bonus should be applied.
+     *
+     * @param SearchContext $context Search context with query information
+     * @param array<int, array> $matches Array of matches
+     * @return bool True if multi-word bonus should be applied
+     */
+    private function shouldApplyMultiWordBonus(SearchContext $context, array $matches): bool
+    {
+        return $context->hasMultipleWords() && count($matches) > 1;
+    }
+
+    /**
+     * Normalize score to ensure it stays within valid range.
+     *
+     * @param float $score Raw score value
+     * @return float Normalized score between 0.0 and 1.0
+     */
+    private function normalizeScore(float $score): float
+    {
+        return min(max($score, 0.0), 1.0);
     }
 }

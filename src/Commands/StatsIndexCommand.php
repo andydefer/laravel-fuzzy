@@ -7,22 +7,22 @@ namespace Fuzzy\Commands;
 use Illuminate\Console\Command;
 
 /**
- * Command to display search index statistics.
+ * Displays comprehensive statistics about the fuzzy search index.
  *
- * Provides insights into indexed data including total entries
- * and per-model statistics.
+ * Provides insights into indexed data including total entries,
+ * per-model statistics, and field distribution.
  */
 class StatsIndexCommand extends Command
 {
     /**
-     * The command signature.
+     * The name and signature of the console command.
      *
      * @var string
      */
     protected $signature = 'fuzzy:stats';
 
     /**
-     * The command description.
+     * The console command description.
      *
      * @var string
      */
@@ -31,21 +31,25 @@ class StatsIndexCommand extends Command
     /**
      * Execute the console command.
      *
-     * Displays comprehensive statistics about the search index,
+     * Retrieves and displays comprehensive statistics about the search index,
      * including total entries and per-model breakdown with field counts.
+     *
+     * @return void
      */
     public function handle(): void
     {
         $searchService = app('laravel-fuzzy.search');
-        $stats = $searchService->getStats();
+        $statistics = $searchService->getStats();
 
         $this->displayHeader();
-        $this->displayTotalEntries($stats['total_entries']);
-        $this->displayModelStatistics($stats['models']);
+        $this->displayTotalEntries($statistics['total_entries']);
+        $this->displayModelStatistics($statistics['models']);
     }
 
     /**
      * Display the command header.
+     *
+     * @return void
      */
     private function displayHeader(): void
     {
@@ -53,7 +57,10 @@ class StatsIndexCommand extends Command
     }
 
     /**
-     * Display total entries count.
+     * Display the total number of indexed entries.
+     *
+     * @param int $totalEntries The total number of indexed entries
+     * @return void
      */
     private function displayTotalEntries(int $totalEntries): void
     {
@@ -62,14 +69,19 @@ class StatsIndexCommand extends Command
     }
 
     /**
-     * Display statistics per model.
+     * Display detailed statistics for each indexed model.
+     *
+     * Shows entry counts and field distributions per model in a tabular format.
+     *
+     * @param array<string, array{count: int, fields: array<string, int>}> $modelsStats
+     * @return void
      */
     private function displayModelStatistics(array $modelsStats): void
     {
         $this->info('Per model statistics:');
         $this->newLine();
 
-        if ($modelsStats === []) {
+        if (empty($modelsStats)) {
             $this->warn('No models indexed yet.');
             return;
         }
@@ -81,19 +93,22 @@ class StatsIndexCommand extends Command
     }
 
     /**
-     * Prepare rows for the models statistics table.
+     * Prepare data rows for the models statistics table.
+     *
+     * @param array<string, array{count: int, fields: array<string, int>}> $modelsStats
+     * @return array<array{string, int, string}>
      */
     private function prepareModelRows(array $modelsStats): array
     {
         $rows = [];
 
-        foreach ($modelsStats as $model => $modelStats) {
-            $fields = $this->formatFieldCounts($modelStats['fields']);
+        foreach ($modelsStats as $modelClass => $modelData) {
+            $formattedFields = $this->formatFieldCounts($modelData['fields']);
 
             $rows[] = [
-                $model,
-                $modelStats['count'],
-                $fields ?: 'No fields indexed',
+                $modelClass, // Retourner le nom complet de la classe
+                $modelData['count'],
+                $formattedFields ?: 'No fields indexed',
             ];
         }
 
@@ -101,14 +116,26 @@ class StatsIndexCommand extends Command
     }
 
     /**
-     * Format field counts into a readable string.
+     * Format field counts into a readable string representation.
+     *
+     * Converts field statistics from array to human-readable format.
+     * Example: ['name' => 100, 'email' => 50] becomes "name: 100, email: 50"
+     *
+     * @param array<string, int> $fieldCounts
+     * @return string
      */
-    private function formatFieldCounts(array $fields): string
+    private function formatFieldCounts(array $fieldCounts): string
     {
-        return implode(', ', array_map(
-            fn(string $field, int $count): string => sprintf('%s: %d', $field, $count),
-            array_keys($fields),
-            array_values($fields)
-        ));
+        if (empty($fieldCounts)) {
+            return '';
+        }
+
+        $formattedParts = [];
+
+        foreach ($fieldCounts as $fieldName => $count) {
+            $formattedParts[] = "{$fieldName}: {$count}";
+        }
+
+        return implode(', ', $formattedParts);
     }
 }

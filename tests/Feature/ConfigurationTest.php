@@ -4,77 +4,91 @@ declare(strict_types=1);
 
 namespace Fuzzy\Tests\Feature;
 
+use Fuzzy\Tests\TestCase;
+use Fuzzy\Tests\Fixtures\User;
+use Fuzzy\Tests\Fixtures\Product;
 use Fuzzy\Stages\NormalizeQueryStage;
 use Fuzzy\Stages\MatchDiscoveryStage;
 use Fuzzy\Stages\ScoringStage;
 use Fuzzy\Stages\SortAndLimitStage;
-use Fuzzy\Tests\TestCase;
 use Illuminate\Support\Facades\Config;
-use Fuzzy\Tests\Fixtures\User;
-use Fuzzy\Tests\Fixtures\Product;
 
 final class ConfigurationTest extends TestCase
 {
+    /**
+     * Set up test environment.
+     */
     protected function setUp(): void
     {
         parent::setUp();
         $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
     }
 
+    /**
+     * Test that searchable models are correctly configured.
+     */
     public function test_searchable_models_configuration(): void
     {
-        // Arrange
+        // Arrange: Configure searchable models
         Config::set('fuzzy.searchable_models', [
             User::class,
             Product::class,
         ]);
 
-        // Act
+        // Act: Retrieve search service and get searchable models
         $searchService = app('laravel-fuzzy.search');
         $models = $searchService->getSearchableModels();
 
-        // Assert
+        // Assert: Verify both models are present
         $this->assertContains(User::class, $models);
         $this->assertContains(Product::class, $models);
         $this->assertCount(2, $models);
     }
 
+    /**
+     * Test auto-discovery when enabled.
+     */
     public function test_auto_discovery_enabled(): void
     {
-        // Arrange
+        // Arrange: Enable auto-discovery with test fixtures directory
         Config::set('fuzzy.auto_discovery.enabled', true);
         Config::set('fuzzy.searchable_models', []);
-
         Config::set('fuzzy.auto_discovery.directories', [
             dirname(__DIR__, 2) . '/tests/Fixtures'
         ]);
 
-        // Act
+        // Act: Retrieve searchable models
         $searchService = app('laravel-fuzzy.search');
         $models = $searchService->getSearchableModels();
 
-        // Assert - Devrait découvrir User et Product
+        // Assert: Verify User and Product models are discovered
         $this->assertContains(User::class, $models);
         $this->assertContains(Product::class, $models);
     }
 
+    /**
+     * Test auto-discovery when disabled.
+     */
     public function test_auto_discovery_disabled(): void
     {
-        // Arrange
+        // Arrange: Disable auto-discovery
         Config::set('fuzzy.auto_discovery.enabled', false);
         Config::set('fuzzy.searchable_models', []);
 
-        // Act
+        // Act: Retrieve searchable models
         $searchService = app('laravel-fuzzy.search');
         $models = $searchService->getSearchableModels();
 
-        // Assert - Ne devrait rien découvrir
+        // Assert: Verify no models are discovered
         $this->assertEmpty($models);
     }
 
+    /**
+     * Test field weights configuration.
+     */
     public function test_field_weights_configuration(): void
     {
-        // Arrange
+        // Arrange: Configure field weights
         Config::set('fuzzy.scoring.field_weights', [
             'name' => 2.0,
             'title' => 1.5,
@@ -83,29 +97,32 @@ final class ConfigurationTest extends TestCase
             'default' => 0.5,
         ]);
 
-        // Act
+        // Act: Calculate weights for different fields
         $indexBuilder = app('laravel-fuzzy.index-builder');
         $nameWeight = $indexBuilder->calculateFieldWeight('name');
         $titleWeight = $indexBuilder->calculateFieldWeight('title');
         $unknownWeight = $indexBuilder->calculateFieldWeight('unknown');
 
-        // Assert
+        // Assert: Verify correct weights are applied
         $this->assertEqualsWithDelta(2.0, $nameWeight, PHP_FLOAT_EPSILON);
         $this->assertEqualsWithDelta(1.5, $titleWeight, PHP_FLOAT_EPSILON);
         $this->assertEqualsWithDelta(0.5, $unknownWeight, PHP_FLOAT_EPSILON);
     }
 
+    /**
+     * Test stop words configuration.
+     */
     public function test_stop_words_configuration(): void
     {
-        // Arrange
+        // Arrange: Configure stop words
         Config::set('fuzzy.stop_words', ['the', 'and', 'or', 'test']);
 
         $normalizer = app('laravel-fuzzy.normalizer');
 
-        // Act
+        // Act: Normalize query containing stop words
         $query = $normalizer->normalizeQuery('the quick brown fox and the lazy dog test');
 
-        // Assert
+        // Assert: Verify stop words are removed
         $this->assertStringNotContainsString('the', (string) $query);
         $this->assertStringNotContainsString('and', (string) $query);
         $this->assertStringNotContainsString('test', (string) $query);
@@ -113,9 +130,12 @@ final class ConfigurationTest extends TestCase
         $this->assertStringContainsString('brown', (string) $query);
     }
 
+    /**
+     * Test default search options configuration.
+     */
     public function test_default_options_configuration(): void
     {
-        // Arrange
+        // Arrange: Configure default search options
         Config::set('fuzzy.default_options', [
             'min_score' => 0.5,
             'max_results' => 50,
@@ -125,31 +145,35 @@ final class ConfigurationTest extends TestCase
 
         $searchService = app('laravel-fuzzy.search');
 
-        // Act - Recherche sans options personnalisées
+        // Act: Perform search without custom options
         $results = $searchService->search('test');
 
-        // Assert - Les options par défaut devraient être utilisées
-        // Note: On ne peut pas directement vérifier les options internes,
-        // mais on peut vérifier que la recherche fonctionne avec ces paramètres
+        // Assert: Verify search returns results with default options
         $this->assertIsIterable($results);
     }
 
+    /**
+     * Test cache configuration.
+     */
     public function test_cache_configuration(): void
     {
-        // Arrange
+        // Arrange: Configure cache settings
         Config::set('fuzzy.cache.enabled', true);
         Config::set('fuzzy.cache.ttl.search', 1800);
         Config::set('fuzzy.cache.invalidation.on_index', true);
 
-        // Act & Assert
+        // Act & Assert: Verify cache configuration is correctly set
         $this->assertTrue(config('fuzzy.cache.enabled'));
         $this->assertEquals(1800, config('fuzzy.cache.ttl.search'));
         $this->assertTrue(config('fuzzy.cache.invalidation.on_index'));
     }
 
+    /**
+     * Test search pipeline configuration.
+     */
     public function test_pipeline_configuration(): void
     {
-        // Arrange
+        // Arrange: Configure pipeline stages
         Config::set('fuzzy.pipeline.stages', [
             NormalizeQueryStage::class,
             MatchDiscoveryStage::class,
@@ -157,18 +181,21 @@ final class ConfigurationTest extends TestCase
             SortAndLimitStage::class,
         ]);
 
-        // Act
+        // Act: Get configured stages
         $stages = config('fuzzy.pipeline.stages');
 
-        // Assert
+        // Assert: Verify all stages are configured
         $this->assertCount(4, $stages);
         $this->assertContains(NormalizeQueryStage::class, $stages);
         $this->assertContains(MatchDiscoveryStage::class, $stages);
     }
 
+    /**
+     * Test exclude patterns for auto-discovery.
+     */
     public function test_exclude_patterns_configuration(): void
     {
-        // Arrange
+        // Arrange: Configure exclude patterns
         Config::set('fuzzy.auto_discovery.exclude_patterns', [
             '/^Abstract/',
             '/^Base/',
@@ -176,18 +203,21 @@ final class ConfigurationTest extends TestCase
             '/Trait$/',
         ]);
 
-        // Act - Tester un pattern
+        // Act: Get configured exclude patterns
         $patterns = config('fuzzy.auto_discovery.exclude_patterns');
 
-        // Assert
+        // Assert: Verify exclude patterns are correctly configured
         $this->assertCount(4, $patterns);
         $this->assertContains('/^Abstract/', $patterns);
         $this->assertContains('/Interface$/', $patterns);
     }
 
+    /**
+     * Test index configuration.
+     */
     public function test_index_configuration(): void
     {
-        // Arrange
+        // Arrange: Configure index settings
         Config::set('fuzzy.index', [
             'min_word_length' => 3,
             'max_word_length' => 100,
@@ -196,7 +226,7 @@ final class ConfigurationTest extends TestCase
             'queue_name' => 'search-index',
         ]);
 
-        // Act & Assert
+        // Act & Assert: Verify index configuration values
         $this->assertEquals(3, config('fuzzy.index.min_word_length'));
         $this->assertEquals(200, config('fuzzy.index.batch_size'));
         $this->assertTrue(config('fuzzy.index.queue'));

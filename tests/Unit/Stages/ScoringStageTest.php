@@ -5,22 +5,22 @@ declare(strict_types=1);
 namespace Fuzzy\Tests\Unit\Stages;
 
 use Fuzzy\Contracts\IndexRepositoryInterface;
-use stdClass;
-use ReflectionProperty;
-use ReflectionMethod;
-use ReflectionClass;
-use InvalidArgumentException;
-use Fuzzy\Tests\TestCase;
-use Fuzzy\Stages\ScoringStage;
 use Fuzzy\Data\SearchOptionsData;
 use Fuzzy\Data\SearchResultData;
+use Fuzzy\SearchContext;
+use Fuzzy\Services\IndexBuilder;
+use Fuzzy\Services\Scoring\ScoringEngine;
 use Fuzzy\Services\SimilarityCalculator;
 use Fuzzy\Services\StringNormalizer;
-use Fuzzy\Services\IndexBuilder;
+use Fuzzy\Stages\ScoringStage;
+use Fuzzy\Tests\TestCase;
 use Fuzzy\ValueObjects\SearchQuery;
-use Fuzzy\SearchContext;
-use Fuzzy\Services\Scoring\ScoringEngine;
+use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
+use ReflectionClass;
+use ReflectionMethod;
+use ReflectionProperty;
+use stdClass;
 
 #[AllowMockObjectsWithoutExpectations]
 final class ScoringStageTest extends TestCase
@@ -35,20 +35,20 @@ final class ScoringStageTest extends TestCase
 
     public function test_handle_with_no_potential_matches(): void
     {
-        // Arrange
+        // Arrange: Scoring stage with empty potential matches
         $normalizer = new StringNormalizer();
-        $query = SearchQuery::create('test', $normalizer);
+        $query = SearchQuery::create(query: 'test', normalizer: $normalizer);
         $options = new SearchOptionsData();
 
         $context = new SearchContext(
-            $query,
-            $options,
-            $normalizer,
-            new SimilarityCalculator(),
-            $this->createMock(IndexBuilder::class),
-            $this->createMock(IndexRepositoryInterface::class),
-            $this->createMock(ScoringEngine::class),
-            []
+            query: $query,
+            options: $options,
+            normalizer: $normalizer,
+            similarityCalculator: new SimilarityCalculator(),
+            indexBuilder: $this->createMock(IndexBuilder::class),
+            indexRepository: $this->createMock(IndexRepositoryInterface::class),
+            scoringEngine: $this->createMock(ScoringEngine::class),
+            indexDataArray: []
         );
 
         $nextCalled = false;
@@ -57,10 +57,10 @@ final class ScoringStageTest extends TestCase
             return 'next';
         };
 
-        // Act
-        $result = $this->stage->handle($context, $next);
+        // Act: Process the pipeline stage
+        $result = $this->stage->handle(context: $context, next: $next);
 
-        // Assert: Should call next without adding results
+        // Assert: Should call next middleware without adding results
         $this->assertTrue($nextCalled);
         $this->assertEquals('next', $result);
         $this->assertEmpty($context->results);
@@ -68,9 +68,9 @@ final class ScoringStageTest extends TestCase
 
     public function test_handle_with_potential_matches(): void
     {
-        // Arrange
+        // Arrange: Context with potential matches and preloaded model
         $normalizer = new StringNormalizer();
-        $query = SearchQuery::create('test', $normalizer);
+        $query = SearchQuery::create(query: 'test', normalizer: $normalizer);
         $options = new SearchOptionsData(minScore: 0.1);
 
         $mockModel = new stdClass();
@@ -82,37 +82,39 @@ final class ScoringStageTest extends TestCase
         $scoringEngine->method('calculateMultiWordScore')->willReturn(0.0);
 
         $context = new SearchContext(
-            $query,
-            $options,
-            $normalizer,
-            new SimilarityCalculator(),
-            $this->createMock(IndexBuilder::class),
-            $this->createMock(IndexRepositoryInterface::class),
-            $scoringEngine,
-            []
+            query: $query,
+            options: $options,
+            normalizer: $normalizer,
+            similarityCalculator: new SimilarityCalculator(),
+            indexBuilder: $this->createMock(IndexBuilder::class),
+            indexRepository: $this->createMock(IndexRepositoryInterface::class),
+            scoringEngine: $scoringEngine,
+            indexDataArray: []
         );
 
-        // Add potential matches via reflection
-        $reflection = new ReflectionProperty($context, 'potentialMatches');
-        $reflection->setAccessible(true);
-        $reflection->setValue($context, [
+        $this->setPrivateProperty($context, 'potentialMatches', [
             'User_1' => [
-                ['indexable_type' => 'User', 'indexable_id' => 1, 'field' => 'name', 'original_value' => 'Test User'],
+                [
+                    'indexable_type' => 'User',
+                    'indexable_id' => 1,
+                    'field' => 'name',
+                    'original_value' => 'Test User',
+                ],
             ],
         ]);
 
-        // Add model instance via reflection
-        $reflectionModels = new ReflectionProperty($context, 'preloadedModels');
-        $reflectionModels->setAccessible(true);
-        $reflectionModels->setValue($context, ['User_1' => $mockModel]);
+        $this->setPrivateProperty($context, 'preloadedModels', ['User_1' => $mockModel]);
 
-        // Act
-        $this->stage->handle($context, fn(): string => 'next');
+        // Act: Process matches through scoring stage
+        $this->stage->handle(
+            context: $context,
+            next: fn(): string => 'next'
+        );
 
-        // Assert: Should add result to context
+        // Assert: Should add scored result to context
         $this->assertArrayHasKey('User_1', $context->results);
-        $result = $context->results['User_1'];
 
+        $result = $context->results['User_1'];
         $this->assertInstanceOf(SearchResultData::class, $result);
         $this->assertSame($mockModel, $result->item);
         $this->assertEqualsWithDelta(0.8, $result->score, PHP_FLOAT_EPSILON);
@@ -123,85 +125,96 @@ final class ScoringStageTest extends TestCase
 
     public function test_handle_filters_by_min_score(): void
     {
-        // Arrange
+        // Arrange: Context with score below minimum threshold
         $normalizer = new StringNormalizer();
-        $query = SearchQuery::create('test', $normalizer);
-        $options = new SearchOptionsData(minScore: 0.5); // High min score
+        $query = SearchQuery::create(query: 'test', normalizer: $normalizer);
+        $options = new SearchOptionsData(minScore: 0.5);
 
         $mockModel = new stdClass();
         $mockModel->id = 1;
 
         $scoringEngine = $this->createMock(ScoringEngine::class);
-        $scoringEngine->method('calculateScore')->willReturn(0.3); // Low score
+        $scoringEngine->method('calculateScore')->willReturn(0.3);
         $scoringEngine->method('calculateMultiWordScore')->willReturn(0.0);
 
         $context = new SearchContext(
-            $query,
-            $options,
-            $normalizer,
-            new SimilarityCalculator(),
-            $this->createMock(IndexBuilder::class),
-            $this->createMock(IndexRepositoryInterface::class),
-            $scoringEngine,
-            []
+            query: $query,
+            options: $options,
+            normalizer: $normalizer,
+            similarityCalculator: new SimilarityCalculator(),
+            indexBuilder: $this->createMock(IndexBuilder::class),
+            indexRepository: $this->createMock(IndexRepositoryInterface::class),
+            scoringEngine: $scoringEngine,
+            indexDataArray: []
         );
 
-        $reflection = new ReflectionProperty($context, 'potentialMatches');
-        $reflection->setAccessible(true);
-        $reflection->setValue($context, [
-            'User_1' => [['indexable_type' => 'User', 'indexable_id' => 1, 'field' => 'name']],
+        $this->setPrivateProperty($context, 'potentialMatches', [
+            'User_1' => [
+                [
+                    'indexable_type' => 'User',
+                    'indexable_id' => 1,
+                    'field' => 'name',
+                ],
+            ],
         ]);
 
-        $reflectionModels = new ReflectionProperty($context, 'preloadedModels');
-        $reflectionModels->setAccessible(true);
-        $reflectionModels->setValue($context, ['User_1' => $mockModel]);
+        $this->setPrivateProperty($context, 'preloadedModels', ['User_1' => $mockModel]);
 
-        // Act
-        $this->stage->handle($context, fn(): string => 'next');
+        // Act: Process matches with score below threshold
+        $this->stage->handle(
+            context: $context,
+            next: fn(): string => 'next'
+        );
 
-        // Assert: Should NOT add result (score below min)
+        // Assert: Should not add result due to insufficient score
         $this->assertEmpty($context->results);
     }
 
     public function test_handle_skips_missing_model(): void
     {
-        // Arrange
+        // Arrange: Context with potential matches but no corresponding model
         $normalizer = new StringNormalizer();
-        $query = SearchQuery::create('test', $normalizer);
+        $query = SearchQuery::create(query: 'test', normalizer: $normalizer);
         $options = new SearchOptionsData();
 
         $scoringEngine = $this->createMock(ScoringEngine::class);
 
         $context = new SearchContext(
-            $query,
-            $options,
-            $normalizer,
-            new SimilarityCalculator(),
-            $this->createMock(IndexBuilder::class),
-            $this->createMock(IndexRepositoryInterface::class),
-            $scoringEngine,
-            []
+            query: $query,
+            options: $options,
+            normalizer: $normalizer,
+            similarityCalculator: new SimilarityCalculator(),
+            indexBuilder: $this->createMock(IndexBuilder::class),
+            indexRepository: $this->createMock(IndexRepositoryInterface::class),
+            scoringEngine: $scoringEngine,
+            indexDataArray: []
         );
 
-        // Add potential match but NO model instance
-        $reflection = new ReflectionProperty($context, 'potentialMatches');
-        $reflection->setAccessible(true);
-        $reflection->setValue($context, [
-            'User_1' => [['indexable_type' => 'User', 'indexable_id' => 1, 'field' => 'name']],
+        $this->setPrivateProperty($context, 'potentialMatches', [
+            'User_1' => [
+                [
+                    'indexable_type' => 'User',
+                    'indexable_id' => 1,
+                    'field' => 'name',
+                ],
+            ],
         ]);
 
-        // Act
-        $this->stage->handle($context, fn(): string => 'next');
+        // Act: Process matches without corresponding model
+        $this->stage->handle(
+            context: $context,
+            next: fn(): string => 'next'
+        );
 
-        // Assert: Should not add result (model missing)
+        // Assert: Should skip result due to missing model
         $this->assertEmpty($context->results);
     }
 
     public function test_handle_with_multiple_matches_for_same_model(): void
     {
-        // Arrange
+        // Arrange: Model with matches in multiple fields
         $normalizer = new StringNormalizer();
-        $query = SearchQuery::create('test', $normalizer);
+        $query = SearchQuery::create(query: 'test', normalizer: $normalizer);
         $options = new SearchOptionsData(minScore: 0.1);
 
         $mockModel = new stdClass();
@@ -209,45 +222,54 @@ final class ScoringStageTest extends TestCase
 
         $scoringEngine = $this->createMock(ScoringEngine::class);
         $scoringEngine->method('calculateScore')
-            ->willReturnOnConsecutiveCalls(0.6, 0.8); // Second match has higher score
+            ->willReturnOnConsecutiveCalls(0.6, 0.8);
 
         $context = new SearchContext(
-            $query,
-            $options,
-            $normalizer,
-            new SimilarityCalculator(),
-            $this->createMock(IndexBuilder::class),
-            $this->createMock(IndexRepositoryInterface::class),
-            $scoringEngine,
-            []
+            query: $query,
+            options: $options,
+            normalizer: $normalizer,
+            similarityCalculator: new SimilarityCalculator(),
+            indexBuilder: $this->createMock(IndexBuilder::class),
+            indexRepository: $this->createMock(IndexRepositoryInterface::class),
+            scoringEngine: $scoringEngine,
+            indexDataArray: []
         );
 
-        $reflection = new ReflectionProperty($context, 'potentialMatches');
-        $reflection->setAccessible(true);
-        $reflection->setValue($context, [
+        $this->setPrivateProperty($context, 'potentialMatches', [
             'User_1' => [
-                ['indexable_type' => 'User', 'indexable_id' => 1, 'field' => 'name', 'original_value' => 'Test Name'],
-                ['indexable_type' => 'User', 'indexable_id' => 1, 'field' => 'email', 'original_value' => 'test@example.com'],
+                [
+                    'indexable_type' => 'User',
+                    'indexable_id' => 1,
+                    'field' => 'name',
+                    'original_value' => 'Test Name',
+                ],
+                [
+                    'indexable_type' => 'User',
+                    'indexable_id' => 1,
+                    'field' => 'email',
+                    'original_value' => 'test@example.com',
+                ],
             ],
         ]);
 
-        $reflectionModels = new ReflectionProperty($context, 'preloadedModels');
-        $reflectionModels->setAccessible(true);
-        $reflectionModels->setValue($context, ['User_1' => $mockModel]);
+        $this->setPrivateProperty($context, 'preloadedModels', ['User_1' => $mockModel]);
 
-        // Act
-        $this->stage->handle($context, fn(): string => 'next');
+        // Act: Process model with multiple field matches
+        $this->stage->handle(
+            context: $context,
+            next: fn(): string => 'next'
+        );
 
-        // Assert: Should use best score (0.8)
+        // Assert: Should use the highest score among all matches
         $this->assertArrayHasKey('User_1', $context->results);
         $this->assertEqualsWithDelta(0.8, $context->results['User_1']->score, PHP_FLOAT_EPSILON);
     }
 
     public function test_handle_with_multi_word_query(): void
     {
-        // Arrange
+        // Arrange: Multi-word query with multiple matches
         $normalizer = new StringNormalizer();
-        $query = SearchQuery::create('test query', $normalizer);
+        $query = SearchQuery::create(query: 'test query', normalizer: $normalizer);
         $options = new SearchOptionsData(minScore: 0.1);
 
         $mockModel = new stdClass();
@@ -258,43 +280,51 @@ final class ScoringStageTest extends TestCase
         $scoringEngine->method('calculateMultiWordScore')->willReturn(0.9);
 
         $context = new SearchContext(
-            $query,
-            $options,
-            $normalizer,
-            new SimilarityCalculator(),
-            $this->createStub(IndexBuilder::class),
-            $this->createStub(IndexRepositoryInterface::class),
-            $scoringEngine,
-            []
+            query: $query,
+            options: $options,
+            normalizer: $normalizer,
+            similarityCalculator: new SimilarityCalculator(),
+            indexBuilder: $this->createStub(IndexBuilder::class),
+            indexRepository: $this->createStub(IndexRepositoryInterface::class),
+            scoringEngine: $scoringEngine,
+            indexDataArray: []
         );
 
-        $reflection = new ReflectionProperty($context, 'potentialMatches');
-        $reflection->setAccessible(true);
-        // CORRECTION CRITIQUE : 2 matches au lieu de 1
-        $reflection->setValue($context, [
+        $this->setPrivateProperty($context, 'potentialMatches', [
             'User_1' => [
-                ['indexable_type' => 'User', 'indexable_id' => 1, 'field' => 'name', 'original_value' => 'Test Query'],
-                ['indexable_type' => 'User', 'indexable_id' => 1, 'field' => 'description', 'original_value' => 'Another Query'],
+                [
+                    'indexable_type' => 'User',
+                    'indexable_id' => 1,
+                    'field' => 'name',
+                    'original_value' => 'Test Query',
+                ],
+                [
+                    'indexable_type' => 'User',
+                    'indexable_id' => 1,
+                    'field' => 'description',
+                    'original_value' => 'Another Query',
+                ],
             ],
         ]);
 
-        $reflectionModels = new ReflectionProperty($context, 'preloadedModels');
-        $reflectionModels->setAccessible(true);
-        $reflectionModels->setValue($context, ['User_1' => $mockModel]);
+        $this->setPrivateProperty($context, 'preloadedModels', ['User_1' => $mockModel]);
 
-        // Act
-        $this->stage->handle($context, fn(): string => 'next');
+        // Act: Process multi-word query with multiple matches
+        $this->stage->handle(
+            context: $context,
+            next: fn(): string => 'next'
+        );
 
-        // Assert: Should use multi-word score (0.9)
+        // Assert: Should use multi-word scoring algorithm
         $this->assertArrayHasKey('User_1', $context->results);
         $this->assertEqualsWithDelta(0.9, $context->results['User_1']->score, PHP_FLOAT_EPSILON);
     }
 
     public function test_calculate_best_score_clamping(): void
     {
-        // Use reflection to test private method
-        $method = new ReflectionMethod($this->stage, 'calculateBestScore');
-        $method->setAccessible(true);
+        // Arrange: Score that exceeds maximum value
+        $calculateBestScoreMethod = new ReflectionMethod($this->stage, 'calculateBestScore');
+        $calculateBestScoreMethod->setAccessible(true);
 
         $mockModel = new stdClass();
 
@@ -302,46 +332,67 @@ final class ScoringStageTest extends TestCase
         $context->method('hasMultipleWords')->willReturn(false);
 
         $scoringEngine = $this->createMock(ScoringEngine::class);
-        $scoringEngine->method('calculateScore')->willReturn(2.0); // Above 1.0
+        $scoringEngine->method('calculateScore')->willReturn(2.0);
 
-        // Set scoringEngine on context via reflection
-        $reflectionContext = new ReflectionClass($context);
-        $engineProp = $reflectionContext->getProperty('scoringEngine');
-        $engineProp->setAccessible(true);
-        $engineProp->setValue($context, $scoringEngine);
+        $this->setPrivateProperty($context, 'scoringEngine', $scoringEngine);
 
         $matches = [['test' => 'match']];
 
-        // Act
-        $score = $method->invoke($this->stage, $context, $matches, $mockModel);
+        // Act: Calculate score that exceeds maximum
+        $score = $calculateBestScoreMethod->invoke(
+            $this->stage,
+            $context,
+            $matches,
+            $mockModel
+        );
 
-        // Assert: Should be clamped to 1.0
+        // Assert: Score should be clamped to maximum of 1.0
         $this->assertEqualsWithDelta(1.0, $score, PHP_FLOAT_EPSILON);
     }
 
     public function test_find_best_match(): void
     {
-        $method = new ReflectionMethod($this->stage, 'findBestMatch');
-        $method->setAccessible(true);
+        // Arrange: Multiple potential matches
+        $findBestMatchMethod = new ReflectionMethod($this->stage, 'extractBestMatchDetails');
+        $findBestMatchMethod->setAccessible(true);
 
         $matches = [
             ['field' => 'name', 'value' => 'first'],
             ['field' => 'email', 'value' => 'second'],
         ];
 
-        $bestMatch = $method->invoke($this->stage, $matches);
+        // Act: Find best match from array
+        $bestMatch = $findBestMatchMethod->invoke($this->stage, $matches);
 
-        // Should return first match
+        // Assert: Should return first match in array
         $this->assertEquals('name', $bestMatch['field']);
         $this->assertEquals('first', $bestMatch['value']);
     }
 
     public function test_find_best_match_empty_array(): void
     {
+        // Arrange: Empty matches array
+        $findBestMatchMethod = new ReflectionMethod($this->stage, 'extractBestMatchDetails');
+        $findBestMatchMethod->setAccessible(true);
+
+        // Assert: Should throw exception for empty array
         $this->expectException(InvalidArgumentException::class);
 
-        $method = new ReflectionMethod($this->stage, 'findBestMatch');
-        $method->setAccessible(true);
-        $method->invoke($this->stage, []);
+        // Act: Attempt to find best match from empty array
+        $findBestMatchMethod->invoke($this->stage, []);
+    }
+
+    /**
+     * Helper method to set private property value using reflection.
+     *
+     * @param object $object The object to modify
+     * @param string $propertyName The name of the private property
+     * @param mixed $value The value to set
+     */
+    private function setPrivateProperty(object $object, string $propertyName, mixed $value): void
+    {
+        $reflection = new ReflectionProperty($object, $propertyName);
+        $reflection->setAccessible(true);
+        $reflection->setValue($object, $value);
     }
 }

@@ -18,7 +18,7 @@ use Fuzzy\SearchContext;
 use Fuzzy\ValueObjects\IndexData;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 
-#[AllowMockObjectsWithoutExpectations] // Pour éviter les notices PHPUnit
+#[AllowMockObjectsWithoutExpectations]
 final class MatchDiscoveryStageTest extends TestCase
 {
     private MatchDiscoveryStage $stage;
@@ -31,7 +31,7 @@ final class MatchDiscoveryStageTest extends TestCase
 
     public function test_handle_with_empty_query(): void
     {
-        // Arrange
+        // Arrange: Creating a search context with an empty query
         $normalizer = new StringNormalizer();
         $query = SearchQuery::create('', $normalizer);
         $options = new SearchOptionsData();
@@ -41,20 +41,17 @@ final class MatchDiscoveryStageTest extends TestCase
         ]);
 
         $context = new SearchContext(
-            $query,
-            $options,
-            $normalizer,
-            new SimilarityCalculator(),
-            $this->createMock(IndexBuilder::class),
-            $this->createMock(IndexRepositoryInterface::class),
-            $this->createMock(ScoringEngine::class),
-            []
+            query: $query,
+            options: $options,
+            normalizer: $normalizer,
+            similarityCalculator: new SimilarityCalculator(),
+            indexBuilder: $this->createMock(IndexBuilder::class),
+            indexRepository: $this->createMock(IndexRepositoryInterface::class),
+            scoringEngine: $this->createMock(ScoringEngine::class),
+            indexDataArray: []
         );
 
-        // Set indexData via reflection since it's private
-        $reflection = new ReflectionProperty($context, 'indexData');
-        $reflection->setAccessible(true);
-        $reflection->setValue($context, $indexData);
+        $this->setPrivateProperty($context, 'indexData', $indexData);
 
         $nextCalled = false;
         $next = function () use (&$nextCalled): string {
@@ -62,10 +59,10 @@ final class MatchDiscoveryStageTest extends TestCase
             return 'next';
         };
 
-        // Act
+        // Act: Handling empty query through the match discovery stage
         $result = $this->stage->handle($context, $next);
 
-        // Assert: Should call next without processing
+        // Assert: Stage should call next without processing empty query
         $this->assertTrue($nextCalled);
         $this->assertEquals('next', $result);
         $this->assertEmpty($context->getAllPotentialMatches());
@@ -73,7 +70,7 @@ final class MatchDiscoveryStageTest extends TestCase
 
     public function test_handle_discovers_exact_matches(): void
     {
-        // Arrange
+        // Arrange: Setting up context with exact word match in index
         $normalizer = new StringNormalizer();
         $query = SearchQuery::create('test', $normalizer);
         $options = new SearchOptionsData();
@@ -88,29 +85,24 @@ final class MatchDiscoveryStageTest extends TestCase
         ]);
 
         $context = new SearchContext(
-            $query,
-            $options,
-            $normalizer,
-            new SimilarityCalculator(),
-            $this->createMock(IndexBuilder::class),
-            $this->createMock(IndexRepositoryInterface::class),
-            $this->createMock(ScoringEngine::class),
-            []
+            query: $query,
+            options: $options,
+            normalizer: $normalizer,
+            similarityCalculator: new SimilarityCalculator(),
+            indexBuilder: $this->createMock(IndexBuilder::class),
+            indexRepository: $this->createMock(IndexRepositoryInterface::class),
+            scoringEngine: $this->createMock(ScoringEngine::class),
+            indexDataArray: []
         );
 
-        $reflection = new ReflectionProperty($context, 'indexData');
-        $reflection->setAccessible(true);
-        $reflection->setValue($context, $indexData);
+        $this->setPrivateProperty($context, 'indexData', $indexData);
 
-        // Act
+        // Act: Discovering matches for exact word
         $this->stage->handle($context, fn(): string => 'next');
 
-        // Assert: Avec la logique corrigée, pour un mot unique:
-        // 1. discoverExactMatches() → ajoute 2 matches
-        // 2. discoverWordMatches() → SAUTE (car déjà traité en exact)
-        // Total attendu: 2 matches
+        // Assert: Two exact matches should be found
         $matches = $context->getAllPotentialMatches();
-        $this->assertCount(2, $matches); // CORRIGÉ: 2, pas 4
+        $this->assertCount(2, $matches);
 
         $user1Matches = $context->getPotentialMatchesForModel('User_1');
         $user2Matches = $context->getPotentialMatchesForModel('User_2');
@@ -123,7 +115,7 @@ final class MatchDiscoveryStageTest extends TestCase
 
     public function test_handle_discovers_word_matches(): void
     {
-        // Arrange
+        // Arrange: Setting up context with multiple words in query
         $normalizer = new StringNormalizer();
         $query = SearchQuery::create('hello world', $normalizer);
         $options = new SearchOptionsData();
@@ -137,27 +129,23 @@ final class MatchDiscoveryStageTest extends TestCase
         ]);
 
         $context = new SearchContext(
-            $query,
-            $options,
-            $normalizer,
-            new SimilarityCalculator(),
-            $this->createMock(IndexBuilder::class),
-            $this->createMock(IndexRepositoryInterface::class),
-            $this->createMock(ScoringEngine::class),
-            []
+            query: $query,
+            options: $options,
+            normalizer: $normalizer,
+            similarityCalculator: new SimilarityCalculator(),
+            indexBuilder: $this->createMock(IndexBuilder::class),
+            indexRepository: $this->createMock(IndexRepositoryInterface::class),
+            scoringEngine: $this->createMock(ScoringEngine::class),
+            indexDataArray: []
         );
 
-        $reflection = new ReflectionProperty($context, 'indexData');
-        $reflection->setAccessible(true);
-        $reflection->setValue($context, $indexData);
+        $this->setPrivateProperty($context, 'indexData', $indexData);
 
-        // Act
+        // Act: Discovering matches for individual query words
         $this->stage->handle($context, fn(): string => 'next');
 
         // Assert: Should find matches for 'hello' and 'world', not 'test'
         $matches = $context->getAllPotentialMatches();
-        // 'hello' et 'world' trouvés par discoverWordMatches()
-        // discoverExactMatches() ne s'exécute pas car 'hello world' n'est pas dans l'index
         $this->assertCount(2, $matches);
         $this->assertArrayHasKey('User_1', $matches);
         $this->assertArrayHasKey('User_2', $matches);
@@ -166,9 +154,9 @@ final class MatchDiscoveryStageTest extends TestCase
 
     public function test_handle_discovers_fuzzy_matches_when_enabled(): void
     {
-        // Arrange
+        // Arrange: Setting up fuzzy search with typo in query
         $normalizer = new StringNormalizer();
-        $query = SearchQuery::create('helo', $normalizer); // Typo for 'hello'
+        $query = SearchQuery::create('helo', $normalizer);
         $options = new SearchOptionsData(fuzzy: true, threshold: 0.7);
 
         $similarityCalculator = $this->createMock(SimilarityCalculator::class);
@@ -185,34 +173,32 @@ final class MatchDiscoveryStageTest extends TestCase
         ]);
 
         $context = new SearchContext(
-            $query,
-            $options,
-            $normalizer,
-            $similarityCalculator,
-            $this->createMock(IndexBuilder::class),
-            $this->createMock(IndexRepositoryInterface::class),
-            $this->createMock(ScoringEngine::class),
-            []
+            query: $query,
+            options: $options,
+            normalizer: $normalizer,
+            similarityCalculator: $similarityCalculator,
+            indexBuilder: $this->createMock(IndexBuilder::class),
+            indexRepository: $this->createMock(IndexRepositoryInterface::class),
+            scoringEngine: $this->createMock(ScoringEngine::class),
+            indexDataArray: []
         );
 
-        $reflection = new ReflectionProperty($context, 'indexData');
-        $reflection->setAccessible(true);
-        $reflection->setValue($context, $indexData);
+        $this->setPrivateProperty($context, 'indexData', $indexData);
 
-        // Act
+        // Act: Discovering fuzzy matches for typo
         $this->stage->handle($context, fn(): string => 'next');
 
         // Assert: Should find fuzzy match for 'helo' -> 'hello'
         $matches = $context->getAllPotentialMatches();
-        $this->assertArrayHasKey('User_1', $matches); // Fuzzy match
+        $this->assertArrayHasKey('User_1', $matches);
     }
 
     public function test_handle_skips_fuzzy_matches_when_disabled(): void
     {
-        // Arrange
+        // Arrange: Fuzzy search disabled
         $normalizer = new StringNormalizer();
         $query = SearchQuery::create('helo', $normalizer);
-        $options = new SearchOptionsData(fuzzy: false); // Fuzzy disabled
+        $options = new SearchOptionsData(fuzzy: false);
 
         $indexData = IndexData::fromArray([
             'wordIndex' => [
@@ -221,31 +207,29 @@ final class MatchDiscoveryStageTest extends TestCase
         ]);
 
         $context = new SearchContext(
-            $query,
-            $options,
-            $normalizer,
-            new SimilarityCalculator(),
-            $this->createMock(IndexBuilder::class),
-            $this->createMock(IndexRepositoryInterface::class),
-            $this->createMock(ScoringEngine::class),
-            []
+            query: $query,
+            options: $options,
+            normalizer: $normalizer,
+            similarityCalculator: new SimilarityCalculator(),
+            indexBuilder: $this->createMock(IndexBuilder::class),
+            indexRepository: $this->createMock(IndexRepositoryInterface::class),
+            scoringEngine: $this->createMock(ScoringEngine::class),
+            indexDataArray: []
         );
 
-        $reflection = new ReflectionProperty($context, 'indexData');
-        $reflection->setAccessible(true);
-        $reflection->setValue($context, $indexData);
+        $this->setPrivateProperty($context, 'indexData', $indexData);
 
-        // Act
+        // Act: Trying to find matches with fuzzy disabled
         $this->stage->handle($context, fn(): string => 'next');
 
-        // Assert: Should not find fuzzy matches
+        // Assert: Should not find fuzzy matches when disabled
         $matches = $context->getAllPotentialMatches();
         $this->assertEmpty($matches);
     }
 
     public function test_handle_discovers_multi_word_matches(): void
     {
-        // Arrange
+        // Arrange: Multiple words query with partial index match
         $normalizer = new StringNormalizer();
         $query = SearchQuery::create('hello world', $normalizer);
         $options = new SearchOptionsData();
@@ -253,38 +237,35 @@ final class MatchDiscoveryStageTest extends TestCase
         $indexData = IndexData::fromArray([
             'wordIndex' => [
                 'hello' => [['indexable_type' => 'User', 'indexable_id' => 1, 'field' => 'name']],
-                // Note: 'world' not in index
             ],
         ]);
 
         $context = new SearchContext(
-            $query,
-            $options,
-            $normalizer,
-            new SimilarityCalculator(),
-            $this->createMock(IndexBuilder::class),
-            $this->createMock(IndexRepositoryInterface::class),
-            $this->createMock(ScoringEngine::class),
-            []
+            query: $query,
+            options: $options,
+            normalizer: $normalizer,
+            similarityCalculator: new SimilarityCalculator(),
+            indexBuilder: $this->createMock(IndexBuilder::class),
+            indexRepository: $this->createMock(IndexRepositoryInterface::class),
+            scoringEngine: $this->createMock(ScoringEngine::class),
+            indexDataArray: []
         );
 
-        $reflection = new ReflectionProperty($context, 'indexData');
-        $reflection->setAccessible(true);
-        $reflection->setValue($context, $indexData);
+        $this->setPrivateProperty($context, 'indexData', $indexData);
 
-        // Act
+        // Act: Discovering matches for multi-word query
         $this->stage->handle($context, fn(): string => 'next');
 
-        // Assert: Should find User_1 for 'hello'
+        // Assert: Should find User_1 for 'hello' even though 'world' not in index
         $matches = $context->getAllPotentialMatches();
         $this->assertArrayHasKey('User_1', $matches);
     }
 
     public function test_handle_skips_short_words(): void
     {
-        // Arrange
+        // Arrange: Query contains very short words
         $normalizer = new StringNormalizer();
-        $query = SearchQuery::create('a be cat', $normalizer); // 'a' (1 char) et 'be' (2 chars)
+        $query = SearchQuery::create('a be cat', $normalizer);
         $options = new SearchOptionsData();
 
         $indexData = IndexData::fromArray([
@@ -296,31 +277,39 @@ final class MatchDiscoveryStageTest extends TestCase
         ]);
 
         $context = new SearchContext(
-            $query,
-            $options,
-            $normalizer,
-            new SimilarityCalculator(),
-            $this->createMock(IndexBuilder::class),
-            $this->createMock(IndexRepositoryInterface::class),
-            $this->createMock(ScoringEngine::class),
-            []
+            query: $query,
+            options: $options,
+            normalizer: $normalizer,
+            similarityCalculator: new SimilarityCalculator(),
+            indexBuilder: $this->createMock(IndexBuilder::class),
+            indexRepository: $this->createMock(IndexRepositoryInterface::class),
+            scoringEngine: $this->createMock(ScoringEngine::class),
+            indexDataArray: []
         );
 
-        $reflection = new ReflectionProperty($context, 'indexData');
-        $reflection->setAccessible(true);
-        $reflection->setValue($context, $indexData);
+        $this->setPrivateProperty($context, 'indexData', $indexData);
 
-        // Act
+        // Act: Discovering matches with short words
         $this->stage->handle($context, fn(): string => 'next');
 
-        // Assert: Should only process words with length >= 2
+        // Assert: Should ignore very short words (length < 2)
         $matches = $context->getAllPotentialMatches();
+        $this->assertArrayNotHasKey('User_1', $matches); // 'a' ignored
+        $this->assertArrayHasKey('User_2', $matches);    // 'be' processed
+        $this->assertArrayHasKey('User_3', $matches);    // 'cat' processed
+    }
 
-        // 'a' (1 char) → IGNORÉ partout
-        // 'be' (2 chars) → TRAITÉ
-        // 'cat' (3 chars) → TRAITÉ
-        $this->assertArrayNotHasKey('User_1', $matches); // 'a' ignoré
-        $this->assertArrayHasKey('User_2', $matches);    // 'be' traité
-        $this->assertArrayHasKey('User_3', $matches);    // 'cat' traité
+    /**
+     * Sets a private property value using reflection.
+     *
+     * @param object $object
+     * @param string $propertyName
+     * @param mixed $value
+     */
+    private function setPrivateProperty(object $object, string $propertyName, mixed $value): void
+    {
+        $reflection = new ReflectionProperty($object, $propertyName);
+        $reflection->setAccessible(true);
+        $reflection->setValue($object, $value);
     }
 }

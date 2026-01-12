@@ -8,22 +8,24 @@ use Illuminate\Database\Eloquent\Model;
 use Spatie\LaravelData\Data;
 
 /**
- * Data object representing a searchable item in fuzzy search results.
+ * Data Transfer Object representing a searchable item in fuzzy search results.
  *
- * Contains metadata and data for items that can be searched through the fuzzy search system.
- * This object is used to standardize the format of search results across different model types.
+ * This object standardizes the format of search results across different model types,
+ * providing a consistent interface for search result consumers.
  */
 class FuzzySearchableData extends Data
 {
     /**
+     * Constructor for FuzzySearchableData.
+     *
      * @param string|int $id Unique identifier of the searchable item
-     * @param string $name Display name of the item
-     * @param string $type Type/class of the item
-     * @param object|null $model Original model instance (if available)
-     * @param array $data Raw data array from the model
-     * @param string|null $description Optional description of the item
-     * @param string|null $image Optional image URL or path
-     * @param string|null $url Optional URL for the item
+     * @param string $name Display name of the item for presentation
+     * @param string $type Type or class name of the item (e.g., 'User', 'Product')
+     * @param object|null $model Original model instance when available
+     * @param array<string, mixed> $data Raw data array from the model attributes
+     * @param string|null $description Optional detailed description of the item
+     * @param string|null $image Optional image URL or path for visual representation
+     * @param string|null $url Optional URL linking to the item's detail page
      */
     public function __construct(
         public string|int $id,
@@ -39,7 +41,10 @@ class FuzzySearchableData extends Data
     /**
      * Create a FuzzySearchableData instance from an Eloquent model.
      *
-     * @param Model $model The model to convert to searchable data
+     * Automatically extracts key properties from the model to populate the searchable data object.
+     *
+     * @param Model $model The Eloquent model to convert to searchable format
+     * @return self Configured FuzzySearchableData instance
      */
     public static function fromModel(Model $model): self
     {

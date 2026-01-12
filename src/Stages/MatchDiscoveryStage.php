@@ -10,37 +10,38 @@ use Closure;
 
 class MatchDiscoveryStage
 {
-    // Cache amélioré avec expiration
-    private static array $cachedOptimizedIndexes = [];
+    private const CACHE_TTL = 300;
 
+    private static array $cachedOptimizedIndexes = [];
     private static array $cacheTimestamps = [];
 
-    private const CACHE_TTL = 300; // 5 minutes
-
+    /**
+     * Process the search context through match discovery stage
+     *
+     * Discovers exact, fuzzy, and multi-word matches in the index based on the query.
+     * Implements optimized strategies for different query patterns.
+     *
+     * @param SearchContext $context Search context containing query and configuration
+     * @param Closure $next Next stage in the pipeline
+     * @return mixed
+     */
     public function handle(SearchContext $context, Closure $next)
     {
         if ($context->query->isEmpty()) {
             return $next($context);
         }
 
-        // OPTIMISATION CRITIQUE : Détection précoce des requêtes à un mot avec match exact
         $hasExactMatches = $this->discoverExactMatches($context);
 
-        // Si la requête est un mot unique ET qu'on a trouvé des matches exacts
-        // ET que la recherche floue est activée, on doit réévaluer
         if (!$context->hasMultipleWords() && $hasExactMatches && $context->options->fuzzy) {
-            // Pour les requêtes à un mot avec match exact, on applique une logique spéciale
             $this->handleSingleWordWithExactMatch($context);
         } else {
-            // Logique normale pour les autres cas
             $this->discoverWordMatches($context);
 
-            // Recherche floue optimisée (si activée)
             if ($context->options->fuzzy) {
                 $this->discoverFuzzyMatchesOptimized($context);
             }
 
-            // Découverte multi-mots (si nécessaire)
             if ($context->hasMultipleWords()) {
                 $this->discoverMultiWordMatches($context);
             }
@@ -50,138 +51,135 @@ class MatchDiscoveryStage
     }
 
     /**
-     * Découvre les matches exacts (requête complète).
-     * RETOURNE : true si des matches exacts ont été trouvés
+     * Discover exact matches for the complete query
+     *
+     * @param SearchContext $context Search context
+     * @return bool True if any exact matches were found
      */
     private function discoverExactMatches(SearchContext $context): bool
     {
         $normalizedQuery = $context->getNormalizedQuery();
         $wordIndex = $context->getWordIndex();
 
-        if (isset($wordIndex[$normalizedQuery])) {
-            foreach ($wordIndex[$normalizedQuery] as $match) {
-                $context->addPotentialMatch($match);
-            }
-
-            return true;
+        if (!isset($wordIndex[$normalizedQuery])) {
+            return false;
         }
 
-        return false;
+        foreach ($wordIndex[$normalizedQuery] as $match) {
+            $context->addPotentialMatch($match);
+        }
+
+        return true;
     }
 
     /**
-     * Gestion spéciale pour les requêtes à un mot avec match exact
-     * OPTIMISATION : Évite les recherches floues redondantes tout en gardant les optimisations
+     * Handle single word queries that have exact matches
+     *
+     * Applies hybrid strategy: keeps exact matches and adds only very close fuzzy matches
+     * to avoid redundant expensive similarity calculations.
+     *
+     * @param SearchContext $context Search context
      */
     private function handleSingleWordWithExactMatch(SearchContext $context): void
     {
         $normalizedQuery = $context->getNormalizedQuery();
         $wordIndex = $context->getWordIndex();
 
-        // Pour une requête à un mot avec match exact, on applique une stratégie hybride :
-        // 1. On garde les matches exacts (déjà ajoutés)
-        // 2. On cherche UNIQUEMENT les matches flous TRÈS proches (threshold élevé)
-        // 3. On évite la recherche floue générique O(n²)
-
         if (count($wordIndex) < 1000) {
-            // Pour petits index, on peut chercher les matches très similaires
             $this->discoverVeryCloseMatches($context, $normalizedQuery, $wordIndex);
         } else {
-            // Pour grands index, on utilise l'optimisation mais avec un threshold plus élevé
             $this->discoverCloseMatchesOptimized($context, $normalizedQuery);
         }
     }
 
     /**
-     * Cherche uniquement les matches TRÈS proches (pour requêtes à un mot avec match exact)
-     * OPTIMISATION : Threshold plus élevé + recherche ciblée
+     * Discover only very similar matches for single word queries with exact matches
+     *
+     * Uses higher threshold and length-based filtering to limit comparisons.
+     *
+     * @param SearchContext $context Search context
+     * @param string $queryWord Normalized query word
+     * @param array $wordIndex Current word index
      */
     private function discoverVeryCloseMatches(SearchContext $context, string $queryWord, array $wordIndex): void
     {
-        // Augmente le threshold pour ne garder que les matches très similaires
         $highThreshold = max($context->options->threshold, 0.7);
 
         foreach ($wordIndex as $indexedWord => $matches) {
-            // Skip si trop court
-            if (strlen((string)$indexedWord) < 2) {
+            $indexedWordString = (string) $indexedWord;
+
+            if (strlen($indexedWordString) < 2) {
                 continue;
             }
 
-            // OPTIMISATION : Filtre rapide par longueur similaire
-            $queryLength = strlen($queryWord);
-            $indexedLength = strlen((string)$indexedWord);
-            if (abs($queryLength - $indexedLength) > 2) {
-                continue;
-            }
-
-            // OPTIMISATION : Filtre par première lettre
-            if ($queryWord[0] !== ((string)$indexedWord)[0]) {
+            if (!$this->passesQuickFilters($queryWord, $indexedWordString)) {
                 continue;
             }
 
             $similarity = $context->similarityCalculator->calculateWordSimilarity(
                 $queryWord,
-                (string) $indexedWord
+                $indexedWordString
             );
 
             if ($similarity >= $highThreshold) {
-                foreach ($matches as $match) {
-                    $context->addPotentialMatch($match);
-                }
+                $this->addAllMatches($context, $matches);
             }
         }
     }
 
     /**
-     * Version optimisée pour les grands index (requêtes à un mot avec match exact)
+     * Discover close matches for large indexes
+     *
+     * @param SearchContext $context Search context
+     * @param string $queryWord Normalized query word
      */
     private function discoverCloseMatchesOptimized(SearchContext $context, string $queryWord): void
     {
         $wordIndex = $context->getWordIndex();
         $optimizedIndexes = $this->getOrBuildOptimizedIndexes($wordIndex);
-
-        // Augmente le threshold pour ne garder que les matches très similaires
         $highThreshold = max($context->options->threshold, 0.7);
 
-        // Utilise uniquement la stratégie la plus précise (première lettre + longueur)
-        // avec un threshold élevé
         $this->findMatchesByFirstCharAndLengthOptimized(
             $queryWord,
             $optimizedIndexes['byLength'],
             $context,
-            $highThreshold // Threshold personnalisé
+            $highThreshold
         );
     }
 
     /**
-     * Découvre les matches par mot individuel.
+     * Discover word-by-word matches in the index
+     *
+     * @param SearchContext $context Search context
      */
     private function discoverWordMatches(SearchContext $context): void
     {
         $wordIndex = $context->getWordIndex();
 
         foreach ($context->getQueryWords() as $queryWord) {
-            // Ignorer les mots trop courts
             if (strlen($queryWord) < 2) {
                 continue;
             }
 
-            // Si la requête est un mot unique ET qu'on l'a déjà traité en exact match, on saute
             if (!$context->hasMultipleWords() && $queryWord === $context->getNormalizedQuery()) {
                 continue;
             }
 
             if (isset($wordIndex[$queryWord])) {
-                foreach ($wordIndex[$queryWord] as $match) {
-                    $context->addPotentialMatch($match);
-                }
+                $this->addAllMatches($context, $wordIndex[$queryWord]);
             }
         }
     }
 
     /**
-     * Découvre les matches flous OPTIMISÉS.
-     * Complexité : O(k) où k = quelques centaines, indépendant de la taille de l'index
+     * Discover fuzzy matches using optimized strategies
+     *
+     * Implements three-level strategy for efficiency:
+     * 1. Contained matches (fastest)
+     * 2. Trigram-based matches
+     * 3. First character + length filtered matches
+     *
+     * @param SearchContext $context Search context
      */
     private function discoverFuzzyMatchesOptimized(SearchContext $context): void
     {
@@ -191,13 +189,11 @@ class MatchDiscoveryStage
             return;
         }
 
-        // OPTIMISATION : Si l'index est petit (< 1000 mots), on peut utiliser la méthode simple
         if (count($wordIndex) < 1000) {
             $this->discoverFuzzyMatchesSimple($context, $wordIndex);
             return;
         }
 
-        // Pour les grands index, utiliser l'optimisation
         $optimizedIndexes = $this->getOrBuildOptimizedIndexes($wordIndex);
 
         foreach ($context->getQueryWords() as $queryWord) {
@@ -205,39 +201,36 @@ class MatchDiscoveryStage
                 continue;
             }
 
-            // OPTIMISATION : Skip si ce mot est déjà traité en exact (pour requêtes multi-mots)
             if ($context->hasMultipleWords() && isset($wordIndex[$queryWord])) {
                 continue;
             }
 
-            // STRATÉGIE À 3 NIVEAUX (du plus rapide au plus précis) :
-
-            // 1. CHERCHER LES CONTENANTS (très rapide, haute précision)
             $this->findContainedMatchesOptimized(
                 $queryWord,
                 $optimizedIndexes['byLength'],
                 $context
             );
 
-            // 2. CHERCHER PAR TRIGRAMS (optimisé)
             $this->findMatchesByTrigrams(
                 $queryWord,
                 $optimizedIndexes['trigramIndex'],
                 $context
             );
 
-            // 3. CHERCHER PAR PREMIÈRE LETTRE + LONGUEUR (méthode principale optimisée)
             $this->findMatchesByFirstCharAndLengthOptimized(
                 $queryWord,
                 $optimizedIndexes['byLength'],
                 $context,
-                $context->options->threshold // Threshold normal
+                $context->options->threshold
             );
         }
     }
 
     /**
-     * Version simple pour petits index (moins de 1000 mots).
+     * Simple fuzzy match discovery for small indexes
+     *
+     * @param SearchContext $context Search context
+     * @param array $wordIndex Current word index
      */
     private function discoverFuzzyMatchesSimple(SearchContext $context, array $wordIndex): void
     {
@@ -246,109 +239,126 @@ class MatchDiscoveryStage
                 continue;
             }
 
-            // OPTIMISATION : Skip si ce mot est déjà traité en exact (pour requêtes multi-mots)
             if ($context->hasMultipleWords() && isset($wordIndex[$queryWord])) {
                 continue;
             }
 
             foreach ($wordIndex as $indexedWord => $matches) {
-                if (strlen((string)$indexedWord) < 2) {
+                $indexedWordString = (string) $indexedWord;
+
+                if (strlen($indexedWordString) < 2) {
                     continue;
                 }
 
                 $similarity = $context->similarityCalculator->calculateWordSimilarity(
                     $queryWord,
-                    (string) $indexedWord
+                    $indexedWordString
                 );
 
                 if ($similarity >= $context->options->threshold) {
-                    foreach ($matches as $match) {
-                        $context->addPotentialMatch($match);
-                    }
+                    $this->addAllMatches($context, $matches);
                 }
             }
         }
     }
 
     /**
-     * Construit ou récupère les index optimisés depuis le cache.
-     * OPTIMISÉ : Construction unique par index
+     * Get cached optimized indexes or build them
+     *
+     * Builds three optimized index structures:
+     * - byLength: Words grouped by character count
+     * - byFirstChar: Words grouped by first character
+     * - trigramIndex: Words indexed by 3-character sequences
+     *
+     * @param array $wordIndex Original word index
+     * @return array<string, array> Optimized index structures
      */
     private function getOrBuildOptimizedIndexes(array $wordIndex): array
     {
         $cacheKey = md5(serialize(array_keys($wordIndex)));
-        $now = Carbon::now()
-            ->getTimestamp();
+        $now = Carbon::now()->getTimestamp();
 
-        // Vérifier le cache avec expiration
-        if (
-            isset(self::$cachedOptimizedIndexes[$cacheKey]) &&
-            isset(self::$cacheTimestamps[$cacheKey]) &&
-            ($now - self::$cacheTimestamps[$cacheKey]) < self::CACHE_TTL
-        ) {
+        if ($this->isCacheValid($cacheKey, $now)) {
             return self::$cachedOptimizedIndexes[$cacheKey];
         }
 
-        // Construire les index optimisés
-        $byLength = [];
-        $byFirstChar = [];
-        $trigramIndex = [];
+        $optimizedIndexes = $this->buildOptimizedIndexes($wordIndex);
 
-        foreach ($wordIndex as $word => $matches) {
-            // 🔥 CORRECTION DU BUG : Conversion explicite en string
-            $word = (string) $word;
-            $wordLength = strlen($word);
-
-            if ($wordLength < 2) {
-                continue;
-            }
-
-            // Index par longueur
-            if (!isset($byLength[$wordLength])) {
-                $byLength[$wordLength] = [];
-            }
-
-            $byLength[$wordLength][$word] = $matches;
-
-            // Index par première lettre
-            $firstChar = $word[0];
-            if (!isset($byFirstChar[$firstChar])) {
-                $byFirstChar[$firstChar] = [];
-            }
-
-            $byFirstChar[$firstChar][$word] = $matches;
-
-            // Index par trigrams (3 caractères)
-            if ($wordLength >= 3) {
-                $trigrams = $this->generateTrigrams($word);
-                foreach ($trigrams as $trigram) {
-                    if (!isset($trigramIndex[$trigram])) {
-                        $trigramIndex[$trigram] = [];
-                    }
-
-                    $trigramIndex[$trigram][$word] = $matches;
-                }
-            }
-        }
-
-        $optimizedIndexes = [
-            'byLength' => $byLength,
-            'byFirstChar' => $byFirstChar,
-            'trigramIndex' => $trigramIndex,
-        ];
-
-        // Mettre en cache
         self::$cachedOptimizedIndexes[$cacheKey] = $optimizedIndexes;
         self::$cacheTimestamps[$cacheKey] = $now;
 
-        // Nettoyage périodique du cache
         $this->cleanupCache($now);
 
         return $optimizedIndexes;
     }
 
     /**
-     * Génère les trigrams d'un mot.
+     * Build optimized index structures
+     *
+     * @param array $wordIndex Original word index
+     * @return array<string, array> Optimized index structures
+     */
+    private function buildOptimizedIndexes(array $wordIndex): array
+    {
+        $byLength = [];
+        $byFirstChar = [];
+        $trigramIndex = [];
+
+        foreach ($wordIndex as $word => $matches) {
+            $wordString = (string) $word;
+            $wordLength = strlen($wordString);
+
+            if ($wordLength < 2) {
+                continue;
+            }
+
+            if (!isset($byLength[$wordLength])) {
+                $byLength[$wordLength] = [];
+            }
+            $byLength[$wordLength][$wordString] = $matches;
+
+            $firstChar = $wordString[0];
+            if (!isset($byFirstChar[$firstChar])) {
+                $byFirstChar[$firstChar] = [];
+            }
+            $byFirstChar[$firstChar][$wordString] = $matches;
+
+            if ($wordLength >= 3) {
+                $this->addToTrigramIndex($wordString, $matches, $trigramIndex);
+            }
+        }
+
+        return [
+            'byLength' => $byLength,
+            'byFirstChar' => $byFirstChar,
+            'trigramIndex' => $trigramIndex,
+        ];
+    }
+
+    /**
+     * Add word to trigram index
+     *
+     * @param string $word Word to index
+     * @param array $matches Associated matches
+     * @param array<string, array> $trigramIndex Reference to trigram index
+     */
+    private function addToTrigramIndex(string $word, array $matches, array &$trigramIndex): void
+    {
+        $trigrams = $this->generateTrigrams($word);
+
+        foreach ($trigrams as $trigram) {
+            if (!isset($trigramIndex[$trigram])) {
+                $trigramIndex[$trigram] = [];
+            }
+            $trigramIndex[$trigram][$word] = $matches;
+        }
+    }
+
+    /**
+     * Generate trigrams from a word
+     *
+     * @param string $word Input word
+     * @return array<int, string> List of trigrams
      */
     private function generateTrigrams(string $word): array
     {
@@ -368,8 +378,11 @@ class MatchDiscoveryStage
     }
 
     /**
-     * Cherche les mots qui CONTIENNENT le mot de requête (optimisé).
-     * @param array<int, mixed> $byLength
+     * Find words containing the query word
+     *
+     * @param string $queryWord Query word to search for
+     * @param array<int, array> $byLength Words grouped by length
+     * @param SearchContext $context Search context
      */
     private function findContainedMatchesOptimized(
         string $queryWord,
@@ -378,31 +391,28 @@ class MatchDiscoveryStage
     ): void {
         $queryLength = strlen($queryWord);
 
-        // Seulement chercher dans les mots assez longs pour contenir la requête
         for ($targetLength = $queryLength; $targetLength <= $queryLength + 10; ++$targetLength) {
             if (!isset($byLength[$targetLength])) {
                 continue;
             }
 
-            // OPTIMISATION : Limiter le nombre de mots à vérifier
             $maxChecks = min(200, count($byLength[$targetLength]));
             $wordsToCheck = array_slice($byLength[$targetLength], 0, $maxChecks, true);
 
             foreach ($wordsToCheck as $indexedWord => $matches) {
-                // 🔥 CORRECTION : Conversion en string pour str_contains()
-                $indexedWord = (string) $indexedWord;
-
-                if (str_contains($indexedWord, $queryWord)) {
-                    foreach ($matches as $match) {
-                        $context->addPotentialMatch($match);
-                    }
+                if (str_contains((string) $indexedWord, $queryWord)) {
+                    $this->addAllMatches($context, $matches);
                 }
             }
         }
     }
 
     /**
-     * Cherche les matches via trigrams (très efficace).
+     * Find matches using trigram similarity
+     *
+     * @param string $queryWord Query word
+     * @param array<string, array> $trigramIndex Trigram index
+     * @param SearchContext $context Search context
      */
     private function findMatchesByTrigrams(
         string $queryWord,
@@ -418,15 +428,14 @@ class MatchDiscoveryStage
         $candidates = [];
         $candidateScores = [];
 
-        // 1. Récupérer les candidats via trigrams communs
         foreach ($queryTrigrams as $trigram) {
-            if (isset($trigramIndex[$trigram])) {
-                foreach ($trigramIndex[$trigram] as $word => $matches) {
-                    // 🔥 CORRECTION : Conversion en string
-                    $word = (string) $word;
-                    $candidateScores[$word] = ($candidateScores[$word] ?? 0) + 1;
-                    $candidates[$word] = $matches;
-                }
+            if (!isset($trigramIndex[$trigram])) {
+                continue;
+            }
+
+            foreach ($trigramIndex[$trigram] as $word => $matches) {
+                $candidateScores[$word] = ($candidateScores[$word] ?? 0) + 1;
+                $candidates[$word] = $matches;
             }
         }
 
@@ -434,14 +443,10 @@ class MatchDiscoveryStage
             return;
         }
 
-        // 2. Trier par score de trigram (meilleurs matchs d'abord)
         arsort($candidateScores);
-
-        // 3. Limiter à un nombre raisonnable de candidats
         $maxCandidates = min(100, count($candidates));
         $topCandidates = array_slice(array_keys($candidateScores), 0, $maxCandidates, true);
 
-        // 4. Calculer la similarité sur les meilleurs candidats
         foreach ($topCandidates as $candidateWord) {
             $similarity = $context->similarityCalculator->calculateWordSimilarity(
                 $queryWord,
@@ -449,17 +454,18 @@ class MatchDiscoveryStage
             );
 
             if ($similarity >= $context->options->threshold) {
-                foreach ($candidates[$candidateWord] as $match) {
-                    $context->addPotentialMatch($match);
-                }
+                $this->addAllMatches($context, $candidates[$candidateWord]);
             }
         }
     }
 
     /**
-     * Cherche les matches par première lettre et longueur similaire (OPTIMISÉ).
-     * CORRECTION : Commencer par la longueur pour réduire le dataset
-     * AJOUT : Support du threshold personnalisé
+     * Find matches by first character and similar length
+     *
+     * @param string $queryWord Query word
+     * @param array<int, array> $byLength Words grouped by length
+     * @param SearchContext $context Search context
+     * @param float|null $customThreshold Optional custom similarity threshold
      */
     private function findMatchesByFirstCharAndLengthOptimized(
         string $queryWord,
@@ -470,55 +476,49 @@ class MatchDiscoveryStage
         $queryLength = strlen($queryWord);
         $firstChar = $queryWord[0];
         $threshold = $customThreshold ?? $context->options->threshold;
-
-        // OPTIMISATION CRITIQUE : Commencer par la longueur (plus sélectif)
         $lengthsToCheck = $this->getOptimalLengthsToCheck($queryLength);
 
         $totalChecks = 0;
-        $maxChecksPerQuery = 500; // Limite de sécurité
+        $maxChecksPerQuery = 500;
 
         foreach ($lengthsToCheck as $length) {
             if (!isset($byLength[$length])) {
                 continue;
             }
 
-            // Filtrer par première lettre DANS le sous-ensemble de longueur
             foreach ($byLength[$length] as $indexedWord => $matches) {
-                // 🔥 CORRECTION : Conversion en string pour accéder au premier caractère
-                $indexedWord = (string) $indexedWord;
+                $indexedWordString = (string) $indexedWord;
 
-                // Vérifier la première lettre
-                if ($indexedWord[0] !== $firstChar) {
+                if ($indexedWordString[0] !== $firstChar) {
                     continue;
                 }
 
                 ++$totalChecks;
                 if ($totalChecks > $maxChecksPerQuery) {
-                    return; // Limite de sécurité atteinte
+                    return;
                 }
 
                 $similarity = $context->similarityCalculator->calculateWordSimilarity(
                     $queryWord,
-                    $indexedWord
+                    $indexedWordString
                 );
 
                 if ($similarity >= $threshold) {
-                    foreach ($matches as $match) {
-                        $context->addPotentialMatch($match);
-                    }
+                    $this->addAllMatches($context, $matches);
                 }
             }
         }
     }
 
     /**
-     * Détermine les longueurs optimales à checker.
+     * Get optimal word lengths to check based on query length
+     *
+     * @param int $queryLength Length of query word
+     * @return array<int> List of lengths to check
      */
     private function getOptimalLengthsToCheck(int $queryLength): array
     {
-        // Stratégie adaptative basée sur la longueur du mot
         if ($queryLength <= 3) {
-            // Mots courts : large plage
             return array_filter([
                 $queryLength - 1,
                 $queryLength,
@@ -528,9 +528,7 @@ class MatchDiscoveryStage
             ], fn(int $l): bool => $l >= 2);
         }
 
-        // Stratégie adaptative basée sur la longueur du mot
         if ($queryLength <= 6) {
-            // Mots moyens : plage moyenne
             return array_filter([
                 $queryLength - 2,
                 $queryLength - 1,
@@ -540,7 +538,6 @@ class MatchDiscoveryStage
             ], fn(int $l): bool => $l >= 2);
         }
 
-        // Mots longs : plage étroite
         return array_filter([
             $queryLength - 1,
             $queryLength,
@@ -549,23 +546,9 @@ class MatchDiscoveryStage
     }
 
     /**
-     * Nettoyage périodique du cache.
-     */
-    private function cleanupCache(int $currentTime): void
-    {
-        // Nettoyer une fois toutes les 100 requêtes environ
-        if (count(self::$cacheTimestamps) > 20 && rand(1, 100) === 1) {
-            foreach (self::$cacheTimestamps as $key => $timestamp) {
-                if (($currentTime - $timestamp) > self::CACHE_TTL) {
-                    unset(self::$cachedOptimizedIndexes[$key]);
-                    unset(self::$cacheTimestamps[$key]);
-                }
-            }
-        }
-    }
-
-    /**
-     * Découvre les matches multi-mots additionnels.
+     * Discover additional multi-word matches
+     *
+     * @param SearchContext $context Search context
      */
     private function discoverMultiWordMatches(SearchContext $context): void
     {
@@ -573,7 +556,6 @@ class MatchDiscoveryStage
         $queryWords = $context->getQueryWords();
 
         foreach ($queryWords as $queryWord) {
-            // Ignorer les mots courts
             if (strlen($queryWord) < 2) {
                 continue;
             }
@@ -585,13 +567,75 @@ class MatchDiscoveryStage
             foreach ($wordIndex[$queryWord] as $match) {
                 $key = $match['indexable_type'] . '_' . $match['indexable_id'];
 
-                // Ignorer si déjà découvert par les autres méthodes
                 if ($context->hasPotentialMatches($key)) {
                     continue;
                 }
 
                 $context->addPotentialMatch($match);
             }
+        }
+    }
+
+    /**
+     * Check if cache is still valid
+     *
+     * @param string $cacheKey Cache key
+     * @param int $currentTime Current timestamp
+     * @return bool True if cache is valid
+     */
+    private function isCacheValid(string $cacheKey, int $currentTime): bool
+    {
+        return isset(self::$cachedOptimizedIndexes[$cacheKey]) &&
+            isset(self::$cacheTimestamps[$cacheKey]) &&
+            ($currentTime - self::$cacheTimestamps[$cacheKey]) < self::CACHE_TTL;
+    }
+
+    /**
+     * Clean up expired cache entries
+     *
+     * @param int $currentTime Current timestamp
+     */
+    private function cleanupCache(int $currentTime): void
+    {
+        if (count(self::$cacheTimestamps) > 20 && rand(1, 100) === 1) {
+            foreach (self::$cacheTimestamps as $key => $timestamp) {
+                if (($currentTime - $timestamp) > self::CACHE_TTL) {
+                    unset(self::$cachedOptimizedIndexes[$key]);
+                    unset(self::$cacheTimestamps[$key]);
+                }
+            }
+        }
+    }
+
+    /**
+     * Apply quick filters to skip unlikely matches
+     *
+     * @param string $queryWord Query word
+     * @param string $indexedWord Indexed word
+     * @return bool True if word passes filters
+     */
+    private function passesQuickFilters(string $queryWord, string $indexedWord): bool
+    {
+        $queryLength = strlen($queryWord);
+        $indexedLength = strlen($indexedWord);
+
+        if (abs($queryLength - $indexedLength) > 2) {
+            return false;
+        }
+
+        return $queryWord[0] === $indexedWord[0];
+    }
+
+    /**
+     * Add all matches to context
+     *
+     * @param SearchContext $context Search context
+     * @param array $matches List of matches to add
+     */
+    private function addAllMatches(SearchContext $context, array $matches): void
+    {
+        foreach ($matches as $match) {
+            $context->addPotentialMatch($match);
         }
     }
 }

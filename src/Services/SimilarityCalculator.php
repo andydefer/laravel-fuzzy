@@ -10,21 +10,29 @@ use Fuzzy\Services\Algorithms\PrefixSimilarityAlgorithm;
 use Fuzzy\Contracts\SimilarityAlgorithmInterface;
 
 /**
- * Composite similarity calculator using multiple algorithms.
+ * Composite similarity calculator that uses multiple algorithms
+ * to compute similarity scores between strings.
+ *
+ * Aggregates results from registered algorithms using weighted averaging
+ * to produce robust similarity measurements for fuzzy search operations.
  */
 class SimilarityCalculator
 {
     private const MIN_QUERY_LENGTH = 2;
 
+    /** @var array<int, SimilarityAlgorithmInterface> Registered similarity algorithms */
     private array $algorithms = [];
 
+    /**
+     * Initialize the calculator with default similarity algorithms.
+     */
     public function __construct()
     {
         $this->registerDefaultAlgorithms();
     }
 
     /**
-     * Register default similarity algorithms.
+     * Register the default set of similarity algorithms.
      */
     private function registerDefaultAlgorithms(): void
     {
@@ -36,7 +44,9 @@ class SimilarityCalculator
     }
 
     /**
-     * Add a custom algorithm.
+     * Register a custom similarity algorithm.
+     *
+     * @param SimilarityAlgorithmInterface $algorithm The algorithm to register
      */
     public function addAlgorithm(SimilarityAlgorithmInterface $algorithm): void
     {
@@ -44,14 +54,18 @@ class SimilarityCalculator
     }
 
     /**
-     * Calculate similarity score between two words using multiple algorithms.
+     * Calculate similarity score between two individual words.
+     *
+     * @param string $queryWord The search query word
+     * @param string $targetWord The target word to compare against
+     * @return float Similarity score between 0.0 and 1.0
      */
     public function calculateWordSimilarity(string $queryWord, string $targetWord): float
     {
         $queryWord = strtolower(trim($queryWord));
         $targetWord = strtolower(trim($targetWord));
 
-        if ($queryWord === '' || $queryWord === '0' || ($targetWord === '' || $targetWord === '0')) {
+        if ($queryWord === '' || $targetWord === '') {
             return 0.0;
         }
 
@@ -59,29 +73,39 @@ class SimilarityCalculator
             return 1.0;
         }
 
-        // Check for contained words (fast path)
         if (str_contains($targetWord, $queryWord)) {
-            return $this->calculateContainedSimilarity($queryWord, $targetWord, true);
+            return $this->calculateContainedWordSimilarity(
+                containedWord: $queryWord,
+                containerWord: $targetWord,
+                isQueryInTarget: true
+            );
         }
 
         if (str_contains($queryWord, $targetWord)) {
-            return $this->calculateContainedSimilarity($targetWord, $queryWord, false);
+            return $this->calculateContainedWordSimilarity(
+                containedWord: $targetWord,
+                containerWord: $queryWord,
+                isQueryInTarget: false
+            );
         }
 
-        // Use composite algorithm score
-        return $this->calculateCompositeSimilarity($queryWord, $targetWord);
+        return $this->calculateCompositeWordSimilarity($queryWord, $targetWord);
     }
 
     /**
-     * Calculate composite similarity using registered algorithms.
+     * Calculate similarity score using all registered algorithms.
+     *
+     * @param string $firstWord First word to compare
+     * @param string $secondWord Second word to compare
+     * @return float Weighted average similarity score
      */
-    private function calculateCompositeSimilarity(string $str1, string $str2): float
+    private function calculateCompositeWordSimilarity(string $firstWord, string $secondWord): float
     {
         $totalScore = 0.0;
         $totalWeight = 0.0;
 
         foreach ($this->algorithms as $algorithm) {
-            $score = $algorithm->calculate($str1, $str2);
+            $score = $algorithm->calculate($firstWord, $secondWord);
             $weight = $algorithm->getWeight();
 
             $totalScore += $score * $weight;
@@ -92,16 +116,21 @@ class SimilarityCalculator
     }
 
     /**
-     * Calculate similarity when one word is contained within another.
+     * Calculate similarity when one word is fully contained within another.
+     *
+     * @param string $containedWord The shorter word contained within the longer
+     * @param string $containerWord The longer word containing the shorter
+     * @param bool $isQueryInTarget Whether the query is contained in the target
+     * @return float Similarity score with containment bonus
      */
-    private function calculateContainedSimilarity(
-        string $contained,
-        string $container,
+    private function calculateContainedWordSimilarity(
+        string $containedWord,
+        string $containerWord,
         bool $isQueryInTarget
     ): float {
-        $ratio = strlen($contained) / strlen($container);
+        $containmentRatio = strlen($containedWord) / strlen($containerWord);
 
-        if ($ratio >= 0.8) {
+        if ($containmentRatio >= 0.8) {
             return $isQueryInTarget ? 0.95 : 0.9;
         }
 
@@ -109,52 +138,45 @@ class SimilarityCalculator
         $multiplier = $isQueryInTarget ? 0.2 : 0.25;
         $maxScore = $isQueryInTarget ? 0.9 : 0.85;
 
-        return min($maxScore, $baseScore + ($ratio * $multiplier));
+        return min($maxScore, $baseScore + ($containmentRatio * $multiplier));
     }
 
     /**
      * Calculate similarity between two strings based on word-level comparisons.
+     *
+     * @param string $firstString First string to compare
+     * @param string $secondString Second string to compare
+     * @return float Overall similarity score between 0.0 and 1.0
      */
-    public function calculateSimilarity(string $str1, string $str2): float
+    public function calculateSimilarity(string $firstString, string $secondString): float
     {
-        $str1 = $this->normalizeForComparison($str1);
-        $str2 = $this->normalizeForComparison($str2);
+        $normalizedFirstString = $this->normalizeForComparison($firstString);
+        $normalizedSecondString = $this->normalizeForComparison($secondString);
 
-        if ($str1 === $str2) {
+        if ($normalizedFirstString === $normalizedSecondString) {
             return 1.0;
         }
 
-        if ($str1 === '' || $str1 === '0' || ($str2 === '' || $str2 === '0')) {
+        if ($normalizedFirstString === '' || $normalizedSecondString === '') {
             return 0.0;
         }
 
-        $words1 = preg_split('/[\s\-_,\.]+/', $str1);
-        $words2 = preg_split('/[\s\-_,\.]+/', $str2);
+        $firstWords = $this->splitIntoWords($normalizedFirstString);
+        $secondWords = $this->splitIntoWords($normalizedSecondString);
 
-        if (empty($words1) || empty($words2)) {
+        if (empty($firstWords) || empty($secondWords)) {
             return 0.0;
         }
 
         $totalScore = 0.0;
         $matchedWords = 0;
 
-        foreach ($words1 as $word1) {
-            $word1 = (string) $word1;
-
-            if (strlen($word1) < self::MIN_QUERY_LENGTH) {
+        foreach ($firstWords as $firstWord) {
+            if (strlen($firstWord) < self::MIN_QUERY_LENGTH) {
                 continue;
             }
 
-            $bestScore = 0.0;
-
-            foreach ($words2 as $word2) {
-                $word2 = (string) $word2;
-                $score = $this->calculateWordSimilarity($word1, $word2);
-
-                if ($score > $bestScore) {
-                    $bestScore = $score;
-                }
-            }
+            $bestScore = $this->findBestWordMatchScore($firstWord, $secondWords);
 
             if ($bestScore > 0) {
                 $totalScore += $bestScore;
@@ -166,37 +188,80 @@ class SimilarityCalculator
             return 0.0;
         }
 
-        return $this->calculateFinalScore($totalScore, $matchedWords, count($words1));
+        return $this->calculateNormalizedScore($totalScore, $matchedWords, count($firstWords));
     }
 
     /**
-     * Calculate final similarity score with coverage-based bonus or penalty.
+     * Find the best matching score for a word against an array of candidate words.
+     *
+     * @param string $searchWord The word to find matches for
+     * @param array<int, string> $candidateWords Array of words to compare against
+     * @return float Best similarity score found
      */
-    private function calculateFinalScore(float $totalScore, int $matchedWords, int $totalWords): float
+    private function findBestWordMatchScore(string $searchWord, array $candidateWords): float
+    {
+        $bestScore = 0.0;
+
+        foreach ($candidateWords as $candidateWord) {
+            $score = $this->calculateWordSimilarity($searchWord, $candidateWord);
+
+            if ($score > $bestScore) {
+                $bestScore = $score;
+            }
+        }
+
+        return $bestScore;
+    }
+
+    /**
+     * Calculate final normalized score with coverage-based adjustments.
+     *
+     * @param float $totalScore Sum of all individual word scores
+     * @param int $matchedWords Number of words that found matches
+     * @param int $totalWords Total number of words in the query
+     * @return float Final normalized similarity score
+     */
+    private function calculateNormalizedScore(float $totalScore, int $matchedWords, int $totalWords): float
     {
         $averageScore = $totalScore / $totalWords;
-        $coverage = $matchedWords / $totalWords;
+        $coverageRatio = $matchedWords / $totalWords;
 
-        if ($coverage >= 0.5) {
-            $coverageBonus = $coverage * 0.15;
+        if ($coverageRatio >= 0.5) {
+            $coverageBonus = $coverageRatio * 0.15;
             return min($averageScore + $coverageBonus, 1.0);
         }
 
-        return $averageScore * $coverage * 1.5;
+        return $averageScore * $coverageRatio * 1.5;
     }
 
     /**
-     * Normalize string for comparison.
+     * Normalize a string for comparison by removing special characters
+     * and collapsing multiple spaces.
+     *
+     * @param string $string The string to normalize
+     * @return string Normalized string
      */
-    private function normalizeForComparison(string $str): string
+    private function normalizeForComparison(string $string): string
     {
-        if ($str === '' || $str === '0') {
+        if ($string === '') {
             return '';
         }
 
-        $normalized = preg_replace('/[^a-z0-9\s]/i', ' ', $str);
+        $normalized = preg_replace('/[^a-z0-9\s]/i', ' ', $string);
         $normalized = preg_replace('/\s+/', ' ', $normalized);
 
         return trim($normalized);
+    }
+
+    /**
+     * Split a string into individual words.
+     *
+     * @param string $string The string to split
+     * @return array<int, string> Array of words
+     */
+    private function splitIntoWords(string $string): array
+    {
+        $words = preg_split('/[\s\-_,\.]+/', $string);
+        return $words !== false ? $words : [];
     }
 }

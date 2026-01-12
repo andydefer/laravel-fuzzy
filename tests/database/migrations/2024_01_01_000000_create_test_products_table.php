@@ -7,10 +7,10 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Creates the products table for storing product information.
+ * Creates the products table for product management.
  *
- * This migration sets up the basic structure for product management,
- * including fields for name, description, price, and automatic timestamps.
+ * This migration sets up the structure for storing product information,
+ * including name, description, price and timestamps.
  */
 return new class() extends Migration {
     /**

@@ -9,23 +9,23 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 /**
- * Represents a search index entry for fuzzy search functionality.
+ * Represents a search index entry for fuzzy search functionality
  *
- * Stores normalized search data and metadata for searchable models.
- * Each entry contains original and normalized field values,
- * word breakdowns, and weighting information for relevance scoring.
+ * This model stores indexed data for searchable models, including original and normalized
+ * field values, word breakdowns, and weighting information for relevance scoring.
+ * Each entry is associated with a specific field of a searchable model instance.
  */
 class FuzzyIndex extends Model
 {
     /**
-     * The database table name.
+     * The table associated with the model
      *
      * @var string
      */
     protected $table = 'fuzzy_index';
 
     /**
-     * The attributes that are mass assignable.
+     * The attributes that are mass assignable
      *
      * @var array<int, string>
      */
@@ -41,7 +41,7 @@ class FuzzyIndex extends Model
     ];
 
     /**
-     * The attributes that should be cast.
+     * The attributes that should be cast
      *
      * @var array<string, string>
      */
@@ -54,7 +54,11 @@ class FuzzyIndex extends Model
     ];
 
     /**
-     * Scope the query to a specific model type.
+     * Scope query to a specific model type
+     *
+     * @param Builder $query The Eloquent query builder
+     * @param string $modelType The fully qualified model class name
+     * @return Builder The scoped query builder
      */
     public function scopeForModel(Builder $query, string $modelType): Builder
     {
@@ -62,18 +66,26 @@ class FuzzyIndex extends Model
     }
 
     /**
-     * Scope the query to a specific model instance.
+     * Scope query to a specific model instance
      *
-     * @param int|string $modelId
+     * @param Builder $query The Eloquent query builder
+     * @param string $modelType The fully qualified model class name
+     * @param int|string $modelId The identifier of the model instance
+     * @return Builder The scoped query builder
      */
-    public function scopeForModelInstance(Builder $query, string $modelType, $modelId): Builder
+    public function scopeForModelInstance(Builder $query, string $modelType, int|string $modelId): Builder
     {
-        return $query->where('indexable_type', $modelType)
+        return $query
+            ->where('indexable_type', $modelType)
             ->where('indexable_id', $modelId);
     }
 
     /**
-     * Scope the query to a specific field.
+     * Scope query to a specific field
+     *
+     * @param Builder $query The Eloquent query builder
+     * @param string $field The field name to filter by
+     * @return Builder The scoped query builder
      */
     public function scopeForField(Builder $query, string $field): Builder
     {
@@ -81,7 +93,11 @@ class FuzzyIndex extends Model
     }
 
     /**
-     * Scope the query to entries containing a specific word.
+     * Scope query to entries containing a specific word
+     *
+     * @param Builder $query The Eloquent query builder
+     * @param string $word The word to search for in the JSON array
+     * @return Builder The scoped query builder
      */
     public function scopeWithWord(Builder $query, string $word): Builder
     {
@@ -89,7 +105,11 @@ class FuzzyIndex extends Model
     }
 
     /**
-     * Scope the query to entries with normalized values containing the given string.
+     * Scope query to entries with normalized values containing the given substring
+     *
+     * @param Builder $query The Eloquent query builder
+     * @param string $value The substring to search for in normalized values
+     * @return Builder The scoped query builder
      */
     public function scopeWithNormalizedValue(Builder $query, string $value): Builder
     {
@@ -97,7 +117,9 @@ class FuzzyIndex extends Model
     }
 
     /**
-     * Get the polymorphic relationship to the indexable model.
+     * Get the polymorphic relationship to the indexable model
+     *
+     * @return MorphTo The morphTo relationship
      */
     public function indexable(): MorphTo
     {

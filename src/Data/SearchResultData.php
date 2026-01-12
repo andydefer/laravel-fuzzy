@@ -8,19 +8,21 @@ use Spatie\LaravelData\Data;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * Represents a single search result with its relevance score and match details.
+ * Represents a single search result with relevance score and match details.
  *
- * This data object wraps search results from fuzzy search operations, providing
- * standardized formatting and scoring information for consistent API responses.
+ * This data object standardizes fuzzy search results for consistent API responses,
+ * providing scoring information and optional custom formatting capabilities.
  */
 class SearchResultData extends Data
 {
     /**
-     * @param object $item The original model/entity found in the search
-     * @param float $score The relevance score (0-100) indicating match quality
-     * @param string $modelType The class name or type identifier of the item
-     * @param string|null $matchedField The specific field that matched the search query
-     * @param string|null $matchedValue The actual value that triggered the match
+     * Creates a new search result instance.
+     *
+     * @param object $item The original model or entity found in search
+     * @param float $score Relevance score indicating match quality (0-100)
+     * @param string $modelType Class name or type identifier of the item
+     * @param string|null $matchedField Specific field that matched the search query
+     * @param string|null $matchedValue Actual value that triggered the match
      */
     public function __construct(
         public object $item,
@@ -28,13 +30,17 @@ class SearchResultData extends Data
         public string $modelType,
         public ?string $matchedField = null,
         public ?string $matchedValue = null,
-    ) {
-        // Constructeur PUR : seulement initialise les propriétés
-        // Aucun effet secondaire ici
-    }
+    ) {}
 
     /**
-     * Factory method pour créer un résultat avec formatting personnalisé
+     * Factory method to create a search result with automatic formatting.
+     *
+     * @param object $item The original model or entity
+     * @param float $score Relevance score
+     * @param string $modelType Class name or type identifier
+     * @param string|null $matchedField Specific field that matched
+     * @param string|null $matchedValue Actual matched value
+     * @return self Formatted search result
      */
     public static function create(
         object $item,
@@ -55,11 +61,13 @@ class SearchResultData extends Data
     }
 
     /**
-     * Tentative de formatting personnalisé si disponible
+     * Attempts to apply custom formatting to the item if a formatter is defined.
+     *
+     * @param object $item The item to format
+     * @return object|null Formatted item or null if no formatter available
      */
     private static function attemptCustomFormatting(object $item): ?object
     {
-        // ÉTAPE 1: Essayer d'utiliser le getter getFuzzyFormat() si disponible
         $formatterClass = self::getFormatterClassFromItem($item);
 
         if (!$formatterClass) {
@@ -74,14 +82,18 @@ class SearchResultData extends Data
     }
 
     /**
-     * Récupère la classe de formateur selon la priorité:
-     * 1. Méthode getFuzzyFormat() (prioritaire, pour formatage dynamique)
-     * 2. Propriété fuzzyFormat (fallback statique)
-     * 3. null (pas de formatage)
+     * Retrieves the formatter class from an item using priority order.
+     *
+     * Priority:
+     * 1. getFuzzyFormat() method (dynamic formatting)
+     * 2. fuzzyFormat property (static fallback)
+     * 3. null (no formatting)
+     *
+     * @param object $item The item to check for formatter
+     * @return string|null Formatter class name or null
      */
     private static function getFormatterClassFromItem(object $item): ?string
     {
-        // 1. Vérifier si le getter getFuzzyFormat() existe et retourne une valeur
         if (method_exists($item, 'getFuzzyFormat')) {
             $formatter = $item->getFuzzyFormat();
             if ($formatter && is_string($formatter)) {
@@ -89,20 +101,15 @@ class SearchResultData extends Data
             }
         }
 
-        // 2. Fallback: vérifier la propriété fuzzyFormat
         if (property_exists($item, 'fuzzyFormat') && $item->fuzzyFormat) {
             return $item->fuzzyFormat;
         }
 
-        // 3. Aucun formateur disponible
         return null;
     }
 
     /**
-     * Convert the search result to a standardized array format for API responses.
-     *
-     * Applies custom formatting if defined on the item, otherwise uses default formatting.
-     * Ensures consistent structure across all search result types.
+     * Converts the search result to a standardized array for API responses.
      *
      * @return array{
      *     score: float,
@@ -124,21 +131,27 @@ class SearchResultData extends Data
     }
 
     /**
-     * Format the item for API output.
+     * Formats the item for API output.
+     *
+     * @return array Formatted item data
      */
     private function formatItemForOutput(): array
     {
-        // Si l'item a déjà été formaté dans le factory method
         if ($this->item instanceof Data) {
             return $this->item->toArray();
         }
 
-        // Fallback au formatting par défaut
         return FuzzySearchableData::fromModel($this->item)->toArray();
     }
 
     /**
-     * Factory method pour créer à partir d'un modèle (méthode d'usine)
+     * Factory method to create from an Eloquent model.
+     *
+     * @param Model $model The Eloquent model instance
+     * @param float $score Relevance score
+     * @param string|null $matchedField Specific field that matched
+     * @param string|null $matchedValue Actual matched value
+     * @return self Search result from model
      */
     public static function fromModel(
         Model $model,
@@ -156,7 +169,15 @@ class SearchResultData extends Data
     }
 
     /**
-     * Factory method pour un formatting spécifique
+     * Factory method with custom formatter callback.
+     *
+     * @param object $item The original item
+     * @param float $score Relevance score
+     * @param string $modelType Class name or type identifier
+     * @param callable $formatter Custom formatting callback
+     * @param string|null $matchedField Specific field that matched
+     * @param string|null $matchedValue Actual matched value
+     * @return self Formatted search result
      */
     public static function withFormatter(
         object $item,

@@ -8,7 +8,14 @@ use Fuzzy\Stages\ScoringStage;
 use Fuzzy\Stages\SortAndLimitStage;
 
 return [
-    // Configuration du pipeline (NON MODIFIABLE)
+    /**
+     * Fuzzy search pipeline configuration
+     *
+     * Defines the processing pipeline for search queries.
+     * The order of stages is critical for proper operation.
+     *
+     * @var array<string, mixed>
+     */
     'pipeline' => [
         'stages' => [
             NormalizeQueryStage::class,
@@ -18,7 +25,14 @@ return [
         ],
     ],
 
-    // Stop words (AJOUTABLE mais non supprimable)
+    /**
+     * Stop words to ignore during indexing and searching
+     *
+     * This list can be extended via configuration but existing words
+     * cannot be removed to ensure consistency.
+     *
+     * @var array<int, string>
+     */
     'stop_words' => [
         'the',
         'and',
@@ -82,7 +96,11 @@ return [
         'now',
     ],
 
-    // Configuration du cache
+    /**
+     * Cache configuration for performance optimization
+     *
+     * @var array<string, mixed>
+     */
     'cache' => [
         'enabled' => env('FUZZY_SEARCH_CACHE_ENABLED', true),
         'prefix' => 'fuzzy_search:',
@@ -99,7 +117,13 @@ return [
         ],
     ],
 
-    // Auto-discovery
+    /**
+     * Auto-discovery configuration for model detection
+     *
+     * Automatically discovers searchable models in specified directories.
+     *
+     * @var array<string, mixed>
+     */
     'auto_discovery' => [
         'enabled' => true,
         'directories' => [
@@ -113,7 +137,11 @@ return [
         ],
     ],
 
-    // Options par défaut
+    /**
+     * Default search options applied when not explicitly specified
+     *
+     * @var array<string, mixed>
+     */
     'default_options' => [
         'min_score' => 0.1,
         'max_results' => 20,
@@ -121,7 +149,13 @@ return [
         'threshold' => 0.3,
     ],
 
-    // Configuration de l'index
+    /**
+     * Indexing configuration
+     *
+     * Controls how content is indexed for searching.
+     *
+     * @var array<string, mixed>
+     */
     'index' => [
         'min_word_length' => 2,
         'max_word_length' => 50,
@@ -130,7 +164,13 @@ return [
         'queue_name' => env('FUZZY_SEARCH_QUEUE_NAME', 'default'),
     ],
 
-    // Similarité
+    /**
+     * Similarity algorithm configuration
+     *
+     * Defines thresholds and weights for different similarity algorithms.
+     *
+     * @var array<string, mixed>
+     */
     'similarity' => [
         'min_query_length' => 2,
         'min_similarity_threshold' => 0.1,
@@ -142,7 +182,14 @@ return [
         ],
     ],
 
-    // Scoring (partiellement modifiable)
+    /**
+     * Scoring configuration for result ranking
+     *
+     * Controls how search results are scored and ranked.
+     * Field weights are partially customizable.
+     *
+     * @var array<string, mixed>
+     */
     'scoring' => [
         'field_weights' => [
             'name' => 1.3,
@@ -161,7 +208,6 @@ return [
             'high_coverage' => 0.15,
             'early_position' => 0.2,
         ],
-        // Bonus consécutifs (NON MODIFIABLE)
         'consecutive_bonus' => [
             2 => 1.05,
             3 => 1.15,

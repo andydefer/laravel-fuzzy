@@ -25,7 +25,7 @@ final class FuzzySearchServiceTest extends TestCase
     private FuzzySearchService $service;
 
     /**
-     * Set up test data and index.
+     * Set up test environment with test data and indexes.
      */
     protected function setUp(): void
     {
@@ -40,7 +40,7 @@ final class FuzzySearchServiceTest extends TestCase
     }
 
     /**
-     * Clean all test data and indexes.
+     * Remove all test data and indexes.
      */
     private function cleanTestData(): void
     {
@@ -50,7 +50,7 @@ final class FuzzySearchServiceTest extends TestCase
     }
 
     /**
-     * Create test users and products.
+     * Create test users and products for search testing.
      */
     private function createTestData(): void
     {
@@ -86,7 +86,7 @@ final class FuzzySearchServiceTest extends TestCase
     }
 
     /**
-     * Test search returns collection.
+     * Test that search returns a collection.
      */
     public function test_search_returns_collection(): void
     {
@@ -100,7 +100,7 @@ final class FuzzySearchServiceTest extends TestCase
     }
 
     /**
-     * Test search finds exact match.
+     * Test that search finds exact matches.
      */
     public function test_search_finds_exact_match(): void
     {
@@ -119,7 +119,7 @@ final class FuzzySearchServiceTest extends TestCase
     }
 
     /**
-     * Test search finds fuzzy match.
+     * Test that search finds fuzzy matches.
      */
     public function test_search_finds_fuzzy_match(): void
     {
@@ -400,10 +400,8 @@ final class FuzzySearchServiceTest extends TestCase
         $this->assertInstanceOf(Collection::class, $results);
 
         if ($results->count() > 0) {
-            // If we have results, they must meet the high minimum score
             $this->assertGreaterThanOrEqual(0.99, $results->first()->score);
         } else {
-            // If no results, that's also valid - the score was too high
             $this->assertCount(0, $results, 'No results returned with min_score 0.99');
         }
     }
@@ -497,9 +495,11 @@ final class FuzzySearchServiceTest extends TestCase
     }
 
     /**
-     * Find a search result by name.
+     * Find a search result by name in the results collection.
      *
-     * @param Collection<int, SearchResultData> $results
+     * @param Collection<int, SearchResultData> $results The search results collection
+     * @param string $name The name to search for
+     * @return SearchResultData|null The matching result or null if not found
      */
     private function findResultByName(Collection $results, string $name): ?SearchResultData
     {

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Fuzzy\Tests\Unit\ValueObjects;
 
+use Fuzzy\Services\StringNormalizer;
 use Fuzzy\Tests\TestCase;
 use Fuzzy\ValueObjects\SearchQuery;
-use Fuzzy\Services\StringNormalizer;
 
 final class SearchQueryTest extends TestCase
 {
@@ -20,8 +20,13 @@ final class SearchQueryTest extends TestCase
 
     public function test_create_with_empty_query(): void
     {
-        $query = SearchQuery::create('', $this->normalizer);
+        // Arrange: Create search query with empty string
+        $query = SearchQuery::create(
+            query: '',
+            normalizer: $this->normalizer
+        );
 
+        // Assert: Query should be empty with no words
         $this->assertSame('', $query->originalQuery);
         $this->assertSame('', $query->normalizedQuery);
         $this->assertSame([], $query->words);
@@ -31,8 +36,13 @@ final class SearchQueryTest extends TestCase
 
     public function test_create_with_single_word(): void
     {
-        $query = SearchQuery::create('hello', $this->normalizer);
+        // Arrange: Create search query with single word
+        $query = SearchQuery::create(
+            query: 'hello',
+            normalizer: $this->normalizer
+        );
 
+        // Assert: Query should contain single word with no normalization needed
         $this->assertSame('hello', $query->originalQuery);
         $this->assertSame('hello', $query->normalizedQuery);
         $this->assertSame(['hello'], $query->words);
@@ -42,8 +52,13 @@ final class SearchQueryTest extends TestCase
 
     public function test_create_with_multiple_words(): void
     {
-        $query = SearchQuery::create('hello world test', $this->normalizer);
+        // Arrange: Create search query with multiple words
+        $query = SearchQuery::create(
+            query: 'hello world test',
+            normalizer: $this->normalizer
+        );
 
+        // Assert: Query should contain all words and be marked as multi-word
         $this->assertSame('hello world test', $query->originalQuery);
         $this->assertSame('hello world test', $query->normalizedQuery);
         $this->assertSame(['hello', 'world', 'test'], $query->words);
@@ -53,8 +68,13 @@ final class SearchQueryTest extends TestCase
 
     public function test_create_with_special_characters(): void
     {
-        $query = SearchQuery::create('Héllò, Wörld!', $this->normalizer);
+        // Arrange: Create search query with accented characters and punctuation
+        $query = SearchQuery::create(
+            query: 'Héllò, Wörld!',
+            normalizer: $this->normalizer
+        );
 
+        // Assert: Special characters should be normalized and punctuation removed
         $this->assertSame('Héllò, Wörld!', $query->originalQuery);
         $this->assertSame('hello world', $query->normalizedQuery);
         $this->assertSame(['hello', 'world'], $query->words);
@@ -63,10 +83,16 @@ final class SearchQueryTest extends TestCase
 
     public function test_create_removes_stop_words(): void
     {
+        // Arrange: Configure stop words in config
         config(['fuzzy.stop_words' => ['the', 'and', 'or']]);
 
-        $query = SearchQuery::create('the quick brown fox and the lazy dog', $this->normalizer);
+        // Act: Create query containing stop words
+        $query = SearchQuery::create(
+            query: 'the quick brown fox and the lazy dog',
+            normalizer: $this->normalizer
+        );
 
+        // Assert: Stop words should be removed from normalized query
         $this->assertStringNotContainsString('the', $query->normalizedQuery);
         $this->assertStringNotContainsString('and', $query->normalizedQuery);
         $this->assertStringContainsString('quick', $query->normalizedQuery);
@@ -75,61 +101,98 @@ final class SearchQueryTest extends TestCase
 
     public function test_is_empty(): void
     {
-        $query1 = SearchQuery::create('', $this->normalizer);
-        $this->assertTrue($query1->isEmpty());
+        // Arrange & Act: Create queries with various empty patterns
+        $emptyQuery = SearchQuery::create(
+            query: '',
+            normalizer: $this->normalizer
+        );
+        $whitespaceQuery = SearchQuery::create(
+            query: '   ',
+            normalizer: $this->normalizer
+        );
+        $punctuationQuery = SearchQuery::create(
+            query: '!!!',
+            normalizer: $this->normalizer
+        );
+        $nonEmptyQuery = SearchQuery::create(
+            query: 'hello',
+            normalizer: $this->normalizer
+        );
 
-        $query2 = SearchQuery::create('   ', $this->normalizer);
-        $this->assertTrue($query2->isEmpty());
-
-        $query3 = SearchQuery::create('!!!', $this->normalizer);
-        $this->assertTrue($query3->isEmpty());
-
-        $query4 = SearchQuery::create('hello', $this->normalizer);
-        $this->assertFalse($query4->isEmpty());
+        // Assert: Only actual content should not be empty
+        $this->assertTrue($emptyQuery->isEmpty());
+        $this->assertTrue($whitespaceQuery->isEmpty());
+        $this->assertTrue($punctuationQuery->isEmpty());
+        $this->assertFalse($nonEmptyQuery->isEmpty());
     }
 
     public function test_is_multi_word(): void
     {
-        $query1 = SearchQuery::create('hello', $this->normalizer);
-        $this->assertFalse($query1->isMultiWord);
+        // Arrange & Act: Create queries with different word counts
+        $singleWordQuery = SearchQuery::create(
+            query: 'hello',
+            normalizer: $this->normalizer
+        );
+        $twoWordQuery = SearchQuery::create(
+            query: 'hello world',
+            normalizer: $this->normalizer
+        );
+        $multiWordQuery = SearchQuery::create(
+            query: 'hello world test',
+            normalizer: $this->normalizer
+        );
 
-        $query2 = SearchQuery::create('hello world', $this->normalizer);
-        $this->assertTrue($query2->isMultiWord);
-
-        $query3 = SearchQuery::create('hello world test', $this->normalizer);
-        $this->assertTrue($query3->isMultiWord);
+        // Assert: Only queries with 2+ words should be multi-word
+        $this->assertFalse($singleWordQuery->isMultiWord);
+        $this->assertTrue($twoWordQuery->isMultiWord);
+        $this->assertTrue($multiWordQuery->isMultiWord);
     }
 
     public function test_words_are_normalized(): void
     {
-        $query = SearchQuery::create('HELLO world TEST', $this->normalizer);
+        // Arrange: Create query with mixed case words
+        $query = SearchQuery::create(
+            query: 'HELLO world TEST',
+            normalizer: $this->normalizer
+        );
 
+        // Assert: All words should be lowercased in normalized form
         $this->assertSame(['hello', 'world', 'test'], $query->words);
     }
 
     public function test_query_with_only_stop_words(): void
     {
+        // Arrange: Configure stop words
         config(['fuzzy.stop_words' => ['the', 'and']]);
 
-        // Avec la logique actuelle, "the and the" (3 mots) n'est PAS filtré
-        // Il faut 4+ mots pour que les stop words soient supprimés
+        // Act: Create query with only stop words
+        $fourStopWordsQuery = SearchQuery::create(
+            query: 'the and the and',
+            normalizer: $this->normalizer
+        );
+        $threeStopWordsQuery = SearchQuery::create(
+            query: 'the and the',
+            normalizer: $this->normalizer
+        );
 
-        // Tester avec 4 stop words
-        $query = SearchQuery::create('the and the and', $this->normalizer);
-        $this->assertTrue($query->isEmpty());
-        $this->assertSame('', $query->normalizedQuery);
-        $this->assertSame([], $query->words);
+        // Assert: Stop words behavior should follow configured logic
+        $this->assertTrue($fourStopWordsQuery->isEmpty());
+        $this->assertSame('', $fourStopWordsQuery->normalizedQuery);
+        $this->assertSame([], $fourStopWordsQuery->words);
 
-        // Tester que 3 stop words ne sont PAS filtrés (comportement attendu)
-        $query2 = SearchQuery::create('the and the', $this->normalizer);
-        $this->assertFalse($query2->isEmpty());
-        $this->assertSame('the and the', $query2->normalizedQuery);
+        $this->assertFalse($threeStopWordsQuery->isEmpty());
+        $this->assertSame('the and the', $threeStopWordsQuery->normalizedQuery);
     }
 
     public function test_query_with_mixed_case_and_spacing(): void
     {
-        $query = SearchQuery::create('  Hello   WORLD   Test  ', $this->normalizer);
+        // Arrange: Create query with irregular spacing and mixed case
+        $query = SearchQuery::create(
+            query: '  Hello   WORLD   Test  ',
+            normalizer: $this->normalizer
+        );
 
+        // Assert: Original should preserve format, normalized should be clean
         $this->assertSame('  Hello   WORLD   Test  ', $query->originalQuery);
         $this->assertSame('hello world test', $query->normalizedQuery);
         $this->assertSame(['hello', 'world', 'test'], $query->words);
