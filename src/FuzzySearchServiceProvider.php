@@ -11,7 +11,7 @@ use Fuzzy\Services\Scoring\ScoringStrategies\MultiWordStrategy;
 use Fuzzy\Commands\IndexSearchCommand;
 use Fuzzy\Commands\ClearIndexCommand;
 use Fuzzy\Commands\StatsIndexCommand;
-use Fuzzy\Commands\ClearCacheCommand; // AJOUTÉ
+use Fuzzy\Commands\ClearCacheCommand;
 use Fuzzy\Services\FuzzySearchService;
 use Fuzzy\Services\IndexBuilder;
 use Fuzzy\Services\SimilarityCalculator;
@@ -27,11 +27,112 @@ class FuzzySearchServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->mergeConfigFrom(__DIR__ . '/../config/fuzzy.php', 'fuzzy');
+        $this->mergeDefaultConfig();
         $this->registerCoreServices();
         $this->registerRepository();
         $this->registerSearchService();
         $this->registerScoringSystem();
+    }
+
+    private function mergeDefaultConfig(): void
+    {
+        // Charger la configuration par défaut (protégée)
+        $defaultConfig = require __DIR__ . '/../config/fuzzy-defaults.php';
+
+        // Charger la configuration utilisateur si elle existe
+        $userConfig = $this->app['config']->get('fuzzy', []);
+
+        // Fusionner intelligemment les configurations
+        $mergedConfig = $this->mergeConfigurations($defaultConfig, $userConfig);
+
+        // Définir la configuration fusionnée
+        $this->app['config']->set('fuzzy', $mergedConfig);
+
+        // Garder aussi l'ancienne méthode pour compatibilité
+        $this->mergeConfigFrom(__DIR__ . '/../config/fuzzy.php', 'fuzzy');
+    }
+
+    private function mergeConfigurations(array $defaults, array $userConfig): array
+    {
+        $merged = [];
+
+        foreach ($defaults as $key => $defaultValue) {
+            if (!isset($userConfig[$key])) {
+                $merged[$key] = $defaultValue;
+                continue;
+            }
+
+            $userValue = $userConfig[$key];
+
+            // Logique de fusion spécifique pour chaque section
+            switch ($key) {
+                case 'pipeline':
+                    // Pipeline non modifiable - toujours utiliser la valeur par défaut
+                    $merged[$key] = $defaultValue;
+                    break;
+
+                case 'stop_words':
+                    // Fusionner les tableaux - ajouter mais pas supprimer
+                    if (is_array($defaultValue) && is_array($userValue)) {
+                        $merged[$key] = array_unique(array_merge($defaultValue, $userValue));
+                    } else {
+                        $merged[$key] = $defaultValue;
+                    }
+                    break;
+
+                case 'scoring':
+                    // Fusionner récursivement mais protéger certains sous-éléments
+                    $merged[$key] = $this->mergeScoringConfig($defaultValue, $userValue);
+                    break;
+
+                default:
+                    // Fusion standard pour les autres sections
+                    if (is_array($defaultValue) && is_array($userValue)) {
+                        $merged[$key] = array_merge($defaultValue, $userValue);
+                    } else {
+                        $merged[$key] = $userValue;
+                    }
+            }
+        }
+
+        // Ajouter les clés qui n'existent que dans la config utilisateur
+        foreach ($userConfig as $key => $value) {
+            if (!isset($defaults[$key])) {
+                $merged[$key] = $value;
+            }
+        }
+
+        return $merged;
+    }
+
+    private function mergeScoringConfig(array $defaults, array $userConfig): array
+    {
+        $merged = [];
+
+        foreach ($defaults as $key => $defaultValue) {
+            if (!isset($userConfig[$key])) {
+                $merged[$key] = $defaultValue;
+                continue;
+            }
+
+            $userValue = $userConfig[$key];
+
+            switch ($key) {
+                case 'consecutive_bonus':
+                    // Les bonus consécutifs sont critiques - toujours utiliser les valeurs par défaut
+                    $merged[$key] = $defaultValue;
+                    break;
+
+                default:
+                    if (is_array($defaultValue) && is_array($userValue)) {
+                        $merged[$key] = array_merge($defaultValue, $userValue);
+                    } else {
+                        $merged[$key] = $userValue;
+                    }
+            }
+        }
+
+        return $merged;
     }
 
     private function registerCoreServices(): void
@@ -87,7 +188,6 @@ class FuzzySearchServiceProvider extends ServiceProvider
 
     private function registerScoringSystem(): void
     {
-        // Scoring Engine unifié
         $this->app->singleton(ScoringEngine::class, function ($app): ScoringEngine {
             $advancedCalculator = $app->make(AdvancedScoringCalculator::class);
 
@@ -129,7 +229,7 @@ class FuzzySearchServiceProvider extends ServiceProvider
             IndexSearchCommand::class,
             ClearIndexCommand::class,
             StatsIndexCommand::class,
-            ClearCacheCommand::class, // AJOUTÉ
+            ClearCacheCommand::class,
         ]);
     }
 

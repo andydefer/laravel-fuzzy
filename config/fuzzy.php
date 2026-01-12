@@ -2,12 +2,64 @@
 
 declare(strict_types=1);
 
-use Fuzzy\Stages\NormalizeQueryStage;
-use Fuzzy\Stages\MatchDiscoveryStage;
-use Fuzzy\Stages\ScoringStage;
-use Fuzzy\Stages\SortAndLimitStage;
-
 return [
+    /*
+    |--------------------------------------------------------------------------
+    | Configuration de la recherche floue
+    |--------------------------------------------------------------------------
+    |
+    | Ce fichier vous permet de configurer le comportement de la recherche floue.
+    | Certaines sections sont protégées pour assurer le bon fonctionnement.
+    |
+    */
+
+    /*
+    |--------------------------------------------------------------------------
+    | Stop Words (AJOUTABLE SEULEMENT)
+    |--------------------------------------------------------------------------
+    |
+    | Vous pouvez ajouter des mots à ignorer mais pas en supprimer.
+    | Les mots de base sont toujours présents.
+    |
+    */
+    'stop_words' => [
+        // Ajoutez vos mots ici
+        // 'votre_mot',
+        // 'autre_mot',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Configuration du cache
+    |--------------------------------------------------------------------------
+    |
+    | Contrôle le comportement de mise en cache.
+    |
+    */
+    'cache' => [
+        'enabled' => env('FUZZY_SEARCH_CACHE_ENABLED', true),
+        'prefix' => 'fuzzy_search:',
+        'ttl' => [
+            'search' => env('FUZZY_SEARCH_CACHE_TTL', 3600),
+            'search_in_model' => env('FUZZY_SEARCH_MODEL_CACHE_TTL', 3600),
+            'search_in_models' => env('FUZZY_SEARCH_MODELS_CACHE_TTL', 3600),
+            'stats' => env('FUZZY_SEARCH_STATS_CACHE_TTL', 30),
+        ],
+        'invalidation' => [
+            'on_index' => true,
+            'on_update' => true,
+            'on_delete' => true,
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Auto-discovery
+    |--------------------------------------------------------------------------
+    |
+    | Configuration de la découverte automatique des modèles.
+    |
+    */
     'auto_discovery' => [
         'enabled' => true,
         'directories' => [
@@ -21,94 +73,14 @@ return [
         ],
     ],
 
-    'pipeline' => [
-        'stages' => [
-            NormalizeQueryStage::class,
-            MatchDiscoveryStage::class,
-            ScoringStage::class,
-            SortAndLimitStage::class,
-        ],
-    ],
-
-    'cache' => [
-        'enabled' => env('FUZZY_SEARCH_CACHE_ENABLED', true),
-        'prefix' => 'fuzzy_search:',
-        'ttl' => [
-            'search' => env('FUZZY_SEARCH_CACHE_TTL', 3600),
-            'search_in_model' => env('FUZZY_SEARCH_MODEL_CACHE_TTL', 3600),
-            'search_in_models' => env('FUZZY_SEARCH_MODELS_CACHE_TTL', 3600),
-            'stats' => env('FUZZY_SEARCH_STATS_CACHE_TTL', 30), // 30s pour stats
-        ],
-        'invalidation' => [
-            'on_index' => true,
-            'on_update' => true,
-            'on_delete' => true,
-        ],
-    ],
-
-    'stop_words' => [
-        'the',
-        'and',
-        'or',
-        'a',
-        'an',
-        'in',
-        'on',
-        'at',
-        'to',
-        'for',
-        'of',
-        'with',
-        'by',
-        'is',
-        'are',
-        'was',
-        'were',
-        'be',
-        'been',
-        'being',
-        'have',
-        'has',
-        'had',
-        'do',
-        'does',
-        'did',
-        'but',
-        'if',
-        'then',
-        'else',
-        'when',
-        'where',
-        'why',
-        'how',
-        'all',
-        'any',
-        'both',
-        'each',
-        'few',
-        'more',
-        'most',
-        'other',
-        'some',
-        'such',
-        'no',
-        'nor',
-        'not',
-        'only',
-        'own',
-        'same',
-        'so',
-        'than',
-        'too',
-        'very',
-        'can',
-        'will',
-        'over',
-        'just',
-        'should',
-        'now',
-    ],
-
+    /*
+    |--------------------------------------------------------------------------
+    | Options par défaut
+    |--------------------------------------------------------------------------
+    |
+    | Paramètres par défaut pour les recherches.
+    |
+    */
     'default_options' => [
         'min_score' => 0.1,
         'max_results' => 20,
@@ -116,6 +88,14 @@ return [
         'threshold' => 0.3,
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Configuration de l'index
+    |--------------------------------------------------------------------------
+    |
+    | Paramètres pour la construction de l'index.
+    |
+    */
     'index' => [
         'min_word_length' => 2,
         'max_word_length' => 50,
@@ -124,6 +104,14 @@ return [
         'queue_name' => env('FUZZY_SEARCH_QUEUE_NAME', 'default'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Similarité
+    |--------------------------------------------------------------------------
+    |
+    | Configuration des algorithmes de similarité.
+    |
+    */
     'similarity' => [
         'min_query_length' => 2,
         'min_similarity_threshold' => 0.1,
@@ -135,8 +123,17 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Scoring (PARTIELLEMENT MODIFIABLE)
+    |--------------------------------------------------------------------------
+    |
+    | Configuration du système de scoring. Certaines parties sont protégées.
+    |
+    */
     'scoring' => [
         'field_weights' => [
+            // Vous pouvez ajouter ou modifier les poids de champs
             'name' => 1.3,
             'title' => 1.2,
             'email' => 1.0,
@@ -145,19 +142,16 @@ return [
             'default' => 0.6,
         ],
         'penalties' => [
+            // Vous pouvez ajuster les pénalités
             'short_query' => 0.4,
             'cross_word_match_multi' => 0.3,
         ],
         'bonuses' => [
+            // Vous pouvez ajuster les bonus
             'full_coverage' => 0.3,
             'high_coverage' => 0.15,
             'early_position' => 0.2,
         ],
-        'consecutive_bonus' => [
-            2 => 1.05,
-            3 => 1.15,
-            4 => 1.30,
-            5 => 1.50,
-        ],
+        // ATTENTION: 'consecutive_bonus' ne peut pas être modifié
     ],
 ];

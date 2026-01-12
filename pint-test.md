@@ -1,12 +1,12 @@
 # Pint Formatting Test Report
-*Generated: lun. 12 janv. 2026 08:37:58 WAT*
+*Generated: lun. 12 janv. 2026 14:10:51 WAT*
 
 
-  ⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯.⨯..⨯.⨯.⨯.⨯⨯⨯⨯.⨯⨯⨯⨯⨯.⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯.⨯⨯⨯⨯⨯⨯
+  ⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯.⨯..⨯.⨯.⨯.⨯⨯⨯⨯.⨯⨯⨯⨯⨯.⨯⨯⨯⨯.⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯.⨯⨯⨯⨯⨯⨯
 
   ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── Laravel  
-    FAIL   ................................................................................................................................................. 70 files, 61 style issues  
-  ⨯ config/fuzzy.php                                                                                                                                                   ordered_imports  
+    FAIL   ................................................................................................................................................. 71 files, 61 style issues  
+  ⨯ config/fuzzy-defaults.php                                                                                                                                          ordered_imports  
   ⨯ database/migrations/2024_01_01_000000_create_fuzzy_index_table.php                                      class_definition, no_superfluous_phpdoc_tags, braces_position, phpdoc_trim  
   ⨯ rector.php                                                                                                                                                            concat_space  
   ⨯ src/Commands/ClearCacheCommand.php                                                                                                 concat_space, not_operator_with_successor_space  
@@ -21,7 +21,7 @@
   ⨯ src/Exceptions/FuzzySearchException.php                                                                                                                               phpdoc_align  
   ⨯ src/Exceptions/ModelNotSearchableException.php                                                                                                                        phpdoc_align  
   ⨯ src/FuzzySearch.php                                                                                                                                                ordered_imports  
-  ⨯ src/FuzzySearchServiceProvider.php                                                                       new_with_parentheses, function_declaration, concat_space, ordered_imports  
+  ⨯ src/FuzzySearchServiceProvider.php       new_with_parentheses, function_declaration, concat_space, not_operator_with_successor_space, blank_line_before_statement, ordered_imports  
   ⨯ src/Models/FuzzyIndex.php                                                                                                                            ordered_imports, phpdoc_align  
   ⨯ src/Repositories/IndexRepository.php                                               concat_space, phpdoc_separation, not_operator_with_successor_space, blank_line_before_statement  
   ⨯ src/SearchContext.php        concat_space, phpdoc_separation, statement_indentation, not_operator_with_successor_space, blank_line_before_statement, ordered_imports, phpdoc_align  

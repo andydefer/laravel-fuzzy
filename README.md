@@ -10,9 +10,8 @@ Un package Laravel puissant de recherche floue (fuzzy search) avec indexation ba
 ## 📦 Installation
 
 ### Prérequis
-- PHP ^8.1
-- Laravel ^9.0 | ^10.0 | ^11.0
-- Composer
+- PHP ^8.2
+- Laravel ^12.0
 - MySQL 5.7+ ou PostgreSQL 9.6+
 
 ### Installation via Composer
