@@ -51,8 +51,10 @@ class FuzzyMatchStrategy implements ScoringStrategy
     {
         $exactStrategy = new ExactMatchStrategy($this->advancedCalculator);
         $wordStrategy = new WordMatchStrategy($this->advancedCalculator);
+        if ($exactStrategy->supports($context, $indexEntry)) {
+            return true;
+        }
 
-        return $exactStrategy->supports($context, $indexEntry) ||
-            $wordStrategy->supports($context, $indexEntry);
+        return $wordStrategy->supports($context, $indexEntry);
     }
 }

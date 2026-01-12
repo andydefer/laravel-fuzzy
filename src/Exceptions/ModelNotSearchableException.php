@@ -17,7 +17,7 @@ class ModelNotSearchableException extends Exception
     public function __construct(string $modelClass)
     {
         parent::__construct(
-            "Model {$modelClass} must implement Fuzzy\\Contracts\\MustFuzzySearch interface."
+            sprintf('Model %s must implement Fuzzy\Contracts\MustFuzzySearch interface.', $modelClass)
         );
     }
 }

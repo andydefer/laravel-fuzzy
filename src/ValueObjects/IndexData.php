@@ -15,6 +15,9 @@ class IndexData
         public array $modelIndex
     ) {}
 
+    /**
+     * @param array<string, mixed> $data
+     */
     public static function fromArray(array $data): self
     {
         return new self(
@@ -24,7 +27,7 @@ class IndexData
         );
     }
 
-    public function getEntriesForModel(string $modelType, $modelId): array
+    public function getEntriesForModel(string $modelType, string $modelId): array
     {
         $key = $modelType . '_' . $modelId;
         return $this->modelIndex[$key] ?? [];

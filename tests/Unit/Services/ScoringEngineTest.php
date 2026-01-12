@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace Fuzzy\Tests\Unit\Services;
 
+use Fuzzy\Services\IndexBuilder;
+use Fuzzy\Contracts\IndexRepositoryInterface;
 use Fuzzy\Tests\TestCase;
 use Fuzzy\Services\Scoring\ScoringEngine;
 use Fuzzy\Services\Scoring\ScoringStrategy;
-use Fuzzy\Services\AdvancedScoringCalculator;
 use Fuzzy\Data\SearchOptionsData;
 use Fuzzy\Services\SimilarityCalculator;
 use Fuzzy\Services\StringNormalizer;
@@ -16,9 +17,10 @@ use Fuzzy\SearchContext;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 
 #[AllowMockObjectsWithoutExpectations]
-class ScoringEngineTest extends TestCase
+final class ScoringEngineTest extends TestCase
 {
     private ScoringEngine $engine;
+
     private SearchContext $context;
 
     protected function setUp(): void
@@ -27,9 +29,9 @@ class ScoringEngineTest extends TestCase
 
         // Create mock strategies
         $strategies = [
-            $this->createMockStrategy('exact', 100, 0.95),
-            $this->createMockStrategy('word', 90, 0.8),
-            $this->createMockStrategy('fuzzy', 70, 0.6),
+            $this->createMockStrategy(100, 0.95),
+            $this->createMockStrategy(90, 0.8),
+            $this->createMockStrategy(70, 0.6),
         ];
 
         $this->engine = new ScoringEngine(...$strategies);
@@ -45,15 +47,14 @@ class ScoringEngineTest extends TestCase
             $options,
             $normalizer,
             $similarityCalculator,
-            $this->createMock(\Fuzzy\Services\IndexBuilder::class),
-            $this->createMock(\Fuzzy\Contracts\IndexRepositoryInterface::class),
+            $this->createMock(IndexBuilder::class),
+            $this->createMock(IndexRepositoryInterface::class),
             $this->engine,
             []
         );
     }
 
     private function createMockStrategy(
-        string $name,
         int $priority,
         float $scoreToReturn
     ): ScoringStrategy {
@@ -77,7 +78,7 @@ class ScoringEngineTest extends TestCase
         $score = $this->engine->calculateScore($this->context, $indexEntry);
 
         // Should use the highest priority strategy that returns a score
-        $this->assertEquals(0.95, $score);
+        $this->assertEqualsWithDelta(0.95, $score, PHP_FLOAT_EPSILON);
     }
 
     public function test_calculate_score_clamping(): void
@@ -99,7 +100,7 @@ class ScoringEngineTest extends TestCase
 
         $score = $engine->calculateScore($this->context, $indexEntry);
 
-        $this->assertEquals(1.0, $score); // Should be clamped to 1.0
+        $this->assertEqualsWithDelta(1.0, $score, PHP_FLOAT_EPSILON); // Should be clamped to 1.0
     }
 
     public function test_calculate_score_no_strategy_supports(): void
@@ -151,7 +152,7 @@ class ScoringEngineTest extends TestCase
     public function test_calculate_multi_word_score_empty(): void
     {
         $score = $this->engine->calculateMultiWordScore([], $this->context);
-        $this->assertEquals(0.0, $score);
+        $this->assertEqualsWithDelta(0.0, $score, PHP_FLOAT_EPSILON);
     }
 
     public function test_calculate_multi_word_score_single_word_query(): void
@@ -164,8 +165,8 @@ class ScoringEngineTest extends TestCase
             new SearchOptionsData(),
             $normalizer,
             new SimilarityCalculator(),
-            $this->createMock(\Fuzzy\Services\IndexBuilder::class),
-            $this->createMock(\Fuzzy\Contracts\IndexRepositoryInterface::class),
+            $this->createMock(IndexBuilder::class),
+            $this->createMock(IndexRepositoryInterface::class),
             $this->engine,
             []
         );
@@ -178,7 +179,7 @@ class ScoringEngineTest extends TestCase
         ]];
 
         $score = $this->engine->calculateMultiWordScore($indexEntries, $context);
-        $this->assertEquals(0.0, $score); // Not a multi-word query
+        $this->assertEqualsWithDelta(0.0, $score, PHP_FLOAT_EPSILON); // Not a multi-word query
     }
 
     public function test_calculate_multi_word_score_with_field_weighting(): void
@@ -212,8 +213,8 @@ class ScoringEngineTest extends TestCase
             new SearchOptionsData(),
             $normalizer,
             new SimilarityCalculator(),
-            $this->createMock(\Fuzzy\Services\IndexBuilder::class),
-            $this->createMock(\Fuzzy\Contracts\IndexRepositoryInterface::class),
+            $this->createMock(IndexBuilder::class),
+            $this->createMock(IndexRepositoryInterface::class),
             $this->engine,
             []
         );

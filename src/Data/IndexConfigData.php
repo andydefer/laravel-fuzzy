@@ -37,7 +37,7 @@ class IndexConfigData extends Data
      */
     public function matchesConditions(object $model): bool
     {
-        if (empty($this->conditions)) {
+        if ($this->conditions === []) {
             return true;
         }
 

@@ -20,7 +20,7 @@ class StringNormalizer
      */
     public function normalize(string $str): string
     {
-        if (empty($str)) {
+        if ($str === '' || $str === '0') {
             return '';
         }
 
@@ -41,14 +41,14 @@ class StringNormalizer
      */
     public function splitIntoWords(string $str): array
     {
-        if (empty($str)) {
+        if ($str === '' || $str === '0') {
             return [];
         }
 
         $str = str_replace(['_', '-'], ' ', $str);
         $words = preg_split('/\s+/', $str, -1, PREG_SPLIT_NO_EMPTY);
 
-        return array_values(array_filter($words, fn($word) => strlen($word) > 0));
+        return array_values(array_filter($words, fn($word): bool => (string) $word !== ''));
     }
 
     /**
@@ -64,7 +64,7 @@ class StringNormalizer
 
         if (count($words) > 3) {
             $stopWords = config('fuzzy.stop_words', []);
-            $words = array_filter($words, fn($word) => !in_array($word, $stopWords));
+            $words = array_filter($words, fn($word): bool => !in_array($word, $stopWords));
         }
 
         return implode(' ', $words);
@@ -85,18 +85,19 @@ class StringNormalizer
         $stopWords = config('fuzzy.stop_words', []);
         $keywords = array_filter(
             $words,
-            fn($word) => strlen($word) >= 3 && !in_array($word, $stopWords, true)
+            fn(string $word): bool => strlen($word) >= 3 && !in_array($word, $stopWords, true)
         );
 
         $frequencies = array_count_values($keywords);
 
         // Trier par fréquence décroissante, puis alphabétiquement
-        uksort($frequencies, function ($a, $b) use ($frequencies) {
+        uksort($frequencies, function ($a, $b) use ($frequencies): int {
             // Priorité 1: Fréquence (plus haute d'abord)
             $freqCompare = $frequencies[$b] <=> $frequencies[$a];
             if ($freqCompare !== 0) {
                 return $freqCompare;
             }
+
             // Priorité 2: Ordre alphabétique
             return strcmp($a, $b);
         });

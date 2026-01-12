@@ -4,18 +4,18 @@ declare(strict_types=1);
 
 namespace Fuzzy\Tests\Feature;
 
+use Error;
 use Fuzzy\Tests\TestCase;
 use Fuzzy\FuzzySearch;
 use Fuzzy\Tests\Fixtures\User;
 use Fuzzy\Tests\Fixtures\Product;
 use Fuzzy\Models\FuzzyIndex;
 use Illuminate\Support\Collection;
-use Fuzzy\Data\SearchResultData;
 
 /**
  * Feature tests for the FuzzySearch facade.
  */
-class FacadeTest extends TestCase
+final class FacadeTest extends TestCase
 {
     protected function setUp(): void
     {
@@ -79,7 +79,7 @@ class FacadeTest extends TestCase
         $this->assertInstanceOf(Collection::class, $results);
         $this->assertGreaterThan(0, $results->count());
 
-        $johnResult = $results->first(function ($result) {
+        $johnResult = $results->first(function ($result): bool {
             return str_contains(strtolower($result->item->name), 'john');
         });
 
@@ -97,7 +97,7 @@ class FacadeTest extends TestCase
 
         // Should only find users
         foreach ($results as $result) {
-            $this->assertEquals('Fuzzy\Tests\Fixtures\User', $result->modelType);
+            $this->assertEquals(User::class, $result->modelType);
         }
     }
 
@@ -113,8 +113,8 @@ class FacadeTest extends TestCase
         $foundTypes = $results->pluck('modelType')->unique()->toArray();
 
         // CORRECTION : Utiliser les noms de classe complets
-        $this->assertContains('Fuzzy\Tests\Fixtures\User', $foundTypes);
-        $this->assertContains('Fuzzy\Tests\Fixtures\Product', $foundTypes);
+        $this->assertContains(User::class, $foundTypes);
+        $this->assertContains(Product::class, $foundTypes);
     }
 
     public function test_index_model_facade(): void
@@ -238,7 +238,7 @@ class FacadeTest extends TestCase
         $similarity = FuzzySearch::calculateSimilarity('hello', 'hello');
 
         // Assert
-        $this->assertEquals(1.0, $similarity);
+        $this->assertEqualsWithDelta(1.0, $similarity, PHP_FLOAT_EPSILON);
 
         $similarity2 = FuzzySearch::calculateSimilarity('hello', 'helo');
         $this->assertGreaterThan(0.0, $similarity2);
@@ -285,11 +285,12 @@ class FacadeTest extends TestCase
     public function test_facade_missing_method(): void
     {
         // Test that calling non-existent method throws appropriate error
-        $this->expectException(\Error::class);
+        $this->expectException(Error::class);
         $this->expectExceptionMessage('Call to undefined method');
 
         FuzzySearch::nonExistentMethod();
     }
+
     public function test_facade_singleton_instance(): void
     {
         // Test that facade returns same instance

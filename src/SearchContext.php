@@ -20,11 +20,18 @@ use Illuminate\Support\Collection;
 class SearchContext
 {
     public SearchQuery $query;
+
     public IndexData $indexData;
+
     public Collection $finalResults;
-    public array $potentialMatches = []; // NOUVEAU : matches bruts avant scoring
+
+    public array $potentialMatches = [];
+
+     // NOUVEAU : matches bruts avant scoring
     public array $results = [];
+
     public array $seen = [];
+
     public array $preloadedModels = [];
 
     public function __construct(
@@ -50,7 +57,7 @@ class SearchContext
     private function preloadModels(): void
     {
         // Utiliser les getters du Value Object IndexData
-        if (empty($this->indexData->getItemMap())) {
+        if ($this->indexData->getItemMap() === []) {
             $this->preloadedModels = [];
             return;
         }
@@ -73,9 +80,10 @@ class SearchContext
     public function getAllModelIds(): array
     {
         $ids = [];
-        foreach ($this->indexData->getItemMap() as $key => $item) {
+        foreach ($this->indexData->getItemMap() as $item) {
             $ids[] = $item['indexable_id'];
         }
+
         return array_unique($ids);
     }
 
@@ -130,7 +138,7 @@ class SearchContext
     /**
      * Get index entries for a model.
      */
-    public function getIndexEntriesForModel(string $modelType, $modelId): array
+    public function getIndexEntriesForModel(string $modelType, string $modelId): array
     {
         return $this->indexData->getEntriesForModel($modelType, $modelId);
     }
@@ -149,6 +157,7 @@ class SearchContext
      */
     /**
      * Add a potential match (before scoring).
+     * @param array<string, mixed> $match
      */
     public function addPotentialMatch(array $match): void
     {
@@ -172,6 +181,7 @@ class SearchContext
 
     /**
      * Crée une signature unique pour un match.
+     * @param array<string, mixed> $match
      */
     private function createMatchSignature(array $match): string
     {

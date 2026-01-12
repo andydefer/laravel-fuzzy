@@ -30,8 +30,6 @@ class ClearIndexCommand extends Command
 
     /**
      * Execute the console command.
-     *
-     * @return void
      */
     public function handle(): void
     {
@@ -50,25 +48,23 @@ class ClearIndexCommand extends Command
      *
      * @param string $modelClass The model class to clear
      * @param bool $force Whether to skip confirmation
-     * @return void
      */
     protected function clearModelIndex(string $modelClass, bool $force): void
     {
-        if (!$force && !$this->confirm("Clear index for model {$modelClass}?")) {
+        if (!$force && !$this->confirm(sprintf('Clear index for model %s?', $modelClass))) {
             return;
         }
 
         $count = FuzzyIndex::forModel($modelClass)->count();
         FuzzyIndex::forModel($modelClass)->delete();
 
-        $this->info("✓ Cleared {$count} entries for {$modelClass}");
+        $this->info(sprintf('✓ Cleared %s entries for %s', $count, $modelClass));
     }
 
     /**
      * Clear all search indexes.
      *
      * @param bool $force Whether to skip confirmation
-     * @return void
      */
     protected function clearAllIndexes(bool $force): void
     {
@@ -79,6 +75,6 @@ class ClearIndexCommand extends Command
         $count = FuzzyIndex::count();
         FuzzyIndex::query()->truncate();
 
-        $this->info("✓ Cleared all indexes ({$count} entries)");
+        $this->info(sprintf('✓ Cleared all indexes (%s entries)', $count));
     }
 }

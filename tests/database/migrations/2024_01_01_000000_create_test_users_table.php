@@ -17,8 +17,6 @@ return new class() extends Migration {
      * Run the migration.
      *
      * Creates the users table with basic user information columns.
-     *
-     * @return void
      */
     public function up(): void
     {
@@ -35,8 +33,6 @@ return new class() extends Migration {
      * Reverse the migration.
      *
      * Drops the users table if it exists.
-     *
-     * @return void
      */
     public function down(): void
     {

@@ -7,7 +7,6 @@ namespace Fuzzy\Repositories;
 use Fuzzy\Contracts\IndexRepositoryInterface;
 use Fuzzy\Models\FuzzyIndex;
 use Fuzzy\SearchContext;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -21,12 +20,13 @@ class IndexRepository implements IndexRepositoryInterface
 
     /**
      * Get index data for a specific model with optimized query.
+     * @return array<string, mixed>
      */
     public function getIndexDataForModel(string $modelClass, array $modelIds = []): array
     {
         $query = FuzzyIndex::forModel($modelClass);
 
-        if (!empty($modelIds)) {
+        if ($modelIds !== []) {
             $query->whereIn('indexable_id', $modelIds);
         }
 
@@ -61,6 +61,7 @@ class IndexRepository implements IndexRepositoryInterface
                     if (!isset($modelIndex[$modelKey])) {
                         $modelIndex[$modelKey] = [];
                     }
+
                     $modelIndex[$modelKey][] = $matchData;
                 }
             }
@@ -87,7 +88,7 @@ class IndexRepository implements IndexRepositoryInterface
      */
     public function getModelsBatch(string $modelClass, array $ids): Collection
     {
-        if (empty($ids)) {
+        if ($ids === []) {
             return collect();
         }
 
@@ -112,14 +113,14 @@ class IndexRepository implements IndexRepositoryInterface
     {
         $modelIds = $context->getAllModelIds();
 
-        if (empty($modelIds)) {
+        if ($modelIds === []) {
             $this->preloadedModelsMap = [];
             return;
         }
 
         // Utiliser getItemMap() au lieu d'accéder directement à la propriété
         $itemMap = $context->getItemMap();
-        if (empty($itemMap)) {
+        if ($itemMap === []) {
             $this->preloadedModelsMap = [];
             return;
         }
@@ -144,37 +145,6 @@ class IndexRepository implements IndexRepositoryInterface
     public function getPreloadedModelsMap(): array
     {
         return $this->preloadedModelsMap;
-    }
-
-    /**
-     * Process a single index entry.
-     */
-    private function processIndexEntry($entry, array &$wordIndex, array &$itemMap): void
-    {
-        foreach ($entry->words as $word) {
-            if (strlen($word) >= 2) {
-                if (!isset($wordIndex[$word])) {
-                    $wordIndex[$word] = [];
-                }
-
-                $wordIndex[$word][] = [
-                    'indexable_type' => $entry->indexable_type,
-                    'indexable_id' => $entry->indexable_id,
-                    'field' => $entry->field,
-                    'original_value' => $entry->original_value,
-                    'normalized_words' => $entry->words,
-                    'weight' => $entry->weight,
-                ];
-            }
-        }
-
-        $key = $entry->indexable_type . '_' . $entry->indexable_id;
-        if (!isset($itemMap[$key])) {
-            $itemMap[$key] = [
-                'indexable_type' => $entry->indexable_type,
-                'indexable_id' => $entry->indexable_id,
-            ];
-        }
     }
 
     /**

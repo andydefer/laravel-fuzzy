@@ -22,11 +22,12 @@ class PrefixSimilarityAlgorithm implements SimilarityAlgorithmInterface
         }
 
         $prefixLength = 0;
-        for ($i = 0; $i < $minLen; $i++) {
+        for ($i = 0; $i < $minLen; ++$i) {
             if ($str1[$i] !== $str2[$i]) {
                 break;
             }
-            $prefixLength++;
+
+            ++$prefixLength;
         }
 
         if ($prefixLength < self::MIN_PREFIX_LENGTH) {

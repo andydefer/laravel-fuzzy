@@ -24,7 +24,6 @@ class IndexBuilder
      * Index all searchable fields of a model instance.
      *
      * @param MustFuzzySearch $model The model instance to index
-     * @return void
      */
     public function indexModel(MustFuzzySearch $model): void
     {
@@ -53,19 +52,18 @@ class IndexBuilder
      * @param mixed $modelId The model's primary key
      * @param string $field The field name being indexed
      * @param string $value The field value to index
-     * @return void
      */
     public function indexField(string $modelType, mixed $modelId, string $field, string $value): void
     {
         $normalizedValue = $this->normalizer->normalize($value);
 
-        if (empty($normalizedValue)) {
+        if ($normalizedValue === '' || $normalizedValue === '0') {
             return;
         }
 
         $words = $this->normalizer->splitIntoWords($normalizedValue);
 
-        if (empty($words)) {
+        if ($words === []) {
             return;
         }
 
@@ -114,7 +112,6 @@ class IndexBuilder
      * Index multiple models in batch.
      *
      * @param array<MustFuzzySearch|Model> $models Array of models to index
-     * @return void
      */
     public function batchIndex(array $models): void
     {

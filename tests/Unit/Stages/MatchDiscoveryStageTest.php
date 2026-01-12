@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Fuzzy\Tests\Unit\Stages;
 
+use Fuzzy\Contracts\IndexRepositoryInterface;
+use Fuzzy\Services\Scoring\ScoringEngine;
+use ReflectionProperty;
 use Fuzzy\Tests\TestCase;
 use Fuzzy\Stages\MatchDiscoveryStage;
 use Fuzzy\Data\SearchOptionsData;
@@ -16,7 +19,7 @@ use Fuzzy\ValueObjects\IndexData;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 
 #[AllowMockObjectsWithoutExpectations] // Pour éviter les notices PHPUnit
-class MatchDiscoveryStageTest extends TestCase
+final class MatchDiscoveryStageTest extends TestCase
 {
     private MatchDiscoveryStage $stage;
 
@@ -43,18 +46,18 @@ class MatchDiscoveryStageTest extends TestCase
             $normalizer,
             new SimilarityCalculator(),
             $this->createMock(IndexBuilder::class),
-            $this->createMock(\Fuzzy\Contracts\IndexRepositoryInterface::class),
-            $this->createMock(\Fuzzy\Services\Scoring\ScoringEngine::class),
+            $this->createMock(IndexRepositoryInterface::class),
+            $this->createMock(ScoringEngine::class),
             []
         );
 
         // Set indexData via reflection since it's private
-        $reflection = new \ReflectionProperty($context, 'indexData');
+        $reflection = new ReflectionProperty($context, 'indexData');
         $reflection->setAccessible(true);
         $reflection->setValue($context, $indexData);
 
         $nextCalled = false;
-        $next = function () use (&$nextCalled) {
+        $next = function () use (&$nextCalled): string {
             $nextCalled = true;
             return 'next';
         };
@@ -90,17 +93,17 @@ class MatchDiscoveryStageTest extends TestCase
             $normalizer,
             new SimilarityCalculator(),
             $this->createMock(IndexBuilder::class),
-            $this->createMock(\Fuzzy\Contracts\IndexRepositoryInterface::class),
-            $this->createMock(\Fuzzy\Services\Scoring\ScoringEngine::class),
+            $this->createMock(IndexRepositoryInterface::class),
+            $this->createMock(ScoringEngine::class),
             []
         );
 
-        $reflection = new \ReflectionProperty($context, 'indexData');
+        $reflection = new ReflectionProperty($context, 'indexData');
         $reflection->setAccessible(true);
         $reflection->setValue($context, $indexData);
 
         // Act
-        $this->stage->handle($context, fn() => 'next');
+        $this->stage->handle($context, fn(): string => 'next');
 
         // Assert: Avec la logique corrigée, pour un mot unique:
         // 1. discoverExactMatches() → ajoute 2 matches
@@ -139,17 +142,17 @@ class MatchDiscoveryStageTest extends TestCase
             $normalizer,
             new SimilarityCalculator(),
             $this->createMock(IndexBuilder::class),
-            $this->createMock(\Fuzzy\Contracts\IndexRepositoryInterface::class),
-            $this->createMock(\Fuzzy\Services\Scoring\ScoringEngine::class),
+            $this->createMock(IndexRepositoryInterface::class),
+            $this->createMock(ScoringEngine::class),
             []
         );
 
-        $reflection = new \ReflectionProperty($context, 'indexData');
+        $reflection = new ReflectionProperty($context, 'indexData');
         $reflection->setAccessible(true);
         $reflection->setValue($context, $indexData);
 
         // Act
-        $this->stage->handle($context, fn() => 'next');
+        $this->stage->handle($context, fn(): string => 'next');
 
         // Assert: Should find matches for 'hello' and 'world', not 'test'
         $matches = $context->getAllPotentialMatches();
@@ -170,7 +173,7 @@ class MatchDiscoveryStageTest extends TestCase
 
         $similarityCalculator = $this->createMock(SimilarityCalculator::class);
         $similarityCalculator->method('calculateWordSimilarity')
-            ->willReturnCallback(function ($queryWord, $targetWord) {
+            ->willReturnCallback(function (string $queryWord, string $targetWord): float {
                 return $queryWord === 'helo' && $targetWord === 'hello' ? 0.8 : 0.0;
             });
 
@@ -187,17 +190,17 @@ class MatchDiscoveryStageTest extends TestCase
             $normalizer,
             $similarityCalculator,
             $this->createMock(IndexBuilder::class),
-            $this->createMock(\Fuzzy\Contracts\IndexRepositoryInterface::class),
-            $this->createMock(\Fuzzy\Services\Scoring\ScoringEngine::class),
+            $this->createMock(IndexRepositoryInterface::class),
+            $this->createMock(ScoringEngine::class),
             []
         );
 
-        $reflection = new \ReflectionProperty($context, 'indexData');
+        $reflection = new ReflectionProperty($context, 'indexData');
         $reflection->setAccessible(true);
         $reflection->setValue($context, $indexData);
 
         // Act
-        $this->stage->handle($context, fn() => 'next');
+        $this->stage->handle($context, fn(): string => 'next');
 
         // Assert: Should find fuzzy match for 'helo' -> 'hello'
         $matches = $context->getAllPotentialMatches();
@@ -223,17 +226,17 @@ class MatchDiscoveryStageTest extends TestCase
             $normalizer,
             new SimilarityCalculator(),
             $this->createMock(IndexBuilder::class),
-            $this->createMock(\Fuzzy\Contracts\IndexRepositoryInterface::class),
-            $this->createMock(\Fuzzy\Services\Scoring\ScoringEngine::class),
+            $this->createMock(IndexRepositoryInterface::class),
+            $this->createMock(ScoringEngine::class),
             []
         );
 
-        $reflection = new \ReflectionProperty($context, 'indexData');
+        $reflection = new ReflectionProperty($context, 'indexData');
         $reflection->setAccessible(true);
         $reflection->setValue($context, $indexData);
 
         // Act
-        $this->stage->handle($context, fn() => 'next');
+        $this->stage->handle($context, fn(): string => 'next');
 
         // Assert: Should not find fuzzy matches
         $matches = $context->getAllPotentialMatches();
@@ -260,17 +263,17 @@ class MatchDiscoveryStageTest extends TestCase
             $normalizer,
             new SimilarityCalculator(),
             $this->createMock(IndexBuilder::class),
-            $this->createMock(\Fuzzy\Contracts\IndexRepositoryInterface::class),
-            $this->createMock(\Fuzzy\Services\Scoring\ScoringEngine::class),
+            $this->createMock(IndexRepositoryInterface::class),
+            $this->createMock(ScoringEngine::class),
             []
         );
 
-        $reflection = new \ReflectionProperty($context, 'indexData');
+        $reflection = new ReflectionProperty($context, 'indexData');
         $reflection->setAccessible(true);
         $reflection->setValue($context, $indexData);
 
         // Act
-        $this->stage->handle($context, fn() => 'next');
+        $this->stage->handle($context, fn(): string => 'next');
 
         // Assert: Should find User_1 for 'hello'
         $matches = $context->getAllPotentialMatches();
@@ -298,17 +301,17 @@ class MatchDiscoveryStageTest extends TestCase
             $normalizer,
             new SimilarityCalculator(),
             $this->createMock(IndexBuilder::class),
-            $this->createMock(\Fuzzy\Contracts\IndexRepositoryInterface::class),
-            $this->createMock(\Fuzzy\Services\Scoring\ScoringEngine::class),
+            $this->createMock(IndexRepositoryInterface::class),
+            $this->createMock(ScoringEngine::class),
             []
         );
 
-        $reflection = new \ReflectionProperty($context, 'indexData');
+        $reflection = new ReflectionProperty($context, 'indexData');
         $reflection->setAccessible(true);
         $reflection->setValue($context, $indexData);
 
         // Act
-        $this->stage->handle($context, fn() => 'next');
+        $this->stage->handle($context, fn(): string => 'next');
 
         // Assert: Should only process words with length >= 2
         $matches = $context->getAllPotentialMatches();

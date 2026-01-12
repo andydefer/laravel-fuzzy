@@ -30,8 +30,7 @@ class SearchOptionsData extends Data
     /**
      * Create instance from array with support for both camelCase and snake_case keys.
      *
-     * @param array $data Input data with search options
-     * @return self
+     * @param array<string, mixed> $data Input data with search options
      */
     public static function fromArray(array $data): self
     {
@@ -52,7 +51,6 @@ class SearchOptionsData extends Data
      * Create instance from configuration with optional overrides.
      *
      * @param array $override Options to override default configuration
-     * @return self
      */
     public static function fromConfig(array $override = []): self
     {

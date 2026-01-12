@@ -7,7 +7,7 @@ namespace Fuzzy\Tests\Unit\ValueObjects;
 use Fuzzy\Tests\TestCase;
 use Fuzzy\ValueObjects\IndexData;
 
-class IndexDataTest extends TestCase
+final class IndexDataTest extends TestCase
 {
     public function test_from_array_with_empty_data(): void
     {
@@ -44,9 +44,9 @@ class IndexDataTest extends TestCase
 
         $indexData = IndexData::fromArray($data);
 
-        $entries1 = $indexData->getEntriesForModel('User', 1);
-        $entries2 = $indexData->getEntriesForModel('User', 2);
-        $entries3 = $indexData->getEntriesForModel('User', 3); // Non-existent
+        $entries1 = $indexData->getEntriesForModel('User', '1');
+        $entries2 = $indexData->getEntriesForModel('User', '2');
+        $entries3 = $indexData->getEntriesForModel('User', '3'); // Non-existent
 
         $this->assertSame([['id' => 1, 'name' => 'John']], $entries1);
         $this->assertSame([['id' => 2, 'name' => 'Jane']], $entries2);
@@ -103,6 +103,7 @@ class IndexDataTest extends TestCase
 
         $this->assertSame('App\\Models\\User', $indexData->getModelClass());
     }
+
     public function test_with_partial_data(): void
     {
         // Test with only some keys present

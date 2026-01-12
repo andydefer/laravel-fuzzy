@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Fuzzy\Stages;
 
+use InvalidArgumentException;
 use Fuzzy\SearchContext;
 use Fuzzy\Data\SearchResultData;
 use Closure;
@@ -19,12 +20,12 @@ class ScoringStage
         // Traiter tous les matches potentiels
         foreach ($context->getAllPotentialMatches() as $key => $matches) {
             $model = $context->getModelInstance($key);
-            if (!$model) {
+            if ($model === null) {
                 continue;
             }
 
             // Calculer le meilleur score pour ce modèle
-            $bestScore = $this->calculateBestScore($context, $matches, $model);
+            $bestScore = $this->calculateBestScore($context, $matches);
 
             if ($bestScore >= $context->options->minScore) {
                 $bestMatch = $this->findBestMatch($matches);
@@ -45,7 +46,7 @@ class ScoringStage
     /**
      * Calcule le meilleur score pour un ensemble de matches.
      */
-    private function calculateBestScore(SearchContext $context, array $matches, object $model): float
+    private function calculateBestScore(SearchContext $context, array $matches): float
     {
         $bestScore = 0.0;
 
@@ -65,11 +66,12 @@ class ScoringStage
 
     /**
      * Trouve le meilleur match parmi une liste.
+     * @param array<int, mixed> $matches
      */
     private function findBestMatch(array $matches): array
     {
-        if (empty($matches)) {
-            throw new \InvalidArgumentException('Matches array cannot be empty');
+        if ($matches === []) {
+            throw new InvalidArgumentException('Matches array cannot be empty');
         }
 
         // Retourne le premier match (le détail du match spécifique

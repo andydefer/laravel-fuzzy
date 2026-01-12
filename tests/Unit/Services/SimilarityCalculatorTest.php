@@ -10,7 +10,7 @@ use Fuzzy\Contracts\SimilarityAlgorithmInterface;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 
 #[AllowMockObjectsWithoutExpectations]
-class SimilarityCalculatorTest extends TestCase
+final class SimilarityCalculatorTest extends TestCase
 {
     private SimilarityCalculator $calculator;
 
@@ -22,20 +22,20 @@ class SimilarityCalculatorTest extends TestCase
 
     public function test_word_similarity_exact_match(): void
     {
-        $this->assertEquals(1.0, $this->calculator->calculateWordSimilarity('hello', 'hello'));
+        $this->assertEqualsWithDelta(1.0, $this->calculator->calculateWordSimilarity('hello', 'hello'), PHP_FLOAT_EPSILON);
     }
 
     public function test_word_similarity_case_insensitive(): void
     {
         $similarity = $this->calculator->calculateWordSimilarity('HELLO', 'hello');
-        $this->assertEquals(1.0, $similarity);
+        $this->assertEqualsWithDelta(1.0, $similarity, PHP_FLOAT_EPSILON);
     }
 
     public function test_word_similarity_empty_strings(): void
     {
-        $this->assertEquals(0.0, $this->calculator->calculateWordSimilarity('', 'hello'));
-        $this->assertEquals(0.0, $this->calculator->calculateWordSimilarity('hello', ''));
-        $this->assertEquals(0.0, $this->calculator->calculateWordSimilarity('', ''));
+        $this->assertEqualsWithDelta(0.0, $this->calculator->calculateWordSimilarity('', 'hello'), PHP_FLOAT_EPSILON);
+        $this->assertEqualsWithDelta(0.0, $this->calculator->calculateWordSimilarity('hello', ''), PHP_FLOAT_EPSILON);
+        $this->assertEqualsWithDelta(0.0, $this->calculator->calculateWordSimilarity('', ''), PHP_FLOAT_EPSILON);
     }
 
     public function test_word_similarity_with_contained_word(): void
@@ -61,7 +61,7 @@ class SimilarityCalculatorTest extends TestCase
 
     public function test_calculate_similarity_exact_match(): void
     {
-        $this->assertEquals(1.0, $this->calculator->calculateSimilarity('hello world', 'hello world'));
+        $this->assertEqualsWithDelta(1.0, $this->calculator->calculateSimilarity('hello world', 'hello world'), PHP_FLOAT_EPSILON);
     }
 
     public function test_calculate_similarity_similar_phrases(): void
@@ -79,7 +79,7 @@ class SimilarityCalculatorTest extends TestCase
     public function test_calculate_similarity_with_short_words(): void
     {
         $similarity = $this->calculator->calculateSimilarity('a b c', 'x y z');
-        $this->assertEquals(0.0, $similarity);
+        $this->assertEqualsWithDelta(0.0, $similarity, PHP_FLOAT_EPSILON);
     }
 
     public function test_calculate_similarity_with_special_characters(): void
@@ -100,7 +100,7 @@ class SimilarityCalculatorTest extends TestCase
         // Test that the algorithm was added (no easy way to verify internally,
         // but we can test that it doesn't break)
         $similarity = $this->calculator->calculateWordSimilarity('test', 'test');
-        $this->assertEquals(1.0, $similarity);
+        $this->assertEqualsWithDelta(1.0, $similarity, PHP_FLOAT_EPSILON);
     }
 
     public function test_similarity_with_spaces_and_punctuation(): void
@@ -117,7 +117,7 @@ class SimilarityCalculatorTest extends TestCase
         $similarity1 = $this->calculator->calculateSimilarity('test', 'test');
         $similarity2 = $this->calculator->calculateSimilarity('test', 'test');
 
-        $this->assertEquals($similarity1, $similarity2);
+        $this->assertSame($similarity1, $similarity2);
     }
 
     public function test_similarity_boundaries(): void

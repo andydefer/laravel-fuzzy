@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Collection;
 use Fuzzy\Models\FuzzyIndex;
 
-class CacheTest extends TestCase
+final class CacheTest extends TestCase
 {
     protected function setUp(): void
     {
@@ -209,8 +209,8 @@ class CacheTest extends TestCase
         if ($initialCount === $newCount) {
             // Afficher pour debug
             echo "\nDebug stats cache test:\n";
-            echo "Initial count: $initialCount\n";
-            echo "New count: $newCount\n";
+            echo sprintf('Initial count: %s%s', $initialCount, PHP_EOL);
+            echo sprintf('New count: %s%s', $newCount, PHP_EOL);
             echo "Stats1: " . json_encode($stats1) . "\n";
             echo "Stats2: " . json_encode($stats2) . "\n";
 
@@ -261,9 +261,9 @@ class CacheTest extends TestCase
         $results2 = $searchService->searchInModel(User::class, 'john');
 
         // Assert: Les résultats devraient être les mêmes
-        $this->assertEquals(
+        $this->assertCount(
             $initialCount,
-            $results2->count(),
+            $results2,
             'Le cache User ne devrait pas être affecté par l\'indexation d\'un Product'
         );
 
@@ -281,8 +281,8 @@ class CacheTest extends TestCase
         $searchService = app(FuzzySearchService::class);
 
         // Mettre en cache des recherches pour deux modèles
-        $userResults1 = $searchService->searchInModel(User::class, 'john');
-        $productResults1 = $searchService->searchInModel(Product::class, 'laptop');
+        $searchService->searchInModel(User::class, 'john');
+        $searchService->searchInModel(Product::class, 'laptop');
 
         // Act: Invalider seulement le cache User
         $searchService->invalidateCacheForModel(User::class);

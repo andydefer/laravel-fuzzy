@@ -1,6 +1,26 @@
 # Rector Refactoring Report
-*Generated: dim. 11 janv. 2026 20:28:20 WAT*
+*Generated: lun. 12 janv. 2026 07:31:25 WAT*
 
 
- [ERROR] The path "/home/andy-kani/pro/sites/packages/laravel-fuzzy/routes" does not exist.                             
+1 file with changes
+===================
+
+1) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Repositories/IndexRepositoryTest.php:10
+
+    ---------- begin diff ----------
+@@ @@
+ use Fuzzy\Services\IndexBuilder;
+ use Fuzzy\Services\Scoring\ScoringEngine;
+ use Fuzzy\Services\SimilarityCalculator;
+-use ReflectionMethod;
+-use stdClass;
+ use Fuzzy\Tests\TestCase;
+ use Fuzzy\Repositories\IndexRepository;
+ use Fuzzy\Models\FuzzyIndex;
+    ----------- end diff -----------
+
+Applied rules:
+
+
+ [OK] 1 file would have been changed (dry-run) by Rector                                                                
 

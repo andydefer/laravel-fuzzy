@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Fuzzy\Contracts;
 
-use Illuminate\Database\Eloquent\Model;
-
 /**
  * Interface defining the contract for models that support fuzzy search indexing.
  *
@@ -38,15 +36,6 @@ interface MustFuzzySearch
      */
     public function getIndexableId(): string|int;
 
-    /**
-     * Get the model type/category for indexing purposes.
-     *
-     * This type is used to group search results by model.
-     * Typically the table name or a business identifier.
-     *
-     * @return string The type of the indexable item.
-     */
-    public function getSearchableType(): string;
 
     /**
      * Determine whether the model should be included in the search index.

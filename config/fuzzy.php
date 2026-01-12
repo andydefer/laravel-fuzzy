@@ -2,6 +2,11 @@
 
 declare(strict_types=1);
 
+use Fuzzy\Stages\NormalizeQueryStage;
+use Fuzzy\Stages\MatchDiscoveryStage;
+use Fuzzy\Stages\ScoringStage;
+use Fuzzy\Stages\SortAndLimitStage;
+
 return [
     'auto_discovery' => [
         'enabled' => true,
@@ -18,10 +23,10 @@ return [
 
     'pipeline' => [
         'stages' => [
-            \Fuzzy\Stages\NormalizeQueryStage::class,
-            \Fuzzy\Stages\MatchDiscoveryStage::class,
-            \Fuzzy\Stages\ScoringStage::class,
-            \Fuzzy\Stages\SortAndLimitStage::class,
+            NormalizeQueryStage::class,
+            MatchDiscoveryStage::class,
+            ScoringStage::class,
+            SortAndLimitStage::class,
         ],
     ],
 

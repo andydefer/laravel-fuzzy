@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Fuzzy\Tests\Unit\Stages;
 
+use Fuzzy\Contracts\IndexRepositoryInterface;
+use Fuzzy\Services\Scoring\ScoringEngine;
 use Fuzzy\Tests\TestCase;
 use Fuzzy\Stages\NormalizeQueryStage;
 use Fuzzy\Data\SearchOptionsData;
@@ -16,7 +18,7 @@ use Illuminate\Support\Collection;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 
 #[AllowMockObjectsWithoutExpectations]
-class NormalizeQueryStageTest extends TestCase
+final class NormalizeQueryStageTest extends TestCase
 {
     private NormalizeQueryStage $stage;
 
@@ -39,13 +41,13 @@ class NormalizeQueryStageTest extends TestCase
             $normalizer,
             new SimilarityCalculator(),
             $this->createMock(IndexBuilder::class),
-            $this->createMock(\Fuzzy\Contracts\IndexRepositoryInterface::class),
-            $this->createMock(\Fuzzy\Services\Scoring\ScoringEngine::class),
+            $this->createMock(IndexRepositoryInterface::class),
+            $this->createMock(ScoringEngine::class),
             []
         );
 
         // Act
-        $result = $this->stage->handle($context, fn() => 'next');
+        $result = $this->stage->handle($context, fn(): string => 'next');
 
         // Assert: Should return empty collection
         $this->assertInstanceOf(Collection::class, $result);
@@ -65,13 +67,13 @@ class NormalizeQueryStageTest extends TestCase
             $normalizer,
             new SimilarityCalculator(),
             $this->createMock(IndexBuilder::class),
-            $this->createMock(\Fuzzy\Contracts\IndexRepositoryInterface::class),
-            $this->createMock(\Fuzzy\Services\Scoring\ScoringEngine::class),
+            $this->createMock(IndexRepositoryInterface::class),
+            $this->createMock(ScoringEngine::class),
             []
         );
 
         $nextCalled = false;
-        $next = function ($ctx) use (&$nextCalled) {
+        $next = function ($ctx) use (&$nextCalled): string {
             $nextCalled = true;
             return 'next-result';
         };
@@ -97,13 +99,13 @@ class NormalizeQueryStageTest extends TestCase
             $normalizer,
             new SimilarityCalculator(),
             $this->createMock(IndexBuilder::class),
-            $this->createMock(\Fuzzy\Contracts\IndexRepositoryInterface::class),
-            $this->createMock(\Fuzzy\Services\Scoring\ScoringEngine::class),
+            $this->createMock(IndexRepositoryInterface::class),
+            $this->createMock(ScoringEngine::class),
             []
         );
 
         $receivedContext = null;
-        $next = function ($ctx) use (&$receivedContext) {
+        $next = function ($ctx) use (&$receivedContext): string {
             $receivedContext = $ctx;
             return 'result';
         };
@@ -128,13 +130,13 @@ class NormalizeQueryStageTest extends TestCase
             $normalizer,
             new SimilarityCalculator(),
             $this->createMock(IndexBuilder::class),
-            $this->createMock(\Fuzzy\Contracts\IndexRepositoryInterface::class),
-            $this->createMock(\Fuzzy\Services\Scoring\ScoringEngine::class),
+            $this->createMock(IndexRepositoryInterface::class),
+            $this->createMock(ScoringEngine::class),
             []
         );
 
         // Act
-        $result = $this->stage->handle($context, fn() => 'next');
+        $result = $this->stage->handle($context, fn(): string => 'next');
 
         // Assert: Should return empty collection
         $this->assertInstanceOf(Collection::class, $result);

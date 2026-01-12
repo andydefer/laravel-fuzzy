@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Fuzzy\Stages;
 
+use Carbon\Carbon;
 use Fuzzy\SearchContext;
 use Closure;
 
@@ -11,7 +12,9 @@ class MatchDiscoveryStage
 {
     // Cache amélioré avec expiration
     private static array $cachedOptimizedIndexes = [];
+
     private static array $cacheTimestamps = [];
+
     private const CACHE_TTL = 300; // 5 minutes
 
     public function handle(SearchContext $context, Closure $next)
@@ -59,6 +62,7 @@ class MatchDiscoveryStage
             foreach ($wordIndex[$normalizedQuery] as $match) {
                 $context->addPotentialMatch($match);
             }
+
             return true;
         }
 
@@ -143,7 +147,6 @@ class MatchDiscoveryStage
         // avec un threshold élevé
         $this->findMatchesByFirstCharAndLengthOptimized(
             $queryWord,
-            $optimizedIndexes['byFirstChar'],
             $optimizedIndexes['byLength'],
             $context,
             $highThreshold // Threshold personnalisé
@@ -184,7 +187,7 @@ class MatchDiscoveryStage
     {
         $wordIndex = $context->getWordIndex();
 
-        if (empty($wordIndex)) {
+        if ($wordIndex === []) {
             return;
         }
 
@@ -226,7 +229,6 @@ class MatchDiscoveryStage
             // 3. CHERCHER PAR PREMIÈRE LETTRE + LONGUEUR (méthode principale optimisée)
             $this->findMatchesByFirstCharAndLengthOptimized(
                 $queryWord,
-                $optimizedIndexes['byFirstChar'],
                 $optimizedIndexes['byLength'],
                 $context,
                 $context->options->threshold // Threshold normal
@@ -275,7 +277,8 @@ class MatchDiscoveryStage
     private function getOrBuildOptimizedIndexes(array $wordIndex): array
     {
         $cacheKey = md5(serialize(array_keys($wordIndex)));
-        $now = time();
+        $now = Carbon::now()
+            ->getTimestamp();
 
         // Vérifier le cache avec expiration
         if (
@@ -304,6 +307,7 @@ class MatchDiscoveryStage
             if (!isset($byLength[$wordLength])) {
                 $byLength[$wordLength] = [];
             }
+
             $byLength[$wordLength][$word] = $matches;
 
             // Index par première lettre
@@ -311,6 +315,7 @@ class MatchDiscoveryStage
             if (!isset($byFirstChar[$firstChar])) {
                 $byFirstChar[$firstChar] = [];
             }
+
             $byFirstChar[$firstChar][$word] = $matches;
 
             // Index par trigrams (3 caractères)
@@ -320,6 +325,7 @@ class MatchDiscoveryStage
                     if (!isset($trigramIndex[$trigram])) {
                         $trigramIndex[$trigram] = [];
                     }
+
                     $trigramIndex[$trigram][$word] = $matches;
                 }
             }
@@ -353,7 +359,7 @@ class MatchDiscoveryStage
             return [];
         }
 
-        for ($i = 0; $i <= $length - 3; $i++) {
+        for ($i = 0; $i <= $length - 3; ++$i) {
             $trigram = substr($word, $i, 3);
             $trigrams[$trigram] = true;
         }
@@ -363,6 +369,7 @@ class MatchDiscoveryStage
 
     /**
      * Cherche les mots qui CONTIENNENT le mot de requête (optimisé).
+     * @param array<int, mixed> $byLength
      */
     private function findContainedMatchesOptimized(
         string $queryWord,
@@ -372,7 +379,7 @@ class MatchDiscoveryStage
         $queryLength = strlen($queryWord);
 
         // Seulement chercher dans les mots assez longs pour contenir la requête
-        for ($targetLength = $queryLength; $targetLength <= $queryLength + 10; $targetLength++) {
+        for ($targetLength = $queryLength; $targetLength <= $queryLength + 10; ++$targetLength) {
             if (!isset($byLength[$targetLength])) {
                 continue;
             }
@@ -404,7 +411,7 @@ class MatchDiscoveryStage
     ): void {
         $queryTrigrams = $this->generateTrigrams($queryWord);
 
-        if (empty($queryTrigrams)) {
+        if ($queryTrigrams === []) {
             return;
         }
 
@@ -423,7 +430,7 @@ class MatchDiscoveryStage
             }
         }
 
-        if (empty($candidates)) {
+        if ($candidates === []) {
             return;
         }
 
@@ -456,7 +463,6 @@ class MatchDiscoveryStage
      */
     private function findMatchesByFirstCharAndLengthOptimized(
         string $queryWord,
-        array $byFirstChar,
         array $byLength,
         SearchContext $context,
         ?float $customThreshold = null
@@ -486,7 +492,7 @@ class MatchDiscoveryStage
                     continue;
                 }
 
-                $totalChecks++;
+                ++$totalChecks;
                 if ($totalChecks > $maxChecksPerQuery) {
                     return; // Limite de sécurité atteinte
                 }
@@ -519,8 +525,11 @@ class MatchDiscoveryStage
                 $queryLength + 1,
                 $queryLength + 2,
                 $queryLength + 3,
-            ], fn($l) => $l >= 2);
-        } elseif ($queryLength <= 6) {
+            ], fn(int $l): bool => $l >= 2);
+        }
+
+        // Stratégie adaptative basée sur la longueur du mot
+        if ($queryLength <= 6) {
             // Mots moyens : plage moyenne
             return array_filter([
                 $queryLength - 2,
@@ -528,15 +537,15 @@ class MatchDiscoveryStage
                 $queryLength,
                 $queryLength + 1,
                 $queryLength + 2,
-            ], fn($l) => $l >= 2);
-        } else {
-            // Mots longs : plage étroite
-            return array_filter([
-                $queryLength - 1,
-                $queryLength,
-                $queryLength + 1,
-            ], fn($l) => $l >= 2);
+            ], fn(int $l): bool => $l >= 2);
         }
+
+        // Mots longs : plage étroite
+        return array_filter([
+            $queryLength - 1,
+            $queryLength,
+            $queryLength + 1,
+        ], fn(int $l): bool => $l >= 2);
     }
 
     /**

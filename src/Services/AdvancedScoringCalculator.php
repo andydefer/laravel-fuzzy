@@ -46,12 +46,15 @@ class AdvancedScoringCalculator
 
         // 5. Bonus couverture (pour multi-mots)
         if ($context->hasMultipleWords()) {
-            $score = $this->applyCoverageBonus($score, $context, $match);
+            $score = $this->applyCoverageBonus($score);
         }
 
         return min(max($score, 0.0), 1.0);
     }
 
+    /**
+     * @param array<string, mixed> $match
+     */
     private function applyFieldWeighting(float $score, array $match): float
     {
         $fieldWeights = config('fuzzy.scoring.field_weights', [
@@ -67,6 +70,9 @@ class AdvancedScoringCalculator
         return $score * $fieldWeight;
     }
 
+    /**
+     * @param array<string, mixed> $match
+     */
     private function applyConsecutiveBonus(float $score, string $queryWord, array $match): float
     {
         $maxConsecutive = 0;
@@ -84,6 +90,9 @@ class AdvancedScoringCalculator
         return $score;
     }
 
+    /**
+     * @param array<string, mixed> $match
+     */
     private function applyPositionBonus(float $score, array $match): float
     {
         $fullText = strtolower($match['original_value'] ?? '');
@@ -127,7 +136,7 @@ class AdvancedScoringCalculator
         return $score;
     }
 
-    private function applyCoverageBonus(float $score, SearchContext $context, array $match): float
+    private function applyCoverageBonus(float $score): float
     {
         // Implémentation spécifique si nécessaire
         return $score;
@@ -138,8 +147,8 @@ class AdvancedScoringCalculator
         $len1 = strlen($str1);
         $maxLength = 0;
 
-        for ($i = 0; $i < $len1; $i++) {
-            for ($j = $i + 2; $j <= $len1; $j++) {
+        for ($i = 0; $i < $len1; ++$i) {
+            for ($j = $i + 2; $j <= $len1; ++$j) {
                 $substring = substr($str1, $i, $j - $i);
                 if (str_contains($str2, $substring)) {
                     $maxLength = max($maxLength, strlen($substring));

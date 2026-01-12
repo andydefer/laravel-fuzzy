@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Fuzzy\Tests\Feature;
 
+use Fuzzy\Models\FuzzyIndex;
+use Fuzzy\Tests\Fixtures\UserSearchData;
+use Fuzzy\Exceptions\ModelNotSearchableException;
 use Fuzzy\Tests\TestCase;
 use Fuzzy\Tests\Fixtures\User;
 use Fuzzy\Tests\Fixtures\Product;
@@ -14,7 +17,7 @@ use Fuzzy\Data\SearchResultData;
 /**
  * Integration tests for the complete fuzzy search system.
  */
-class IntegrationTest extends TestCase
+final class IntegrationTest extends TestCase
 {
     protected function setUp(): void
     {
@@ -25,7 +28,7 @@ class IntegrationTest extends TestCase
         // $this->loadTestMigrations();
 
         // Garder seulement le nettoyage des données
-        \Fuzzy\Models\FuzzyIndex::query()->truncate();
+        FuzzyIndex::query()->truncate();
         User::query()->delete();
         Product::query()->delete();
     }
@@ -46,13 +49,13 @@ class IntegrationTest extends TestCase
             'type' => 'user',
         ]);
 
-        $product1 = Product::create([
+        Product::create([
             'name' => 'MacBook Pro',
             'description' => 'Apple laptop with M1 chip',
             'price' => 1999.99,
         ]);
 
-        $product2 = Product::create([
+        Product::create([
             'name' => 'Wireless Mouse',
             'description' => 'Ergonomic mouse with Bluetooth',
             'price' => 59.99,
@@ -69,7 +72,7 @@ class IntegrationTest extends TestCase
         $allResults = $searchService->search('john');
         $this->assertGreaterThan(0, $allResults->count());
 
-        $johnFound = $allResults->contains(function ($result) {
+        $johnFound = $allResults->contains(function ($result): bool {
             return str_contains(strtolower($result->item->name), 'john');
         });
         $this->assertTrue($johnFound);
@@ -92,7 +95,7 @@ class IntegrationTest extends TestCase
         $exactResults = $searchService->search('John Smith', ['fuzzy' => false]);
         $this->assertGreaterThan(0, $exactResults->count());
 
-        $exactMatch = $exactResults->first(function ($result) {
+        $exactMatch = $exactResults->first(function ($result): bool {
             return $result->item->name === 'John Smith';
         });
         $this->assertNotNull($exactMatch);
@@ -127,12 +130,12 @@ class IntegrationTest extends TestCase
         $searchService->removeModelFromIndex($user2);
 
         // Supprimer manuellement l'utilisateur SANS événements Eloquent
-        User::withoutEvents(function () use ($user2) {
+        User::withoutEvents(function () use ($user2): void {
             $user2->delete();
         });
 
         $afterRemoveResults = $searchService->search('jane');
-        $janeFound = $afterRemoveResults->contains(function ($result) {
+        $janeFound = $afterRemoveResults->contains(function ($result): bool {
             return str_contains(strtolower($result->item->name), 'jane');
         });
         $this->assertFalse($janeFound);
@@ -150,7 +153,7 @@ class IntegrationTest extends TestCase
         // Test that the FuzzySearchable trait automatically indexes models
 
         // Arrange
-        $initialCount = \Fuzzy\Models\FuzzyIndex::count();
+        $initialCount = FuzzyIndex::count();
 
         // Act: Create a new user (should auto-index via trait)
         $user = User::create([
@@ -160,10 +163,10 @@ class IntegrationTest extends TestCase
         ]);
 
         // Assert
-        $afterCreateCount = \Fuzzy\Models\FuzzyIndex::count();
+        $afterCreateCount = FuzzyIndex::count();
         $this->assertGreaterThan($initialCount, $afterCreateCount);
 
-        $userEntry = \Fuzzy\Models\FuzzyIndex::where('indexable_type', User::class)
+        $userEntry = FuzzyIndex::where('indexable_type', User::class)
             ->where('indexable_id', $user->id)
             ->where('field', 'name')
             ->first();
@@ -176,7 +179,7 @@ class IntegrationTest extends TestCase
         $user->save();
 
         // CORRECTION: Recharger l'entrée depuis la base
-        $updatedEntry = \Fuzzy\Models\FuzzyIndex::where('indexable_type', User::class)
+        $updatedEntry = FuzzyIndex::where('indexable_type', User::class)
             ->where('indexable_id', $user->id)
             ->where('field', 'name')
             ->first();
@@ -188,7 +191,7 @@ class IntegrationTest extends TestCase
         $user->delete();
 
         // Assert: Should remove from index
-        $deletedEntry = \Fuzzy\Models\FuzzyIndex::where('indexable_type', User::class)
+        $deletedEntry = FuzzyIndex::where('indexable_type', User::class)
             ->where('indexable_id', $user->id)
             ->first();
 
@@ -219,7 +222,7 @@ class IntegrationTest extends TestCase
         $searchService->indexModel($user);
 
         // Check no entry was created
-        $entry = \Fuzzy\Models\FuzzyIndex::where('indexable_type', get_class($user))
+        $entry = FuzzyIndex::where('indexable_type', get_class($user))
             ->where('indexable_id', $user->id)
             ->first();
 
@@ -232,7 +235,7 @@ class IntegrationTest extends TestCase
         $searchService->indexModel($user);
 
         // Should now be indexed
-        $entry = \Fuzzy\Models\FuzzyIndex::where('indexable_type', get_class($user))
+        $entry = FuzzyIndex::where('indexable_type', get_class($user))
             ->where('indexable_id', $user->id)
             ->first();
 
@@ -260,8 +263,8 @@ class IntegrationTest extends TestCase
         $this->assertGreaterThan(0, $results->count());
 
         $result = $results->first();
-        $this->assertInstanceOf(\Fuzzy\Tests\Fixtures\UserSearchData::class, $result->item);
-        $this->assertEquals('/users/' . $user->id, $result->item->url);
+        $this->assertInstanceOf(UserSearchData::class, $result->item);
+        $this->assertSame('/users/' . $user->id, $result->item->url);
     }
 
     public function test_performance_with_large_dataset(): void
@@ -269,12 +272,12 @@ class IntegrationTest extends TestCase
         // Performance test (can be skipped in CI)
 
         // Arrange: Create larger dataset
-        $startTime = microtime(true);
+        microtime(true);
 
-        for ($i = 1; $i <= 1000; $i++) {
+        for ($i = 1; $i <= 1000; ++$i) {
             User::create([
-                'name' => "User $i with a longer name for testing",
-                'email' => "user$i@example.com",
+                'name' => sprintf('User %d with a longer name for testing', $i),
+                'email' => sprintf('user%d@example.com', $i),
                 'type' => 'user',
             ]);
         }
@@ -287,7 +290,7 @@ class IntegrationTest extends TestCase
         $indexTime = microtime(true) - $indexStart;
 
         // Assert: Indexing should be reasonable
-        $this->assertLessThan(30.0, $indexTime, "Indexing 1000 users took {$indexTime}s");
+        $this->assertLessThan(30.0, $indexTime, sprintf('Indexing 1000 users took %ss', $indexTime));
 
         // Act: Search
         $searchStart = microtime(true);
@@ -295,10 +298,10 @@ class IntegrationTest extends TestCase
         $searchTime = microtime(true) - $searchStart;
 
         // Assert: Search should be fast
-        $this->assertLessThan(1.0, $searchTime, "Search took {$searchTime}s");
+        $this->assertLessThan(1.0, $searchTime, sprintf('Search took %ss', $searchTime));
         $this->assertGreaterThan(0, $results->count());
 
-        $totalTime = microtime(true) - $startTime;
+        microtime(true);
     }
 
     public function test_cache_integration(): void
@@ -357,7 +360,7 @@ class IntegrationTest extends TestCase
         $this->assertCount(0, $results);
 
         // Search in non-existent model
-        $this->expectException(\Fuzzy\Exceptions\ModelNotSearchableException::class);
+        $this->expectException(ModelNotSearchableException::class);
         $searchService->searchInModel('NonExistentModel', 'test');
 
         // Search with invalid options (should use defaults)

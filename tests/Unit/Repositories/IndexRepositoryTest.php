@@ -4,6 +4,14 @@ declare(strict_types=1);
 
 namespace Fuzzy\Tests\Unit\Repositories;
 
+use Fuzzy\Services\StringNormalizer;
+use Fuzzy\ValueObjects\SearchQuery;
+use Fuzzy\Data\SearchOptionsData;
+use Fuzzy\Services\IndexBuilder;
+use Fuzzy\Services\Scoring\ScoringEngine;
+use Fuzzy\Services\SimilarityCalculator;
+use ReflectionMethod;
+use stdClass;
 use Fuzzy\Tests\TestCase;
 use Fuzzy\Repositories\IndexRepository;
 use Fuzzy\Models\FuzzyIndex;
@@ -11,10 +19,9 @@ use Fuzzy\Tests\Fixtures\User;
 use Fuzzy\Tests\Fixtures\Product;
 use Fuzzy\SearchContext;
 use Fuzzy\ValueObjects\IndexData;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Collection;
 
-class IndexRepositoryTest extends TestCase
+final class IndexRepositoryTest extends TestCase
 {
     private IndexRepository $repository;
 
@@ -209,7 +216,7 @@ class IndexRepositoryTest extends TestCase
         // Arrange
         $user1 = User::create(['name' => 'User 1', 'email' => 'user1@example.com', 'type' => 'user']);
         $user2 = User::create(['name' => 'User 2', 'email' => 'user2@example.com', 'type' => 'user']);
-        $user3 = User::create(['name' => 'User 3', 'email' => 'user3@example.com', 'type' => 'user']);
+        User::create(['name' => 'User 3', 'email' => 'user3@example.com', 'type' => 'user']);
 
         // Act
         $models = $this->repository->getModelsBatch(User::class, [$user1->id, $user2->id]);
@@ -256,19 +263,19 @@ class IndexRepositoryTest extends TestCase
         // Create context with index data
         $indexData = $this->repository->getIndexDataForModel(User::class);
 
-        $normalizer = new \Fuzzy\Services\StringNormalizer();
-        $query = \Fuzzy\ValueObjects\SearchQuery::create('test', $normalizer);
-        $options = new \Fuzzy\Data\SearchOptionsData();
+        $normalizer = new StringNormalizer();
+        $query = SearchQuery::create('test', $normalizer);
+        $options = new SearchOptionsData();
 
         // CORRECTION : Utiliser createStub() au lieu de createMock()
-        $indexBuilder = $this->createStub(\Fuzzy\Services\IndexBuilder::class);
-        $scoringEngine = $this->createStub(\Fuzzy\Services\Scoring\ScoringEngine::class);
+        $indexBuilder = $this->createStub(IndexBuilder::class);
+        $scoringEngine = $this->createStub(ScoringEngine::class);
 
         $context = new SearchContext(
             $query,
             $options,
             $normalizer,
-            new \Fuzzy\Services\SimilarityCalculator(),
+            new SimilarityCalculator(),
             $indexBuilder,
             $this->repository,
             $scoringEngine,
@@ -294,20 +301,20 @@ class IndexRepositoryTest extends TestCase
     public function test_preload_models_with_empty_context(): void
     {
         // Arrange
-        $indexData = IndexData::fromArray(['itemMap' => []]);
-        $normalizer = new \Fuzzy\Services\StringNormalizer();
-        $query = \Fuzzy\ValueObjects\SearchQuery::create('test', $normalizer);
-        $options = new \Fuzzy\Data\SearchOptionsData();
+        IndexData::fromArray(['itemMap' => []]);
+        $normalizer = new StringNormalizer();
+        $query = SearchQuery::create('test', $normalizer);
+        $options = new SearchOptionsData();
 
         // CORRECTION : Utiliser createStub() au lieu de createMock()
-        $indexBuilder = $this->createStub(\Fuzzy\Services\IndexBuilder::class);
-        $scoringEngine = $this->createStub(\Fuzzy\Services\Scoring\ScoringEngine::class);
+        $indexBuilder = $this->createStub(IndexBuilder::class);
+        $scoringEngine = $this->createStub(ScoringEngine::class);
 
         $context = new SearchContext(
             $query,
             $options,
             $normalizer,
-            new \Fuzzy\Services\SimilarityCalculator(),
+            new SimilarityCalculator(),
             $indexBuilder,
             $this->repository,
             $scoringEngine,
@@ -405,61 +412,5 @@ class IndexRepositoryTest extends TestCase
         $this->assertEquals(2, $stats['models'][User::class]['count']);
         $this->assertArrayHasKey('name', $stats['models'][User::class]['fields']);
         $this->assertArrayHasKey('email', $stats['models'][User::class]['fields']);
-    }
-
-    public function test_process_index_entry(): void
-    {
-        // Use reflection to test private method
-        $method = new \ReflectionMethod($this->repository, 'processIndexEntry');
-        $method->setAccessible(true);
-
-        $wordIndex = [];
-        $itemMap = [];
-
-        $entry = new \stdClass();
-        $entry->indexable_type = 'User';
-        $entry->indexable_id = 1;
-        $entry->words = ['test', 'entry'];
-        $entry->field = 'name';
-        $entry->original_value = 'Test Entry';
-        $entry->weight = 1.0;
-
-        // Act - Passez les variables par référence
-        $method->invokeArgs($this->repository, [$entry, &$wordIndex, &$itemMap]);
-
-        // Assert
-        $this->assertArrayHasKey('test', $wordIndex);
-        $this->assertArrayHasKey('entry', $wordIndex);
-        $this->assertArrayHasKey('User_1', $itemMap);
-
-        $this->assertCount(1, $wordIndex['test']);
-        $this->assertEquals('User', $wordIndex['test'][0]['indexable_type']);
-        $this->assertEquals(1, $wordIndex['test'][0]['indexable_id']);
-        $this->assertEquals('name', $wordIndex['test'][0]['field']);
-    }
-
-    public function test_process_index_entry_skips_short_words(): void
-    {
-        $method = new \ReflectionMethod($this->repository, 'processIndexEntry');
-        $method->setAccessible(true);
-
-        $wordIndex = [];
-        $itemMap = [];
-
-        $entry = new \stdClass();
-        $entry->indexable_type = 'User';
-        $entry->indexable_id = 1;
-        $entry->words = ['a', 'ab']; // 'a' is too short
-        $entry->field = 'name';
-        $entry->original_value = 'A Ab';
-        $entry->weight = 1.0;
-
-        // Act - Passez les variables par référence
-        $method->invokeArgs($this->repository, [$entry, &$wordIndex, &$itemMap]);
-
-        // Assert
-        $this->assertArrayNotHasKey('a', $wordIndex); // Skipped
-        $this->assertArrayHasKey('ab', $wordIndex); // Included
-        $this->assertArrayHasKey('User_1', $itemMap);
     }
 }

@@ -34,8 +34,6 @@ class User extends Model implements MustFuzzySearch
 
     /**
      * Custom formatter class for search data.
-     *
-     * @var string|null
      */
     public ?string $fuzzyFormat = UserSearchData::class;
 }
@@ -52,7 +50,6 @@ class UserSearchData extends FuzzySearchableData
      * Create a search data instance from a User model.
      *
      * @param Model $user The User model instance
-     * @return self
      */
     public static function fromModel(Model $user): self
     {
@@ -60,9 +57,9 @@ class UserSearchData extends FuzzySearchableData
             id: $user->id,
             name: $user->name,
             type: 'user',
-            description: $user->email,
-            url: "/users/{$user->id}",
             data: $user->toArray(),
+            description: $user->email,
+            url: '/users/' . $user->id,
         );
     }
 }

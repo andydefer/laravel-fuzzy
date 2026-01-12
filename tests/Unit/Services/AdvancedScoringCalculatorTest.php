@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace Fuzzy\Tests\Unit\Services;
 
+use Fuzzy\Services\IndexBuilder;
+use Fuzzy\Contracts\IndexRepositoryInterface;
+use Fuzzy\Services\Scoring\ScoringEngine;
+use ReflectionMethod;
 use Fuzzy\Tests\TestCase;
 use Fuzzy\Services\AdvancedScoringCalculator;
 use Fuzzy\Data\SearchOptionsData;
@@ -14,9 +18,10 @@ use Fuzzy\SearchContext;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 
 #[AllowMockObjectsWithoutExpectations]
-class AdvancedScoringCalculatorTest extends TestCase
+final class AdvancedScoringCalculatorTest extends TestCase
 {
     private AdvancedScoringCalculator $calculator;
+
     private SearchContext $context;
 
     protected function setUp(): void
@@ -36,9 +41,9 @@ class AdvancedScoringCalculatorTest extends TestCase
             $options,
             $normalizer,
             $similarityCalculator,
-            $this->createMock(\Fuzzy\Services\IndexBuilder::class),
-            $this->createMock(\Fuzzy\Contracts\IndexRepositoryInterface::class),
-            $this->createMock(\Fuzzy\Services\Scoring\ScoringEngine::class),
+            $this->createMock(IndexBuilder::class),
+            $this->createMock(IndexRepositoryInterface::class),
+            $this->createMock(ScoringEngine::class),
             []
         );
     }
@@ -156,9 +161,9 @@ class AdvancedScoringCalculatorTest extends TestCase
             new SearchOptionsData(),
             $normalizer,
             new SimilarityCalculator(),
-            $this->createMock(\Fuzzy\Services\IndexBuilder::class),
-            $this->createMock(\Fuzzy\Contracts\IndexRepositoryInterface::class),
-            $this->createMock(\Fuzzy\Services\Scoring\ScoringEngine::class),
+            $this->createMock(IndexBuilder::class),
+            $this->createMock(IndexRepositoryInterface::class),
+            $this->createMock(ScoringEngine::class),
             []
         );
 
@@ -190,9 +195,9 @@ class AdvancedScoringCalculatorTest extends TestCase
             new SearchOptionsData(),
             $normalizer,
             new SimilarityCalculator(),
-            $this->createMock(\Fuzzy\Services\IndexBuilder::class),
-            $this->createMock(\Fuzzy\Contracts\IndexRepositoryInterface::class),
-            $this->createMock(\Fuzzy\Services\Scoring\ScoringEngine::class),
+            $this->createMock(IndexBuilder::class),
+            $this->createMock(IndexRepositoryInterface::class),
+            $this->createMock(ScoringEngine::class),
             []
         );
 
@@ -224,9 +229,9 @@ class AdvancedScoringCalculatorTest extends TestCase
             new SearchOptionsData(),
             $normalizer,
             new SimilarityCalculator(),
-            $this->createMock(\Fuzzy\Services\IndexBuilder::class),
-            $this->createMock(\Fuzzy\Contracts\IndexRepositoryInterface::class),
-            $this->createMock(\Fuzzy\Services\Scoring\ScoringEngine::class),
+            $this->createMock(IndexBuilder::class),
+            $this->createMock(IndexRepositoryInterface::class),
+            $this->createMock(ScoringEngine::class),
             []
         );
 
@@ -265,13 +270,13 @@ class AdvancedScoringCalculatorTest extends TestCase
             'test'
         );
 
-        $this->assertEquals(0.0, $negativeScore);
-        $this->assertEquals(1.0, $highScore);
+        $this->assertEqualsWithDelta(0.0, $negativeScore, PHP_FLOAT_EPSILON);
+        $this->assertEqualsWithDelta(1.0, $highScore, PHP_FLOAT_EPSILON);
     }
 
     public function test_find_longest_common_substring(): void
     {
-        $method = new \ReflectionMethod($this->calculator, 'findLongestCommonSubstring');
+        $method = new ReflectionMethod($this->calculator, 'findLongestCommonSubstring');
         $method->setAccessible(true);
 
         // Exact match

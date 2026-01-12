@@ -55,10 +55,6 @@ class FuzzyIndex extends Model
 
     /**
      * Scope the query to a specific model type.
-     *
-     * @param Builder $query
-     * @param string $modelType
-     * @return Builder
      */
     public function scopeForModel(Builder $query, string $modelType): Builder
     {
@@ -68,10 +64,7 @@ class FuzzyIndex extends Model
     /**
      * Scope the query to a specific model instance.
      *
-     * @param Builder $query
-     * @param string $modelType
      * @param int|string $modelId
-     * @return Builder
      */
     public function scopeForModelInstance(Builder $query, string $modelType, $modelId): Builder
     {
@@ -81,10 +74,6 @@ class FuzzyIndex extends Model
 
     /**
      * Scope the query to a specific field.
-     *
-     * @param Builder $query
-     * @param string $field
-     * @return Builder
      */
     public function scopeForField(Builder $query, string $field): Builder
     {
@@ -93,10 +82,6 @@ class FuzzyIndex extends Model
 
     /**
      * Scope the query to entries containing a specific word.
-     *
-     * @param Builder $query
-     * @param string $word
-     * @return Builder
      */
     public function scopeWithWord(Builder $query, string $word): Builder
     {
@@ -105,20 +90,14 @@ class FuzzyIndex extends Model
 
     /**
      * Scope the query to entries with normalized values containing the given string.
-     *
-     * @param Builder $query
-     * @param string $value
-     * @return Builder
      */
     public function scopeWithNormalizedValue(Builder $query, string $value): Builder
     {
-        return $query->where('normalized_value', 'like', "%{$value}%");
+        return $query->where('normalized_value', 'like', sprintf('%%%s%%', $value));
     }
 
     /**
      * Get the polymorphic relationship to the indexable model.
-     *
-     * @return MorphTo
      */
     public function indexable(): MorphTo
     {

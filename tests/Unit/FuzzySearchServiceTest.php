@@ -20,14 +20,12 @@ use Fuzzy\Tests\Fixtures\UserSearchData;
  *
  * Tests search functionality, indexing, and configuration options.
  */
-class FuzzySearchServiceTest extends TestCase
+final class FuzzySearchServiceTest extends TestCase
 {
     private FuzzySearchService $service;
 
     /**
      * Set up test data and index.
-     *
-     * @return void
      */
     protected function setUp(): void
     {
@@ -43,8 +41,6 @@ class FuzzySearchServiceTest extends TestCase
 
     /**
      * Clean all test data and indexes.
-     *
-     * @return void
      */
     private function cleanTestData(): void
     {
@@ -55,8 +51,6 @@ class FuzzySearchServiceTest extends TestCase
 
     /**
      * Create test users and products.
-     *
-     * @return void
      */
     private function createTestData(): void
     {
@@ -93,8 +87,6 @@ class FuzzySearchServiceTest extends TestCase
 
     /**
      * Test search returns collection.
-     *
-     * @return void
      */
     public function test_search_returns_collection(): void
     {
@@ -109,8 +101,6 @@ class FuzzySearchServiceTest extends TestCase
 
     /**
      * Test search finds exact match.
-     *
-     * @return void
      */
     public function test_search_finds_exact_match(): void
     {
@@ -123,15 +113,13 @@ class FuzzySearchServiceTest extends TestCase
         $this->assertGreaterThan(0, $results->count());
 
         $johnDoeResult = $this->findResultByName($results, 'John Doe');
-        $this->assertNotNull($johnDoeResult);
+        $this->assertInstanceOf(SearchResultData::class, $johnDoeResult);
         $this->assertEquals('John Doe', $johnDoeResult->item->name);
         $this->assertGreaterThan(0.8, $johnDoeResult->score);
     }
 
     /**
      * Test search finds fuzzy match.
-     *
-     * @return void
      */
     public function test_search_finds_fuzzy_match(): void
     {
@@ -146,8 +134,6 @@ class FuzzySearchServiceTest extends TestCase
 
     /**
      * Test search within specific model.
-     *
-     * @return void
      */
     public function test_search_in_specific_model(): void
     {
@@ -158,14 +144,12 @@ class FuzzySearchServiceTest extends TestCase
 
         // Assert: Should find John Doe as a User
         $johnDoeResult = $this->findResultByName($results, 'John Doe');
-        $this->assertNotNull($johnDoeResult);
-        $this->assertEquals(UserSearchData::class, get_class($johnDoeResult->item));
+        $this->assertInstanceOf(SearchResultData::class, $johnDoeResult);
+        $this->assertInstanceOf(UserSearchData::class, $johnDoeResult->item);
     }
 
     /**
      * Test search with custom options.
-     *
-     * @return void
      */
     public function test_search_with_options(): void
     {
@@ -191,8 +175,6 @@ class FuzzySearchServiceTest extends TestCase
 
     /**
      * Test indexing a model.
-     *
-     * @return void
      */
     public function test_index_model(): void
     {
@@ -215,13 +197,11 @@ class FuzzySearchServiceTest extends TestCase
         $this->assertGreaterThanOrEqual(1, $results->count());
 
         $xylophoneResult = $this->findResultByName($results, 'Xylophone Player');
-        $this->assertNotNull($xylophoneResult);
+        $this->assertInstanceOf(SearchResultData::class, $xylophoneResult);
     }
 
     /**
      * Test removing model from index.
-     *
-     * @return void
      */
     public function test_remove_model_from_index(): void
     {
@@ -233,7 +213,7 @@ class FuzzySearchServiceTest extends TestCase
 
         // Assert: User should not be found in search
         $results = $this->service->search('john');
-        $johnDoeFound = $results->contains(function ($result) {
+        $johnDoeFound = $results->contains(function ($result): bool {
             return $result->item->name === 'John Doe';
         });
 
@@ -242,8 +222,6 @@ class FuzzySearchServiceTest extends TestCase
 
     /**
      * Test getting search statistics.
-     *
-     * @return void
      */
     public function test_get_stats(): void
     {
@@ -260,8 +238,6 @@ class FuzzySearchServiceTest extends TestCase
 
     /**
      * Test similarity calculation.
-     *
-     * @return void
      */
     public function test_calculate_similarity(): void
     {
@@ -271,7 +247,7 @@ class FuzzySearchServiceTest extends TestCase
         $exactSimilarity = $this->service->calculateSimilarity('hello', 'hello');
 
         // Assert: Exact match should have score of 1.0
-        $this->assertEquals(1.0, $exactSimilarity);
+        $this->assertEqualsWithDelta(1.0, $exactSimilarity, PHP_FLOAT_EPSILON);
 
         // Act: Calculate similarity for close match
         $fuzzySimilarity = $this->service->calculateSimilarity('hello', 'helo');
@@ -284,8 +260,6 @@ class FuzzySearchServiceTest extends TestCase
 
     /**
      * Test minimum score from configuration.
-     *
-     * @return void
      */
     public function test_min_score_is_respected_from_config(): void
     {
@@ -306,8 +280,6 @@ class FuzzySearchServiceTest extends TestCase
 
     /**
      * Test minimum score override with options.
-     *
-     * @return void
      */
     public function test_min_score_is_respected_with_options_override(): void
     {
@@ -330,8 +302,6 @@ class FuzzySearchServiceTest extends TestCase
 
     /**
      * Test minimum score with different naming conventions.
-     *
-     * @return void
      */
     public function test_min_score_works_with_snake_case_and_camel_case(): void
     {
@@ -345,16 +315,14 @@ class FuzzySearchServiceTest extends TestCase
         $camelCaseResults = $this->service->search('john', ['minScore' => 0.8]);
 
         // Assert: Both should produce same results
-        $this->assertEquals(
+        $this->assertCount(
             $snakeCaseResults->count(),
-            $camelCaseResults->count()
+            $camelCaseResults
         );
     }
 
     /**
      * Test facade respects minimum score.
-     *
-     * @return void
      */
     public function test_facade_respects_min_score(): void
     {
@@ -374,8 +342,6 @@ class FuzzySearchServiceTest extends TestCase
 
     /**
      * Test search in model respects minimum score.
-     *
-     * @return void
      */
     public function test_search_in_model_respects_min_score(): void
     {
@@ -399,8 +365,6 @@ class FuzzySearchServiceTest extends TestCase
 
     /**
      * Test multi-word search respects minimum score.
-     *
-     * @return void
      */
     public function test_multi_word_processing_respects_min_score(): void
     {
@@ -421,8 +385,6 @@ class FuzzySearchServiceTest extends TestCase
 
     /**
      * Test exact match bypasses minimum score.
-     *
-     * @return void
      */
     public function test_exact_match_bypasses_min_score(): void
     {
@@ -448,16 +410,14 @@ class FuzzySearchServiceTest extends TestCase
 
     /**
      * Test sorting and limiting respects minimum score.
-     *
-     * @return void
      */
     public function test_sort_and_limit_stage_respects_min_score(): void
     {
         // Arrange: Create additional test users
-        for ($i = 1; $i <= 10; $i++) {
+        for ($i = 1; $i <= 10; ++$i) {
             User::create([
-                'name' => "Test User $i",
-                'email' => "user{$i}@example.com",
+                'name' => 'Test User ' . $i,
+                'email' => sprintf('user%d@example.com', $i),
                 'type' => 'user',
             ]);
         }
@@ -487,22 +447,20 @@ class FuzzySearchServiceTest extends TestCase
 
     /**
      * Test search options data handles edge cases.
-     *
-     * @return void
      */
     public function test_search_options_data_handles_edge_cases(): void
     {
         // Arrange & Act: Test empty options
         $options1 = SearchOptionsData::fromConfig([]);
-        $this->assertEquals(0.1, $options1->minScore);
+        $this->assertEqualsWithDelta(0.1, $options1->minScore, PHP_FLOAT_EPSILON);
 
         // Arrange & Act: Test negative value
         $options2 = SearchOptionsData::fromConfig(['min_score' => -0.5]);
-        $this->assertEquals(-0.5, $options2->minScore);
+        $this->assertSame(-0.5, $options2->minScore);
 
         // Arrange & Act: Test value above 1.0
         $options3 = SearchOptionsData::fromConfig(['minScore' => 2.0]);
-        $this->assertEquals(2.0, $options3->minScore);
+        $this->assertEqualsWithDelta(2.0, $options3->minScore, PHP_FLOAT_EPSILON);
 
         // Act: Search with minimum score above 1.0
         /** @var Collection<int, SearchResultData> $results  */
@@ -516,8 +474,6 @@ class FuzzySearchServiceTest extends TestCase
 
     /**
      * Test minimum score of zero returns all results.
-     *
-     * @return void
      */
     public function test_min_score_zero_returns_all_results(): void
     {
@@ -544,12 +500,10 @@ class FuzzySearchServiceTest extends TestCase
      * Find a search result by name.
      *
      * @param Collection<int, SearchResultData> $results
-     * @param string $name
-     * @return SearchResultData|null
      */
     private function findResultByName(Collection $results, string $name): ?SearchResultData
     {
-        return $results->first(function ($result) use ($name) {
+        return $results->first(function ($result) use ($name): bool {
             return $result->item->name === $name;
         });
     }

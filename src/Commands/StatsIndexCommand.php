@@ -33,8 +33,6 @@ class StatsIndexCommand extends Command
      *
      * Displays comprehensive statistics about the search index,
      * including total entries and per-model breakdown with field counts.
-     *
-     * @return void
      */
     public function handle(): void
     {
@@ -48,8 +46,6 @@ class StatsIndexCommand extends Command
 
     /**
      * Display the command header.
-     *
-     * @return void
      */
     private function displayHeader(): void
     {
@@ -58,28 +54,22 @@ class StatsIndexCommand extends Command
 
     /**
      * Display total entries count.
-     *
-     * @param int $totalEntries
-     * @return void
      */
     private function displayTotalEntries(int $totalEntries): void
     {
-        $this->info("Total entries: {$totalEntries}");
+        $this->info('Total entries: ' . $totalEntries);
         $this->newLine();
     }
 
     /**
      * Display statistics per model.
-     *
-     * @param array $modelsStats
-     * @return void
      */
     private function displayModelStatistics(array $modelsStats): void
     {
         $this->info('Per model statistics:');
         $this->newLine();
 
-        if (empty($modelsStats)) {
+        if ($modelsStats === []) {
             $this->warn('No models indexed yet.');
             return;
         }
@@ -92,9 +82,6 @@ class StatsIndexCommand extends Command
 
     /**
      * Prepare rows for the models statistics table.
-     *
-     * @param array $modelsStats
-     * @return array
      */
     private function prepareModelRows(array $modelsStats): array
     {
@@ -115,14 +102,11 @@ class StatsIndexCommand extends Command
 
     /**
      * Format field counts into a readable string.
-     *
-     * @param array $fields
-     * @return string
      */
     private function formatFieldCounts(array $fields): string
     {
         return implode(', ', array_map(
-            fn(string $field, int $count): string => "{$field}: {$count}",
+            fn(string $field, int $count): string => sprintf('%s: %d', $field, $count),
             array_keys($fields),
             array_values($fields)
         ));

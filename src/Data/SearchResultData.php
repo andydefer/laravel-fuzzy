@@ -59,17 +59,42 @@ class SearchResultData extends Data
      */
     private static function attemptCustomFormatting(object $item): ?object
     {
-        // Vérification de la propriété fuzzyFormat
-        if (!property_exists($item, 'fuzzyFormat') || !$item->fuzzyFormat) {
+        // ÉTAPE 1: Essayer d'utiliser le getter getFuzzyFormat() si disponible
+        $formatterClass = self::getFormatterClassFromItem($item);
+
+        if (!$formatterClass) {
             return null;
         }
-
-        $formatterClass = $item->fuzzyFormat;
 
         if (class_exists($formatterClass) && method_exists($formatterClass, 'fromModel')) {
             return $formatterClass::fromModel($item);
         }
 
+        return null;
+    }
+
+    /**
+     * Récupère la classe de formateur selon la priorité:
+     * 1. Méthode getFuzzyFormat() (prioritaire, pour formatage dynamique)
+     * 2. Propriété fuzzyFormat (fallback statique)
+     * 3. null (pas de formatage)
+     */
+    private static function getFormatterClassFromItem(object $item): ?string
+    {
+        // 1. Vérifier si le getter getFuzzyFormat() existe et retourne une valeur
+        if (method_exists($item, 'getFuzzyFormat')) {
+            $formatter = $item->getFuzzyFormat();
+            if ($formatter && is_string($formatter)) {
+                return $formatter;
+            }
+        }
+
+        // 2. Fallback: vérifier la propriété fuzzyFormat
+        if (property_exists($item, 'fuzzyFormat') && $item->fuzzyFormat) {
+            return $item->fuzzyFormat;
+        }
+
+        // 3. Aucun formateur disponible
         return null;
     }
 

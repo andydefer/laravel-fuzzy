@@ -12,6 +12,8 @@ use Fuzzy\SearchContext;
 interface ScoringStrategy
 {
     public function supports(SearchContext $context, array $indexEntry): bool;
+
     public function calculate(SearchContext $context, array $indexEntry): float;
+
     public function getPriority(): int;
 }

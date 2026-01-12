@@ -33,6 +33,6 @@ class SearchQuery
 
     public function isEmpty(): bool
     {
-        return empty($this->normalizedQuery) || empty($this->words);
+        return $this->normalizedQuery === '' || $this->normalizedQuery === '0' || $this->words === [];
     }
 }

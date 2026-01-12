@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace Fuzzy;
 
+use Fuzzy\Services\Scoring\ScoringStrategies\ExactMatchStrategy;
+use Fuzzy\Services\Scoring\ScoringStrategies\WordMatchStrategy;
+use Fuzzy\Services\Scoring\ScoringStrategies\FuzzyMatchStrategy;
+use Fuzzy\Services\Scoring\ScoringStrategies\MultiWordStrategy;
 use Fuzzy\Commands\IndexSearchCommand;
 use Fuzzy\Commands\ClearIndexCommand;
 use Fuzzy\Commands\StatsIndexCommand;
@@ -14,7 +18,6 @@ use Fuzzy\Services\SimilarityCalculator;
 use Fuzzy\Services\StringNormalizer;
 use Fuzzy\Services\AdvancedScoringCalculator;
 use Fuzzy\Services\Scoring\ScoringEngine;
-use Fuzzy\Services\Scoring\ScoringStrategies;
 use Fuzzy\Repositories\IndexRepository;
 use Fuzzy\Contracts\IndexRepositoryInterface;
 use Illuminate\Pipeline\Pipeline;
@@ -85,14 +88,14 @@ class FuzzySearchServiceProvider extends ServiceProvider
     private function registerScoringSystem(): void
     {
         // Scoring Engine unifié
-        $this->app->singleton(ScoringEngine::class, function ($app) {
+        $this->app->singleton(ScoringEngine::class, function ($app): ScoringEngine {
             $advancedCalculator = $app->make(AdvancedScoringCalculator::class);
 
             return new ScoringEngine(
-                new ScoringStrategies\ExactMatchStrategy($advancedCalculator),
-                new ScoringStrategies\WordMatchStrategy($advancedCalculator),
-                new ScoringStrategies\FuzzyMatchStrategy($advancedCalculator),
-                new ScoringStrategies\MultiWordStrategy($advancedCalculator)
+                new ExactMatchStrategy($advancedCalculator),
+                new WordMatchStrategy($advancedCalculator),
+                new FuzzyMatchStrategy($advancedCalculator),
+                new MultiWordStrategy($advancedCalculator)
             );
         });
 

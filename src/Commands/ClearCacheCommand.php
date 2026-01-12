@@ -31,8 +31,6 @@ class ClearCacheCommand extends Command
 
     /**
      * Execute the console command.
-     *
-     * @return void
      */
     public function handle(): void
     {
@@ -77,7 +75,7 @@ class ClearCacheCommand extends Command
     {
         if (method_exists($searchService, 'invalidateCacheForModel')) {
             $searchService->invalidateCacheForModel($modelClass);
-            $this->info("✓ Cache cleared for model: {$modelClass}");
+            $this->info('✓ Cache cleared for model: ' . $modelClass);
         } else {
             $this->warn('Model-specific cache clearing not available');
         }

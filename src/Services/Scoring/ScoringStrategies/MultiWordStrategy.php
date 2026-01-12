@@ -5,15 +5,10 @@ declare(strict_types=1);
 namespace Fuzzy\Services\Scoring\ScoringStrategies;
 
 use Fuzzy\SearchContext;
-use Fuzzy\Services\AdvancedScoringCalculator;
 use Fuzzy\Services\Scoring\ScoringStrategy;
 
 class MultiWordStrategy implements ScoringStrategy
 {
-    public function __construct(
-        private AdvancedScoringCalculator $advancedCalculator
-    ) {}
-
     public function supports(SearchContext $context, array $indexEntry): bool
     {
         return $context->hasMultipleWords();

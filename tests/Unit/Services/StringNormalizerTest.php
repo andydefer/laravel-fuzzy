@@ -7,7 +7,7 @@ namespace Fuzzy\Tests\Unit\Services;
 use Fuzzy\Tests\TestCase;
 use Fuzzy\Services\StringNormalizer;
 
-class StringNormalizerTest extends TestCase
+final class StringNormalizerTest extends TestCase
 {
     private StringNormalizer $normalizer;
 
@@ -111,7 +111,7 @@ class StringNormalizerTest extends TestCase
         $this->assertCount(3, $keywords);
 
 
-        $this->assertEquals(['brown', 'dog', 'fox'], $keywords);
+        $this->assertSame(['brown', 'dog', 'fox'], $keywords);
 
         // Alternative: Vérifier sans ordre spécifique
         $expectedPossible = ['brown', 'dog', 'fox', 'jumps', 'lazy', 'quick'];
@@ -119,6 +119,7 @@ class StringNormalizerTest extends TestCase
             $this->assertContains($keyword, $expectedPossible);
         }
     }
+
     public function test_extract_keywords_with_limit(): void
     {
         $input = 'one two three four five six seven eight nine ten';

@@ -23,8 +23,8 @@ class LongestCommonSubstringAlgorithm implements SimilarityAlgorithmInterface
         $maxLength = 0;
         $dp = array_fill(0, $len1 + 1, array_fill(0, $len2 + 1, 0));
 
-        for ($i = 1; $i <= $len1; $i++) {
-            for ($j = 1; $j <= $len2; $j++) {
+        for ($i = 1; $i <= $len1; ++$i) {
+            for ($j = 1; $j <= $len2; ++$j) {
                 if ($str1[$i - 1] === $str2[$j - 1]) {
                     $dp[$i][$j] = $dp[$i - 1][$j - 1] + 1;
                     $maxLength = max($maxLength, $dp[$i][$j]);

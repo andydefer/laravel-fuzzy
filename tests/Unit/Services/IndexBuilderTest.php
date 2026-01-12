@@ -4,16 +4,16 @@ declare(strict_types=1);
 
 namespace Fuzzy\Tests\Unit\Services;
 
+use Fuzzy\Contracts\MustFuzzySearch;
 use Fuzzy\Tests\TestCase;
 use Fuzzy\Services\IndexBuilder;
 use Fuzzy\Services\StringNormalizer;
 use Fuzzy\Tests\Fixtures\User;
 use Fuzzy\Tests\Fixtures\Product;
 use Fuzzy\Models\FuzzyIndex;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 
-class IndexBuilderTest extends TestCase
+final class IndexBuilderTest extends TestCase
 {
     private IndexBuilder $builder;
 
@@ -70,7 +70,10 @@ class IndexBuilderTest extends TestCase
     public function test_index_model_with_null_value(): void
     {
         // Arrange - Créer une classe anonyme qui implémente MustFuzzySearch
-        $testUser = new class implements \Fuzzy\Contracts\MustFuzzySearch {
+        $testUser = new class implements MustFuzzySearch {
+            /**
+             * @return array<int, string>
+             */
             public function getSearchableFields(): array
             {
                 return ['name', 'nullable_field'];
@@ -81,22 +84,18 @@ class IndexBuilderTest extends TestCase
                 return null;
             }
 
-            public function getIndexableId(): string|int
+            public function getIndexableId(): int
             {
                 return 99999;
             }
 
-            public function getSearchableType(): string
-            {
-                return 'test-user';
-            }
 
             public function shouldBeIndexed(): bool
             {
                 return true;
             }
 
-            public function getAttribute($key)
+            public function getAttribute($key): ?string
             {
                 return $key === 'name' ? 'Test User' : null;
             }
@@ -200,9 +199,9 @@ class IndexBuilderTest extends TestCase
         ]);
 
         // Act & Assert
-        $this->assertEquals(1.0, $this->builder->calculateFieldWeight('name'));
-        $this->assertEquals(0.9, $this->builder->calculateFieldWeight('title'));
-        $this->assertEquals(0.5, $this->builder->calculateFieldWeight('unknown_field'));
+        $this->assertEqualsWithDelta(1.0, $this->builder->calculateFieldWeight('name'), PHP_FLOAT_EPSILON);
+        $this->assertEqualsWithDelta(0.9, $this->builder->calculateFieldWeight('title'), PHP_FLOAT_EPSILON);
+        $this->assertEqualsWithDelta(0.5, $this->builder->calculateFieldWeight('unknown_field'), PHP_FLOAT_EPSILON);
     }
 
     public function test_batch_index(): void

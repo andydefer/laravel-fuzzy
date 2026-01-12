@@ -6,7 +6,6 @@ namespace Fuzzy\Stages;
 
 use Fuzzy\SearchContext;
 use Closure;
-use Illuminate\Support\Collection;
 
 /**
  * Query normalization stage.

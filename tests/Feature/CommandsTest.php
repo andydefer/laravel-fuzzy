@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Config;
 /**
  * Feature tests for console commands.
  */
-class CommandsTest extends TestCase
+final class CommandsTest extends TestCase
 {
     protected function setUp(): void
     {
@@ -66,12 +66,12 @@ class CommandsTest extends TestCase
         Config::set('fuzzy.auto_discovery.enabled', false);
 
         // Créer sans événements
-        $user = User::withoutEvents(
+        User::withoutEvents(
             fn() =>
             User::create(['name' => 'User One', 'email' => 'user1@example.com'])
         );
 
-        $product = Product::withoutEvents(
+        Product::withoutEvents(
             fn() =>
             Product::create(['name' => 'Product One', 'description' => 'Test', 'price' => 100])
         );
@@ -131,10 +131,10 @@ class CommandsTest extends TestCase
     public function test_index_command_with_chunk_option(): void
     {
         // Arrange: Create multiple users
-        for ($i = 1; $i <= 150; $i++) {
+        for ($i = 1; $i <= 150; ++$i) {
             User::create([
-                'name' => "User $i",
-                'email' => "user$i@example.com",
+                'name' => 'User ' . $i,
+                'email' => sprintf('user%d@example.com', $i),
                 'type' => 'user',
             ]);
         }
@@ -170,8 +170,8 @@ class CommandsTest extends TestCase
     public function test_clear_command_with_specific_model(): void
     {
         // Arrange
-        $user = User::create(['name' => 'Test', 'email' => 'test@example.com', 'type' => 'user']);
-        $product = Product::create(['name' => 'Product', 'description' => 'Test', 'price' => 100]);
+        User::create(['name' => 'Test', 'email' => 'test@example.com', 'type' => 'user']);
+        Product::create(['name' => 'Product', 'description' => 'Test', 'price' => 100]);
 
         Artisan::call('fuzzy:index');
 

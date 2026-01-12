@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace Fuzzy\Tests\Unit\Models;
 
+use Exception;
 use Fuzzy\Tests\TestCase;
 use Fuzzy\Models\FuzzyIndex;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
-class FuzzyIndexTest extends TestCase
+final class FuzzyIndexTest extends TestCase
 {
     protected function setUp(): void
     {
@@ -185,7 +186,7 @@ class FuzzyIndexTest extends TestCase
         try {
             $results = $query->get();
             $this->assertGreaterThanOrEqual(0, $results->count());
-        } catch (\Exception $e) {
+        } catch (Exception $exception) {
             // If it fails due to JSON support, that's OK for this test
             $this->addToAssertionCount(1); // Mark test as passed
         }
@@ -211,7 +212,7 @@ class FuzzyIndexTest extends TestCase
         $this->assertGreaterThanOrEqual(0, $entries->count());
 
         if ($entries->count() > 0) {
-            $this->assertStringContainsString('test', $entries->first()->normalized_value);
+            $this->assertStringContainsString('test', (string) $entries->first()->normalized_value);
         }
     }
 
@@ -249,7 +250,7 @@ class FuzzyIndexTest extends TestCase
         $this->assertEquals('Test', $entry->original_value);
         $this->assertEquals('test', $entry->normalized_value);
         $this->assertEquals(['test'], $entry->words);
-        $this->assertEquals(0.8, $entry->weight);
+        $this->assertEqualsWithDelta(0.8, $entry->weight, PHP_FLOAT_EPSILON);
         $this->assertEquals([
             'word_count' => 1,
             'value_length' => 4,
@@ -277,14 +278,14 @@ class FuzzyIndexTest extends TestCase
 
         // Assert
         $this->assertIsArray($entry->words);
-        $this->assertEquals(['test', 'one', 'two'], $entry->words);
+        $this->assertSame(['test', 'one', 'two'], $entry->words);
 
         // Test setting words as array
         $entry->words = ['new', 'words'];
         $entry->save();
         $entry->refresh();
 
-        $this->assertEquals(['new', 'words'], $entry->words);
+        $this->assertSame(['new', 'words'], $entry->words);
     }
 
     public function test_metadata_casting(): void
@@ -308,7 +309,7 @@ class FuzzyIndexTest extends TestCase
 
         // Assert
         $this->assertIsArray($entry->metadata);
-        $this->assertEquals(['custom' => 'value'], $entry->metadata);
+        $this->assertSame(['custom' => 'value'], $entry->metadata);
 
         // Test setting metadata as array
         $entry->metadata = ['updated' => true];
@@ -338,6 +339,6 @@ class FuzzyIndexTest extends TestCase
 
         // Assert
         $this->assertIsFloat($entry->weight);
-        $this->assertEquals(0.75, $entry->weight);
+        $this->assertEqualsWithDelta(0.75, $entry->weight, PHP_FLOAT_EPSILON);
     }
 }

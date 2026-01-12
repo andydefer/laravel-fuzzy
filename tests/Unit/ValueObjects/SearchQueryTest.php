@@ -8,7 +8,7 @@ use Fuzzy\Tests\TestCase;
 use Fuzzy\ValueObjects\SearchQuery;
 use Fuzzy\Services\StringNormalizer;
 
-class SearchQueryTest extends TestCase
+final class SearchQueryTest extends TestCase
 {
     private StringNormalizer $normalizer;
 

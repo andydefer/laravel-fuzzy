@@ -15,12 +15,11 @@ class FuzzySearchException extends Exception
      * Creates an exception for when a model is not searchable.
      *
      * @param string $modelClass The model class name
-     * @return self
      */
     public static function modelNotSearchable(string $modelClass): self
     {
         return new self(
-            "Model {$modelClass} is not searchable. Implement MustFuzzySearch interface."
+            sprintf('Model %s is not searchable. Implement MustFuzzySearch interface.', $modelClass)
         );
     }
 
@@ -28,12 +27,11 @@ class FuzzySearchException extends Exception
      * Creates an exception for when a search index is not found.
      *
      * @param string $modelClass The model class name
-     * @return self
      */
     public static function indexNotFound(string $modelClass): self
     {
         return new self(
-            "Index not found for model {$modelClass}. Run 'php artisan fuzzy:index'."
+            sprintf("Index not found for model %s. Run 'php artisan fuzzy:index'.", $modelClass)
         );
     }
 
@@ -41,12 +39,11 @@ class FuzzySearchException extends Exception
      * Creates an exception for an invalid format class.
      *
      * @param string $formatClass The format class name
-     * @return self
      */
     public static function invalidFormatClass(string $formatClass): self
     {
         return new self(
-            "Invalid format class: {$formatClass}. Must extend Spatie\\LaravelData\\Data."
+            sprintf('Invalid format class: %s. Must extend Spatie\LaravelData\Data.', $formatClass)
         );
     }
 }

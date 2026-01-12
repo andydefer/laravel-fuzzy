@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Fuzzy\Traits;
 
-use Fuzzy\Contracts\MustFuzzySearch;
 use Illuminate\Support\Collection;
 
 /**
@@ -21,24 +20,22 @@ trait FuzzySearchable
      *
      * Sets up model event listeners to automatically manage search index
      * during create, update, and delete operations.
-     *
-     * @return void
      */
     protected static function bootFuzzySearchable(): void
     {
-        static::created(function ($model) {
+        static::created(function ($model): void {
             if ($model->shouldBeIndexed() && method_exists($model, 'indexForSearch')) {
                 $model->indexForSearch();
             }
         });
 
-        static::updated(function ($model) {
+        static::updated(function ($model): void {
             if ($model->shouldBeIndexed() && method_exists($model, 'updateIndexForSearch')) {
                 $model->updateIndexForSearch();
             }
         });
 
-        static::deleted(function ($model) {
+        static::deleted(function ($model): void {
             if (method_exists($model, 'removeFromIndex')) {
                 $model->removeFromIndex();
             }
@@ -49,8 +46,6 @@ trait FuzzySearchable
      * Determine if this model instance should be indexed.
      *
      * Override this method in individual models to implement custom indexing logic.
-     *
-     * @return bool
      */
     public function shouldBeIndexed(): bool
     {
@@ -71,8 +66,6 @@ trait FuzzySearchable
 
     /**
      * Get the format class for custom search data transformation.
-     *
-     * @return string|null
      */
     public function getFuzzyFormat(): ?string
     {
@@ -81,28 +74,15 @@ trait FuzzySearchable
 
     /**
      * Get the identifier used for indexing.
-     *
-     * @return string|int
      */
     public function getIndexableId(): string|int
     {
         return $this->getKey();
     }
 
-    /**
-     * Get the type identifier for search results.
-     *
-     * @return string
-     */
-    public function getSearchableType(): string
-    {
-        return class_basename($this);
-    }
 
     /**
      * Index this model for search.
-     *
-     * @return void
      */
     public function indexForSearch(): void
     {
@@ -111,8 +91,6 @@ trait FuzzySearchable
 
     /**
      * Update the search index for this model.
-     *
-     * @return void
      */
     public function updateIndexForSearch(): void
     {
@@ -121,8 +99,6 @@ trait FuzzySearchable
 
     /**
      * Remove this model from the search index.
-     *
-     * @return void
      */
     public function removeFromIndex(): void
     {

@@ -40,7 +40,6 @@ class FuzzySearchableData extends Data
      * Create a FuzzySearchableData instance from an Eloquent model.
      *
      * @param Model $model The model to convert to searchable data
-     * @return self
      */
     public static function fromModel(Model $model): self
     {

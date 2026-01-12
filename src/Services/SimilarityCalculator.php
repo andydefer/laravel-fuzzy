@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Fuzzy\Services;
 
+use Fuzzy\Services\Algorithms\LongestCommonSubstringAlgorithm;
+use Fuzzy\Services\Algorithms\LevenshteinSimilarityAlgorithm;
+use Fuzzy\Services\Algorithms\PrefixSimilarityAlgorithm;
 use Fuzzy\Contracts\SimilarityAlgorithmInterface;
-use Fuzzy\Services\Algorithms;
 
 /**
  * Composite similarity calculator using multiple algorithms.
@@ -13,6 +15,7 @@ use Fuzzy\Services\Algorithms;
 class SimilarityCalculator
 {
     private const MIN_QUERY_LENGTH = 2;
+
     private array $algorithms = [];
 
     public function __construct()
@@ -26,9 +29,9 @@ class SimilarityCalculator
     private function registerDefaultAlgorithms(): void
     {
         $this->algorithms = [
-            new Algorithms\LongestCommonSubstringAlgorithm(),
-            new Algorithms\LevenshteinSimilarityAlgorithm(),
-            new Algorithms\PrefixSimilarityAlgorithm(),
+            new LongestCommonSubstringAlgorithm(),
+            new LevenshteinSimilarityAlgorithm(),
+            new PrefixSimilarityAlgorithm(),
         ];
     }
 
@@ -48,7 +51,7 @@ class SimilarityCalculator
         $queryWord = strtolower(trim($queryWord));
         $targetWord = strtolower(trim($targetWord));
 
-        if (empty($queryWord) || empty($targetWord)) {
+        if ($queryWord === '' || $queryWord === '0' || ($targetWord === '' || $targetWord === '0')) {
             return 0.0;
         }
 
@@ -121,7 +124,7 @@ class SimilarityCalculator
             return 1.0;
         }
 
-        if (empty($str1) || empty($str2)) {
+        if ($str1 === '' || $str1 === '0' || ($str2 === '' || $str2 === '0')) {
             return 0.0;
         }
 
@@ -155,7 +158,7 @@ class SimilarityCalculator
 
             if ($bestScore > 0) {
                 $totalScore += $bestScore;
-                $matchedWords++;
+                ++$matchedWords;
             }
         }
 
@@ -187,7 +190,7 @@ class SimilarityCalculator
      */
     private function normalizeForComparison(string $str): string
     {
-        if (empty($str)) {
+        if ($str === '' || $str === '0') {
             return '';
         }
 

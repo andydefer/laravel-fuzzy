@@ -4,15 +4,18 @@ declare(strict_types=1);
 
 namespace Fuzzy\Services;
 
+use Symfony\Component\Finder\Finder;
+use Fuzzy\Stages\NormalizeQueryStage;
+use Fuzzy\Stages\MatchDiscoveryStage;
+use Fuzzy\Stages\ScoringStage;
+use Fuzzy\Stages\SortAndLimitStage;
 use Fuzzy\Contracts\MustFuzzySearch;
 use Fuzzy\Contracts\IndexRepositoryInterface;
 use Fuzzy\Data\SearchOptionsData;
-use Fuzzy\Data\SearchResultData;
 use Fuzzy\ValueObjects\SearchQuery;
 use Fuzzy\Exceptions\ModelNotSearchableException;
 use Fuzzy\Models\FuzzyIndex;
 use Fuzzy\SearchContext;
-use Fuzzy\Stages;
 use Fuzzy\Services\Scoring\ScoringEngine;
 use Illuminate\Pipeline\Pipeline;
 use Illuminate\Support\Collection;
@@ -24,11 +27,6 @@ use ReflectionClass;
  */
 class FuzzySearchService
 {
-    /**
-     * Liste des clés de cache générées (pour invalidation sélective)
-     */
-    private array $generatedCacheKeys = [];
-
     /**
      * @param Pipeline $pipeline Laravel pipeline for processing search stages
      * @param StringNormalizer $normalizer Service for normalizing strings and queries
@@ -58,7 +56,7 @@ class FuzzySearchService
         $cacheKey = $this->generateCacheKey('search', $query, $options);
         $ttl = config('fuzzy.cache.ttl.search', 3600);
 
-        return $this->cacheRemember($cacheKey, $ttl, function () use ($query, $options) {
+        return $this->cacheRemember($cacheKey, $ttl, function () use ($query, $options): Collection {
             return $this->performSearch($query, $options);
         });
     }
@@ -93,7 +91,7 @@ class FuzzySearchService
         $cacheKey = $this->generateCacheKey('search_in_model', $modelClass, $query, $options);
         $ttl = config('fuzzy.cache.ttl.search_in_model', 3600);
 
-        return $this->cacheRemember($cacheKey, $ttl, function () use ($modelClass, $query, $options) {
+        return $this->cacheRemember($cacheKey, $ttl, function () use ($modelClass, $query, $options): Collection {
             return $this->performSearchInModel($modelClass, $query, $options);
         });
     }
@@ -126,7 +124,7 @@ class FuzzySearchService
         $results = $this->pipeline
             ->send($context)
             ->through($this->getPipelineStages())
-            ->then(fn(SearchContext $context) => $context->results);
+            ->then(fn(SearchContext $context): array => $context->results);
 
         return $this->filterAndSortResults(collect($results), $searchOptions->minScore);
     }
@@ -143,7 +141,7 @@ class FuzzySearchService
         $cacheKey = $this->generateCacheKey('search_in_models', $modelClasses, $query, $options);
         $ttl = config('fuzzy.cache.ttl.search_in_models', 3600);
 
-        return $this->cacheRemember($cacheKey, $ttl, function () use ($modelClasses, $query, $options) {
+        return $this->cacheRemember($cacheKey, $ttl, function () use ($modelClasses, $query, $options): Collection {
             return $this->performSearchInModels($modelClasses, $query, $options);
         });
     }
@@ -228,7 +226,7 @@ class FuzzySearchService
 
         FuzzyIndex::forModel($modelClass)->delete();
 
-        $modelClass::chunk(100, function ($models) {
+        $modelClass::chunk(100, function ($models): void {
             foreach ($models as $model) {
                 if ($model->shouldBeIndexed()) {
                     $this->indexModel($model);
@@ -285,7 +283,7 @@ class FuzzySearchService
         $cacheKey = $this->generateCacheKey('stats');
         $ttl = config('fuzzy.cache.ttl.stats', 30); // 30 secondes
 
-        return $this->cacheRemember($cacheKey, $ttl, function () {
+        return $this->cacheRemember($cacheKey, $ttl, function (): array {
             return $this->indexRepository->getStats();
         });
     }
@@ -318,7 +316,7 @@ class FuzzySearchService
     /**
      * Get all searchable models.
      */
-    protected function getSearchableModels(): array
+    public function getSearchableModels(): array
     {
         if (!$this->isCacheEnabled()) {
             return $this->fetchSearchableModels();
@@ -327,7 +325,7 @@ class FuzzySearchService
         $cacheKey = $this->generateCacheKey('searchable_models');
         $ttl = config('fuzzy.cache.ttl.search', 3600);
 
-        return $this->cacheRemember($cacheKey, $ttl, function () {
+        return $this->cacheRemember($cacheKey, $ttl, function (): array {
             return $this->fetchSearchableModels();
         });
     }
@@ -337,7 +335,7 @@ class FuzzySearchService
         $configuredModels = config('fuzzy.searchable_models', []);
 
         if (!empty($configuredModels)) {
-            return array_filter($configuredModels, function ($modelClass) {
+            return array_filter($configuredModels, function (string $modelClass): bool {
                 return $this->isModelSearchable($modelClass);
             });
         }
@@ -351,11 +349,20 @@ class FuzzySearchService
     private function discoverSearchableModels(): array
     {
         $models = [];
-        $finder = new \Symfony\Component\Finder\Finder();
+        $finder = new Finder();
+
+        $paths = [
+            app_path('Models'),
+        ];
+
+        if (config('fuzzy.auto_discovery.enabled')) {
+            $paths[] = dirname(__DIR__, 2) . '/tests/Fixtures';
+        }
 
         $finder->files()
-            ->in(app_path('Models'))
+            ->in($paths)
             ->name('*.php');
+
 
         foreach ($finder as $file) {
             $modelClass = $this->getClassNameFromFile($file->getRealPath());
@@ -413,7 +420,7 @@ class FuzzySearchService
     {
         if (!$this->isModelSearchable($modelClass)) {
             throw new ModelNotSearchableException(
-                "Model {$modelClass} must implement " . MustFuzzySearch::class
+                sprintf('Model %s must implement ', $modelClass) . MustFuzzySearch::class
             );
         }
     }
@@ -424,10 +431,10 @@ class FuzzySearchService
     protected function getPipelineStages(): array
     {
         return config('fuzzy.pipeline.stages', [
-            Stages\NormalizeQueryStage::class,
-            Stages\MatchDiscoveryStage::class,
-            Stages\ScoringStage::class,
-            Stages\SortAndLimitStage::class,
+            NormalizeQueryStage::class,
+            MatchDiscoveryStage::class,
+            ScoringStage::class,
+            SortAndLimitStage::class,
         ]);
     }
 
@@ -437,7 +444,7 @@ class FuzzySearchService
     private function filterAndSortResults(Collection $results, float $minScore): Collection
     {
         return $results
-            ->filter(fn($result) => $result !== null && $result->score >= $minScore)
+            ->filter(fn($result): bool => $result !== null && $result->score >= $minScore)
             ->sortByDesc('score')
             ->values();
     }
@@ -482,17 +489,17 @@ class FuzzySearchService
     /**
      * Génère une clé de cache unique.
      */
-    private function generateCacheKey(string $type, ...$params): string
+    private function generateCacheKey(string $type, string|array ...$params): string
     {
         $prefix = config('fuzzy.cache.prefix', 'fuzzy_search:');
 
         // Simplification: ne pas faire d'hypothèses sur le contenu
         $hash = md5(json_encode($params));
-        $key = "{$prefix}{$type}:{$hash}";
+        $key = sprintf('%s%s:%s', $prefix, $type, $hash);
 
         // Limiter la longueur de la clé
         if (strlen($key) > 250) {
-            $key = "{$prefix}{$type}:" . md5($key);
+            return sprintf('%s%s:', $prefix, $type) . md5($key);
         }
 
         return $key;
@@ -556,7 +563,7 @@ class FuzzySearchService
         }
 
         // Mettre à jour la liste stockée
-        if (!empty($keysToDelete)) {
+        if ($keysToDelete !== []) {
             $maxTtl = max(array_values(config('fuzzy.cache.ttl', []))) + 86400;
             Cache::put($storageKey, $keysToKeep, $maxTtl);
         }

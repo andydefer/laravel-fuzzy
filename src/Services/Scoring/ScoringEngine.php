@@ -22,7 +22,7 @@ class ScoringEngine
         $this->strategies = $strategies;
 
         // Trier les stratégies par priorité décroissante
-        usort($this->strategies, fn($a, $b) => $b->getPriority() <=> $a->getPriority());
+        usort($this->strategies, fn($a, $b): int => $b->getPriority() <=> $a->getPriority());
     }
 
     /**
@@ -57,7 +57,7 @@ class ScoringEngine
      */
     public function calculateMultiWordScore(array $indexEntries, SearchContext $context): float
     {
-        if (empty($indexEntries) || !$context->hasMultipleWords()) {
+        if ($indexEntries === [] || !$context->hasMultipleWords()) {
             return 0.0;
         }
 
@@ -107,6 +107,7 @@ class ScoringEngine
 
     /**
      * Score de fallback basé sur la similarité simple.
+     * @param array<string, mixed> $indexEntry
      */
     private function calculateFallbackScore(SearchContext $context, array $indexEntry): float
     {
@@ -138,6 +139,7 @@ class ScoringEngine
 
     /**
      * Applique la pondération du champ.
+     * @param array<string, mixed> $match
      */
     private function applyFieldWeighting(float $score, array $match): float
     {

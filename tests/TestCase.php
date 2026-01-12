@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Fuzzy\Tests;
 
+use Fuzzy\Tests\Fixtures\User;
+use Fuzzy\Tests\Fixtures\Product;
+use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Config;
 use Orchestra\Testbench\TestCase as Orchestra;
 use Fuzzy\FuzzySearchServiceProvider;
@@ -19,8 +22,6 @@ abstract class TestCase extends Orchestra
      * Set up the test environment.
      *
      * Loads migrations and configures in-memory caching for isolated testing.
-     *
-     * @return void
      */
     protected function setUp(): void
     {
@@ -35,8 +36,6 @@ abstract class TestCase extends Orchestra
 
     /**
      * Load package migrations.
-     *
-     * @return void
      */
     private function loadPackageMigrations(): void
     {
@@ -45,8 +44,6 @@ abstract class TestCase extends Orchestra
 
     /**
      * Load test-specific migrations.
-     *
-     * @return void
      */
     private function loadTestMigrations(): void
     {
@@ -55,8 +52,6 @@ abstract class TestCase extends Orchestra
 
     /**
      * Configure in-memory cache for tests.
-     *
-     * @return void
      */
     private function configureMemoryCache(): void
     {
@@ -66,7 +61,7 @@ abstract class TestCase extends Orchestra
     /**
      * Get package service providers.
      *
-     * @param \Illuminate\Foundation\Application $app
+     * @param Application $app
      * @return array<class-string>
      */
     protected function getPackageProviders($app): array
@@ -79,8 +74,7 @@ abstract class TestCase extends Orchestra
     /**
      * Configure test environment.
      *
-     * @param \Illuminate\Foundation\Application $app
-     * @return void
+     * @param Application $app
      */
     protected function getEnvironmentSetUp($app): void
     {
@@ -102,8 +96,8 @@ abstract class TestCase extends Orchestra
         $app['config']->set('fuzzy.eager_load', []);
 
         $app['config']->set('fuzzy.searchable_models', [
-            \Fuzzy\Tests\Fixtures\User::class,
-            \Fuzzy\Tests\Fixtures\Product::class,
+            User::class,
+            Product::class,
         ]);
     }
 }
