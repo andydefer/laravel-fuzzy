@@ -1,3 +1,5 @@
+Voici votre fichier README.md corrigé et complet :
+
 # Laravel Fuzzy Search
 
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/andydefer/laravel-fuzzy.svg?style=flat-square)](https://packagist.org/packages/andydefer/laravel-fuzzy)
@@ -11,7 +13,7 @@ Un package Laravel puissant de recherche floue (fuzzy search) avec indexation ba
 
 ### Prérequis
 - PHP ^8.2
-- Laravel ^12.0
+- Laravel ^11.0
 - MySQL 5.7+ ou PostgreSQL 9.6+
 
 ### Installation via Composer
@@ -19,7 +21,7 @@ Un package Laravel puissant de recherche floue (fuzzy search) avec indexation ba
 composer require andydefer/laravel-fuzzy
 ```
 
-### Publish les fichiers de configuration et migrations
+### Publier les fichiers de configuration et migrations
 ```bash
 php artisan vendor:publish --provider="Fuzzy\FuzzySearchServiceProvider"
 ```
@@ -41,9 +43,15 @@ return [
         'directories' => [
             app_path('Models'),
         ],
+        'exclude_patterns' => [
+            '/^Abstract/',
+            '/^Base/',
+            '/Interface$/',
+            '/Trait$/',
+        ],
     ],
 
-    // Models explicitement configurés
+    // Modèles explicitement configurés
     'searchable_models' => [
         App\Models\User::class,
         App\Models\Product::class,
@@ -56,7 +64,14 @@ return [
         'prefix' => 'fuzzy_search:',
         'ttl' => [
             'search' => 3600, // 1 heure
+            'search_in_model' => 3600,
+            'search_in_models' => 3600,
             'stats' => 30,    // 30 secondes
+        ],
+        'invalidation' => [
+            'on_index' => true,
+            'on_update' => true,
+            'on_delete' => true,
         ],
     ],
 
@@ -66,6 +81,16 @@ return [
         'max_results' => 20,   // Limite de résultats
         'fuzzy' => true,       // Activer la recherche floue
         'threshold' => 0.3,    // Seuil de similarité
+    ],
+
+    // Configuration du pipeline de recherche (NON MODIFIABLE)
+    'pipeline' => [
+        'stages' => [
+            \Fuzzy\Stages\NormalizeQueryStage::class,
+            \Fuzzy\Stages\MatchDiscoveryStage::class,
+            \Fuzzy\Stages\ScoringStage::class,
+            \Fuzzy\Stages\SortAndLimitStage::class,
+        ],
     ],
 
     // Système de scoring avancé
@@ -85,13 +110,48 @@ return [
         ],
         'penalties' => [
             'short_query' => 0.4,       // Pénalité pour requêtes courtes (<4 chars)
+            'cross_word_match_multi' => 0.3,
+        ],
+        'consecutive_bonus' => [        // NON MODIFIABLE - Configuration protégée
+            2 => 1.05,
+            3 => 1.15,
+            4 => 1.30,
+            5 => 1.50,
         ],
     ],
 
-    // Mots ignorés dans les requêtes longues
+    // Pré-chargement des relations pour éviter les requêtes N+1
+    'eager_load' => [
+        // Exemple:
+        // App\Models\User::class => ['profile', 'roles'],
+        // App\Models\Product::class => ['category', 'brand'],
+    ],
+
+    // Mots ignorés dans les requêtes longues (>3 mots)
     'stop_words' => [
         'the', 'and', 'or', 'a', 'an', 'in', 'on', 'at', 'to',
         // Ajoutez vos propres stop words
+    ],
+
+    // Configuration de l'indexation
+    'index' => [
+        'min_word_length' => 2,
+        'max_word_length' => 50,
+        'batch_size' => 100,
+        'queue' => env('FUZZY_SEARCH_QUEUE', false),
+        'queue_name' => env('FUZZY_SEARCH_QUEUE_NAME', 'default'),
+    ],
+
+    // Configuration des algorithmes de similarité
+    'similarity' => [
+        'min_query_length' => 2,
+        'min_similarity_threshold' => 0.1,
+        'algorithm_weights' => [
+            'jaro_winkler' => 0.4,
+            'levenshtein' => 0.3,
+            'ngrams' => 0.2,
+            'lcs' => 0.1,
+        ],
     ],
 ];
 ```
@@ -118,8 +178,19 @@ class Product extends Model implements MustFuzzySearch
     // ✅ REQUIS: Définir les champs à indexer
     public array $searchableFields = ['name', 'description'];
 
-    // ✅ OPTIONNEL: Formatage personnalisé des résultats
+    // ✅ OPTIONNEL: Formatage personnalisé des résultats via propriété
     public ?string $fuzzyFormat = ProductSearchData::class;
+
+    // ✅ OPTIONNEL: Formatage dynamique via méthode
+    public function getFuzzyFormat(): ?string
+    {
+        // Exemple: format différent selon le type de produit
+        if ($this->is_premium) {
+            return PremiumProductSearchData::class;
+        }
+
+        return ProductSearchData::class;
+    }
 
     // ✅ OPTIONNEL: Contrôle d'indexation dynamique
     public function shouldBeIndexed(): bool
@@ -132,6 +203,12 @@ class Product extends Model implements MustFuzzySearch
     public function getIndexableId(): string|int
     {
         return $this->getKey();
+    }
+
+    // ✅ REQUIS: Retourne les attributs du modèle
+    public function getAttribute($key)
+    {
+        return parent::getAttribute($key);
     }
 }
 ```
@@ -156,14 +233,10 @@ class ProductSearchData extends FuzzySearchableData
             name: $product->name,
             type: 'product',
             model: $product,
+            data: $product->toArray(),
             description: $product->short_description,
-            image: $product->getFirstMediaUrl('thumbnail'),
-            url: route('products.show', $product),
-            data: [
-                'price' => $product->formatted_price,
-                'in_stock' => $product->stock > 0,
-                'category' => optional($product->category)->name,
-            ]
+            image: optional($product->getFirstMedia('thumbnail'))->getUrl(),
+            url: route('products.show', $product)
         );
     }
 }
@@ -172,23 +245,30 @@ class ProductSearchData extends FuzzySearchableData
 ### 3. Indexer vos données
 
 ```bash
+# Afficher les modèles disponibles sans indexer
+php artisan fuzzy:index --list
+
 # Indexer tous les modèles configurés
 php artisan fuzzy:index
 
 # Indexer un modèle spécifique
 php artisan fuzzy:index "App\Models\Product"
 
-# Forcer la réindexation complète
+# Forcer la réindexation complète (supprime et recrée l'index)
 php artisan fuzzy:index --force
 
 # Indexer par lots pour les grandes tables
 php artisan fuzzy:index --chunk=500
+
+# Indexer avec auto-découverte seulement
+php artisan fuzzy:index --auto
 ```
 
 ### 4. Recherche de base
 
 ```php
 use Fuzzy\FuzzySearch;
+use App\Models\Product;
 
 // Recherche globale (tous les modèles indexés)
 $results = FuzzySearch::search('laptop gaming');
@@ -198,7 +278,7 @@ $products = FuzzySearch::searchInModel(Product::class, 'wireless mouse');
 
 // Recherche dans plusieurs modèles
 $results = FuzzySearch::searchInModels(
-    [Product::class, Article::class],
+    [Product::class, App\Models\Article::class],
     'nouvelle technologie'
 );
 
@@ -284,6 +364,17 @@ class User extends Model implements MustFuzzySearch
 }
 ```
 
+**Note** : Vous pouvez aussi utiliser la propriété `$fuzzyFormat` directement :
+
+```php
+class User extends Model implements MustFuzzySearch
+{
+    use FuzzySearchable;
+
+    public ?string $fuzzyFormat = UserSearchData::class;
+}
+```
+
 ### Options de recherche avancées
 
 ```php
@@ -312,9 +403,15 @@ $results = FuzzySearch::search('John Doe', [
 $results = FuzzySearch::search('important', [
     'min_score' => 0.8,      // Résultats très pertinents seulement
 ]);
+
+// Recherche avec seuil de similarité personnalisé
+$results = FuzzySearch::search('approximate', [
+    'fuzzy' => true,
+    'threshold' => 0.2,      // Plus sensible aux correspondances faibles
+]);
 ```
 
-### Gestion des modèles
+### Gestion des modèles et index
 
 ```php
 use Fuzzy\FuzzySearch;
@@ -337,37 +434,36 @@ FuzzySearch::reindexModel(Product::class);
 
 // Réindexer tout
 FuzzySearch::reindexAll();
+
+// Obtenir des statistiques
+$stats = FuzzySearch::getStats();
+echo "Total entries: " . $stats['total_entries'];
+```
+
+### Utilitaire de similarité
+
+```php
+use Fuzzy\FuzzySearch;
+
+// Calculer la similarité entre deux chaînes
+$similarity = FuzzySearch::calculateSimilarity('hello', 'helo');
+// Résultat: ~0.85 (très similaire)
+
+$similarity = FuzzySearch::calculateSimilarity('cat', 'dog');
+// Résultat: ~0.1 (peu similaire)
+
+// Normaliser une chaîne pour la recherche
+$normalized = FuzzySearch::normalize('Héllò Wörld!');
+// Résultat: 'hello world'
+
+// Séparer une chaîne en mots
+$words = FuzzySearch::splitIntoWords('hello-world test');
+// Résultat: ['hello', 'world', 'test']
 ```
 
 ## 🎯 Comment tirer le meilleur parti de ce package
 
 ### 1. Vue d'ensemble de l'architecture
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Requête utilisateur                       │
-│                   "iphne 15 pro max"                         │
-└───────────────────────┬─────────────────────────────────────┘
-                        │
-                        ▼
-┌─────────────────────────────────────────────────────────────┐
-│                Pipeline de recherche fuzzy                   │
-├─────────────────┬─────────────────┬─────────────────┬───────┤
-│  1. Normalisation │  2. Découverte  │  3. Scoring     │  4. Tri │
-│   • Nettoyage    │   • Trigrammes  │   • Pondération │   • Score│
-│   • Stop words   │   • Matching    │   • Bonus/Pénal.│   • Limite│
-│   • Tokenisation │   • Similarité  │                 │         │
-└─────────────────┴─────────────────┴─────────────────┴───────┘
-                        │
-                        ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    Résultats enrichis                        │
-│                                                              │
-│  • "iPhone 15 Pro Max" (score: 0.92)                        │
-│  • "iPhone 14 Pro" (score: 0.75)                            │
-│  • "Samsung Galaxy" (score: 0.15)                           │
-└─────────────────────────────────────────────────────────────┘
-```
 
 Le package fonctionne via un **pipeline en 4 étapes** qui transforme une requête utilisateur brute en résultats pertinents. Contrairement à une recherche SQL classique, chaque étape ajoute une couche d'intelligence : normalisation des termes, découverte via trigrammes, calcul de score basé sur plusieurs critères, et enfin tri intelligent.
 
@@ -492,13 +588,12 @@ class Product extends Model implements MustFuzzySearch
             && $this->stock_count > 0
             && $this->category->is_active;
     }
-
-    // Relation préchargée automatiquement
-    public function getIndexableRelations(): array
-    {
-        return ['category', 'brand', 'media'];
-    }
 }
+
+// Configuration de pré-chargement dans config/fuzzy.php
+'eager_load' => [
+    App\Models\Product::class => ['category', 'brand', 'media'],
+],
 
 // Utilisation dans le contrôleur
 class ProductController extends Controller
@@ -530,10 +625,10 @@ class ProductController extends Controller
 
 Le package utilise un pipeline modulaire en 4 étapes :
 
-1. **NormalizeQueryStage** : Nettoie et normalise la requête
-2. **MatchDiscoveryStage** : Trouve les correspondances potentielles
-3. **ScoringStage** : Calcule les scores de pertinence
-4. **SortAndLimitStage** : Trie et limite les résultats
+1. **NormalizeQueryStage** : Nettoie et normalise la requête, retire les stop words des requêtes longues
+2. **MatchDiscoveryStage** : Trouve les correspondances potentielles via trigrammes, filtrage par longueur et première lettre
+3. **ScoringStage** : Calcule les scores de pertinence avec bonus/penalties
+4. **SortAndLimitStage** : Trie par score descendant et limite les résultats
 
 ### Système de Scoring
 
@@ -542,16 +637,22 @@ Le score final (0.0 - 1.0) est calculé à partir de plusieurs facteurs :
 - **Match exact** : 1.0 (parfait)
 - **Match par mot** : 0.9 + bonus
 - **Match flou** : Similarité × poids + bonus
-- **Bonus** : Position, couverture, mots consécutifs
-- **Pénalités** : Requêtes courtes, champs peu importants
+- **Bonus** :
+  - Position (mot en début de champ : +20%)
+  - Couverture complète (tous les mots trouvés : +30%)
+  - Couverture élevée (>75% des mots : +15%)
+  - Lettres consécutives (2 lettres : +5%, 3 lettres : +15%, etc.)
+- **Penalties** :
+  - Requêtes courtes (<4 caractères : -40%)
+  - Champs peu importants (description : -20%)
 
 ### Optimisations de Performance
 
-1. **Indexation par trigrams** : Recherche ultra-rapide
-2. **Cache intelligent** : TTL configurable par type
-3. **Batch loading** : Évite les requêtes N+1
-4. **Optimisations DB** : Indexes spécifiques
-5. **Pré-chargement** : Chargement anticipé des modèles
+1. **Indexation par trigrams** : Recherche ultra-rapide via table `fuzzy_index`
+2. **Cache intelligent** : TTL configurable par type de recherche
+3. **Batch loading** : Évite les requêtes N+1 via pré-chargement
+4. **Optimisations DB** : Indexes spécifiques sur mots, longueurs
+5. **Filtres rapides** : Par première lettre et longueur de mot
 
 ## 🔄 Pourquoi choisir Laravel Fuzzy Search ?
 
@@ -578,14 +679,16 @@ Le score final (0.0 - 1.0) est calculé à partir de plusieurs facteurs :
 - Équipes souhaitant garder le contrôle total
 - Déploiements simples (shared hosting, VPS)
 - Recherche "good enough" avec tolérance aux fautes
+- Données sensibles qui doivent rester dans votre infrastructure
 
 **⚠️ Considérer une alternative si :**
-- Plus de 1M+ enregistments avec haute fréquence de recherche
+- Plus de 1M+ enregistrements avec haute fréquence de recherche
 - Besoins de recherche sémantique/vectorielle
 - Équipe dédiée aux opérations de search
 - Budget illimité pour des solutions cloud
+- Requêtes très complexes avec facettes, filtres avancés
 
-### 4. Pourquoi ne pas utiliser Laravel Scout ?
+### Pourquoi ne pas utiliser Laravel Scout ?
 
 **Laravel Fuzzy Search est préférable quand :**
 
@@ -597,6 +700,7 @@ Le score final (0.0 - 1.0) est calculé à partir de plusieurs facteurs :
 | **Données sensibles** | Les données ne quittent jamais votre infrastructure |
 | **Intégration légère** | Évite la surcharge cognitive d'un service supplémentaire |
 | **Recherche "good enough"** | Besoins de base à intermédiaires satisfaits |
+| **Dépendances minimales** | Seulement spatie/laravel-data + illuminate/* |
 
 **Laravel Scout est préférable quand :**
 
@@ -617,7 +721,7 @@ Avantages:
 • ✅ Intégration immédiate (composer + migrate)
 • ✅ Coût = 0 (déjà payé pour la DB)
 • ✅ Contrôle total (SQL, backups, monitoring)
-• ✅ Dépendances = 0
+• ✅ Dépendances minimes
 
 Limites:
 • ⚠️ Montée en charge limitée par la DB
@@ -652,18 +756,18 @@ Ce package remplit parfaitement 80% des cas d'usage courants, tandis que Scout c
 
 ```php
 // Recherche dans tous les modèles
-FuzzySearch::search(string $query, array $options = []): Collection
+FuzzySearch::search(string $query, array $options = []): Illuminate\Support\Collection
 
 // Recherche dans un modèle spécifique
-FuzzySearch::searchInModel(string $modelClass, string $query, array $options = []): Collection
+FuzzySearch::searchInModel(string $modelClass, string $query, array $options = []): Illuminate\Support\Collection
 
 // Recherche dans plusieurs modèles
-FuzzySearch::searchInModels(array $modelClasses, string $query, array $options = []): Collection
+FuzzySearch::searchInModels(array $modelClasses, string $query, array $options = []): Illuminate\Support\Collection
 
-// Gestion de l'index
-FuzzySearch::indexModel(MustFuzzySearch $model): void
-FuzzySearch::updateModelIndex(MustFuzzySearch $model): void
-FuzzySearch::removeModelFromIndex(MustFuzzySearch $model): void
+// Indexation
+FuzzySearch::indexModel(Fuzzy\Contracts\MustFuzzySearch $model): void
+FuzzySearch::updateModelIndex(Fuzzy\Contracts\MustFuzzySearch $model): void
+FuzzySearch::removeModelFromIndex(Fuzzy\Contracts\MustFuzzySearch $model): void
 FuzzySearch::reindexModel(string $modelClass): void
 FuzzySearch::reindexAll(): void
 
@@ -676,6 +780,15 @@ FuzzySearch::normalize(string $str): string
 FuzzySearch::splitIntoWords(string $str): array
 ```
 
+#### Options de recherche (`$options` array)
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `min_score` / `minScore` | `float` | 0.1 | Score minimum (0.0-1.0) pour inclure un résultat |
+| `max_results` / `maxResults` | `int` | 20 | Nombre maximum de résultats à retourner |
+| `fuzzy` | `bool` | `true` | Activer/désactiver la recherche floue |
+| `threshold` | `float` | 0.3 | Seuil de similarité pour les matchs flous (0.0-1.0) |
+
 ### Trait `FuzzySearchable`
 
 ```php
@@ -687,19 +800,23 @@ class YourModel extends Model implements MustFuzzySearch
     // REQUIS: Champs à indexer
     public array $searchableFields = ['name', 'email'];
 
-    // OPTIONNEL: Formatage personnalisé
+    // OPTIONNEL: Formatage personnalisé via propriété
     public ?string $fuzzyFormat = YourSearchData::class;
-    // OU
+
+    // OPTIONNEL: Formatage personnalisé via méthode (prioritaire)
     public function getFuzzyFormat(): ?string { /* ... */ }
 
     // OPTIONNEL: Contrôle d'indexation
     public function shouldBeIndexed(): bool { /* ... */ }
 
-    // REQUIS: ID unique
+    // REQUIS: ID unique pour l'indexation
     public function getIndexableId(): string|int { /* ... */ }
 
+    // REQUIS: Récupération d'attribut (hérité de Model)
+    public function getAttribute($key) { return parent::getAttribute($key); }
+
     // Méthode de recherche via le modèle
-    public static function fuzzySearch(string $query, array $options = []): Collection
+    public static function fuzzySearch(string $query, array $options = []): Illuminate\Support\Collection
 }
 ```
 
@@ -707,7 +824,7 @@ class YourModel extends Model implements MustFuzzySearch
 
 ```bash
 # Gestion de l'index
-php artisan fuzzy:index [model] [--force] [--chunk=100] [--auto] [--list]
+php artisan fuzzy:index [model] [--force] [--chunk=100] [--list]
 php artisan fuzzy:clear [model] [--force]
 php artisan fuzzy:stats
 
@@ -715,214 +832,287 @@ php artisan fuzzy:stats
 php artisan fuzzy:clear-cache [--force] [--model=] [--stats]
 
 # Aide et découverte
-php artisan fuzzy:index --list  # Liste les modèles découverts
+php artisan fuzzy:index --list  # Liste les modèles découverts sans indexer
 ```
 
-## ⚡ Performance & Limitations
+**Options disponibles :**
+- `[model]` : Classe complète du modèle à indexer (ex: `App\Models\User`)
+- `--force` : Force la réindexation (supprime l'index existant)
+- `--chunk` : Taille des lots pour l'indexation (défaut: 100)
+- `--list` : Liste les modèles disponibles sans indexer
 
-### Recommendations de Performance
+## 🛠️ Gestion et Maintenance
+
+### Supervision de l'index
+
+```bash
+# Vérifier l'état de l'index
+php artisan fuzzy:stats
+
+# Sortie exemple:
+=== Search Index Statistics ===
+Total entries: 1250
+Per model statistics:
++---------------------+---------+---------------------------+
+| Model               | Entries | Fields                    |
++---------------------+---------+---------------------------+
+| App\Models\User     | 500     | name: 250, email: 250     |
+| App\Models\Product  | 750     | name: 375, description: 375|
++---------------------+---------+---------------------------+
+```
+
+### Nettoyage et maintenance
+
+```bash
+# Supprimer l'index pour un modèle spécifique
+php artisan fuzzy:clear "App\Models\Product" --force
+
+# Supprimer tous les index
+php artisan fuzzy:clear --force
+
+# Vider le cache de recherche
+php artisan fuzzy:clear-cache --force
+
+# Vider seulement le cache des statistiques
+php artisan fuzzy:clear-cache --stats --force
+
+# Vider le cache pour un modèle spécifique
+php artisan fuzzy:clear-cache --model="App\Models\User" --force
+```
+
+## ⚡ Performance & Optimisation
+
+### Configuration optimale pour la production
 
 ```php
 // config/fuzzy.php
-'cache' => [
-    'enabled' => true, // TOUJOURS activer en production
-    'ttl' => [
-        'search' => 3600, // 1 heure pour les recherches
-        'stats' => 30,    // Court pour les stats
+return [
+    'cache' => [
+        'enabled' => true, // TOUJOURS activer en production
+        'prefix' => 'fuzzy_search:',
+        'ttl' => [
+            'search' => 3600,        // 1 heure pour les recherches
+            'search_in_model' => 1800, // 30 minutes pour les recherches spécifiques
+            'search_in_models' => 1800,
+            'stats' => 300,          // 5 minutes pour les stats
+        ],
     ],
-],
 
-// Pour les grandes tables
-'index' => [
-    'batch_size' => 1000, // Augmenter pour grandes tables
-],
+    'index' => [
+        'min_word_length' => 2,
+        'max_word_length' => 100,    // Augmenter pour les champs longs
+        'batch_size' => 1000,        // Augmenter pour grandes tables
+    ],
+
+    // Pré-chargement agressif pour éviter N+1
+    'eager_load' => [
+        App\Models\Product::class => ['category', 'brand', 'images'],
+        App\Models\User::class => ['profile', 'company'],
+    ],
+];
 ```
 
-### Limitations Connues
-
-1. **Grandes bases de données** : Pour +500 000 enregistrements, considérez :
-   - Augmenter `batch_size` à 5000
-   - Utiliser `php artisan fuzzy:index --chunk=1000`
-   - Indexer pendant les heures creuses
-
-2. **Champs très longs** : Les champs > 1000 caractères peuvent être tronqués
-
-3. **Recherche multi-langues** : Support basique de l'internationalisation
-   - Accents normalisés (é → e)
-   - Pas de support avancé pour les langues non-latines
-
-4. **Mémoire** : L'indexation de très grandes tables peut nécessiter plus de mémoire PHP
-
-### Benchmarks Indicatifs
-
-| Records | Indexation | Recherche |
-|---------|------------|-----------|
-| 10 000  | ~2s        | ~50ms     |
-| 100 000 | ~15s       | ~150ms    |
-| 500 000 | ~1-2min    | ~300ms    |
-
-## 🔒 Sécurité
-
-### Bonnes Pratiques
-
-```php
-// VALIDATION des requêtes
-public function search(Request $request)
-{
-    $validated = $request->validate([
-        'query' => 'required|string|max:100',
-        'min_score' => 'sometimes|numeric|between:0,1',
-    ]);
-
-    // LIMITATION des résultats
-    $results = FuzzySearch::search($validated['query'], [
-        'max_results' => 50, // Limite stricte
-        'min_score' => $validated['min_score'] ?? 0.1,
-    ]);
-
-    // FILTRAGE par permissions
-    $filteredResults = $results->filter(function ($result) {
-        return auth()->user()->can('view', $result->item);
-    });
-
-    return response()->json($filteredResults);
-}
-```
-
-### Protection contre les abus
-
-1. **Rate limiting** sur les endpoints de recherche :
-```php
-// Dans routes/api.php
-Route::middleware('throttle:60,1')->group(function () {
-    Route::get('/search', 'SearchController@index');
-});
-```
-
-2. **Validation des paramètres** : Toujours valider `min_score`, `max_results`
-
-3. **Logging des requêtes** : Surveillez les patterns suspects
-
-## 🧪 Tests
+### Optimisations pour les grandes tables
 
 ```bash
-# Lancer tous les tests
-composer test
+# Indexation par lots larges
+php artisan fuzzy:index --chunk=5000
 
-# Tests unitaires seulement
-composer test -- --testsuite=Unit
+# Indexation pendant les heures creuses
+php artisan fuzzy:index --chunk=10000 > /dev/null 2>&1 &
 
-# Tests d'intégration
-composer test -- --testsuite=Feature
-
-# Exemple de test unitaire
-public function test_basic_search_returns_results()
-{
-    Product::factory()->create(['name' => 'iPhone 15 Pro']);
-
-    $results = FuzzySearch::searchInModel(Product::class, 'iphone');
-
-    $this->assertCount(1, $results);
-    $this->assertEquals('iPhone 15 Pro', $results->first()->item->name);
-}
+# Indexation spécifique pour les nouveaux modèles
+php artisan fuzzy:index "App\Models\Product" --chunk=2000
 ```
+
+### Limitations connues et solutions
+
+1. **Grandes bases de données (+500K enregistrements)**
+   ```php
+   // Solution: Indexation par lots et cache agressif
+   'batch_size' => 5000,
+   'cache' => ['ttl' => ['search' => 86400]], // Cache 24h
+   ```
+
+2. **Champs très longs (>1000 caractères)**
+   ```php
+   // Solution: Augmenter la limite ou tronquer
+   'index' => ['max_word_length' => 200],
+
+   // Ou dans votre modèle:
+   public function getAttribute($key)
+   {
+       $value = parent::getAttribute($key);
+       if (in_array($key, $this->searchableFields) && strlen($value) > 1000) {
+           return substr($value, 0, 1000) . '...';
+       }
+       return $value;
+   }
+   ```
 
 ## 🤝 Contribution
 
 ### Workflow de Contribution
 
-1. **Fork** le projet
-2. **Clone** votre fork
-3. **Branche** (`git checkout -b feature/ma-fonctionnalite`)
-4. **Commits** avec messages conventionnels
-5. **Tests** (obligatoires pour nouvelles fonctionnalités)
-6. **Push** (`git push origin feature/ma-fonctionnalite`)
-7. **Pull Request**
+1. **Fork** le projet sur GitHub
+2. **Clone** votre fork localement
+3. **Créez une branche** pour votre fonctionnalité
+   ```bash
+   git checkout -b feature/ma-fonctionnalite
+   ```
+4. **Développez** avec des commits atomiques
+   ```bash
+   git commit -m "feat: ajout de la recherche par trigrammes"
+   git commit -m "test: tests pour la nouvelle fonctionnalité"
+   git commit -m "docs: documentation mise à jour"
+   ```
+5. **Poussez** votre branche
+   ```bash
+   git push origin feature/ma-fonctionnalite
+   ```
+6. **Ouvrez une Pull Request** sur le repository principal
 
 ### Standards de Code
 
-- **PSR-12** : Coding standards
+- **PSR-12** : Standards de codage PHP
 - **PHPStan** : Niveau 6 minimum
-- **PHPUnit** : Tests avec coverage > 80%
+- **PHPUnit** : Tests avec couverture > 80%
 - **Conventional Commits** :
-  - `feat:` Nouvelle fonctionnalité
-  - `fix:` Correction de bug
-  - `docs:` Documentation
-  - `test:` Tests uniquement
-  - `refactor:` Refactoring
-  - `style:` Formatage
+  ```
+  feat:     Nouvelle fonctionnalité
+  fix:      Correction de bug
+  docs:     Modification de documentation
+  style:    Formatage, point-virgule manquant, etc.
+  refactor: Refactoring de code
+  test:     Ajout ou correction de tests
+  chore:    Tâches de maintenance
+  ```
 
-### Structure du Projet
+### Tests requis pour les contributions
 
+```bash
+# Avant de soumettre une PR, exécutez:
+composer test
+composer analyse  # PHPStan
+composer lint     # PHP CS Fixer
+
+# Les tests doivent tous passer
+# La couverture de code ne doit pas baisser
+# Aucune erreur PHPStan de niveau 6
 ```
-src/
-├── Commands/          # Commandes Artisan
-├── Contracts/         # Interfaces
-├── Data/              # Data Objects
-├── Exceptions/        # Exceptions personnalisées
-├── Models/            # Modèles Eloquent
-├── Repositories/      # Pattern Repository
-├── Services/          # Services principaux
-├── Stages/            # Pipeline stages
-├── Traits/            # Traits réutilisables
-└── ValueObjects/      # Value Objects
+
+### Documentation des changements
+
+```markdown
+## [Version] - YYYY-MM-DD
+
+### Ajouté
+- Nouvelle fonctionnalité X
+- Support pour Y
+
+### Modifié
+- Changement breaking Z
+- Amélioration de performance
+
+### Supprimé
+- Fonctionnalité dépréciée A
+
+### Corrections
+- Bug #123: Description
 ```
-
-## 📋 Changelog
-
-Les changements notables sont documentés dans le fichier [CHANGELOG.md](CHANGELOG.md).
-
-Ce projet suit [Semantic Versioning](https://semver.org/).
 
 ## 📄 Licence
 
 Le package Laravel Fuzzy Search est open-source sous licence [MIT](LICENSE).
 
-## 🆘 Support & Dépannage
+### Conditions de la licence MIT
 
-### Problèmes Courants
+```
+```
+Copyright (c) 2024 [andydefer]
 
-1. **"Aucun résultat retourné"**
-   ```bash
-   # Vérifiez l'index
-   php artisan fuzzy:stats
+Vous pouvez utiliser ce logiciel librement :
+- l’utiliser pour n’importe quel usage
+- le copier
+- le modifier
+- le distribuer
+- le vendre
 
-   # Vérifiez shouldBeIndexed()
-   # Baissez min_score
-   FuzzySearch::search('test', ['min_score' => 0.01])
-   ```
+Vous devez simplement :
+- conserver ce message de copyright et de licence dans les copies du logiciel.
 
-2. **"Erreur lors de l'indexation"**
-   ```bash
-   # Vérifiez les logs
-   tail -f storage/logs/laravel.log
+Ce logiciel est fourni "tel quel", sans aucune garantie.
+L’auteur n’est pas responsable des problèmes, bugs ou dommages
+liés à l’utilisation du logiciel.
+```
 
-   # Augmentez la mémoire
-   php -d memory_limit=512M artisan fuzzy:index
-   ```
+```
 
-3. **"Performances lentes"**
-   ```php
-   // Activez le cache
-   config(['fuzzy.cache.enabled' => true]);
+## 🆘 Support
 
-   // Augmentez TTL
-   config(['fuzzy.cache.ttl.search' => 86400]); // 24h
-   ```
+### Ressources
 
-### Debug
+- **Documentation** : [Lien vers documentation complète]
+- **GitHub Issues** : [Lien vers les issues]
+- **Discussions** : [Lien vers les discussions]
 
-```php
-// Mode debug
-config(['fuzzy.debug' => true]);
+### Support commercial
 
-// Logging des requêtes
-\Log::debug('Fuzzy search', [
-    'query' => $query,
-    'results_count' => $results->count(),
-    'execution_time' => $executionTime,
-]);
+Pour un support commercial, une assistance à la mise en œuvre ou des fonctionnalités personnalisées, contactez-nous à [votre-email@example.com].
+
+### Communauté
+
+Rejoignez notre communauté pour :
+- Poser des questions
+- Partager vos implémentations
+- Proposer des améliorations
+- Discuter des cas d'usage
+
+### Reporting de bugs
+
+```markdown
+**Description du bug**
+Une description claire et concise du bug.
+
+**Pour reproduire**
+Étapes pour reproduire le comportement:
+1. Configurer '...'
+2. Exécuter '....'
+3. Voir l'erreur
+
+**Comportement attendu**
+Une description claire et concise de ce que vous attendiez.
+
+**Screenshots**
+Si applicable, ajoutez des screenshots.
+
+**Environnement:**
+ - OS: [ex: Ubuntu 22.04]
+ - PHP: [ex: 8.2]
+ - Laravel: [ex: 11.0]
+ - Package version: [ex: 1.0.0]
+
+**Informations supplémentaires**
+Toute autre information pertinente.
+```
+
+### Demande de fonctionnalités
+
+```markdown
+**Votre fonctionnalité est-elle liée à un problème?**
+Une description claire et concise du problème.
+
+**Décrivez la solution que vous souhaitez**
+Une description claire et concise de ce que vous voulez qu'il arrive.
+
+**Décrivez les alternatives que vous avez considérées**
+Une description claire et concise des solutions ou fonctionnalités alternatives que vous avez considérées.
+
+**Contexte supplémentaire**
+Ajoutez tout autre contexte ou screenshots concernant la demande de fonctionnalité.
 ```
 
 ---
 **Note** : Ce package est prêt pour la production et maintenu activement. Pour les questions, issues ou contributions, merci de consulter le repository GitHub.
+
+**Fait avec ❤️ pour la communauté Laravel**
