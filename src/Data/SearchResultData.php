@@ -47,7 +47,7 @@ class SearchResultData extends Data
 
         return new self(
             item: $formattedItem ?? $item,
-            score: $score,
+            score: round($score, 2),
             modelType: $modelType,
             matchedField: $matchedField,
             matchedValue: $matchedValue
@@ -148,7 +148,7 @@ class SearchResultData extends Data
     ): self {
         return self::create(
             item: $model,
-            score: $score,
+            score: round($score, 2),
             modelType: class_basename($model),
             matchedField: $matchedField,
             matchedValue: $matchedValue
@@ -170,7 +170,7 @@ class SearchResultData extends Data
 
         return new self(
             item: $formattedItem,
-            score: $score,
+            score: round($score, 2),
             modelType: $modelType,
             matchedField: $matchedField,
             matchedValue: $matchedValue
