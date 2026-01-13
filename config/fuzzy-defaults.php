@@ -24,8 +24,8 @@ return [
             NormalizeQueryStage::class,
             MatchDiscoveryStage::class,
             ScoringStage::class,
-            SortAndLimitStage::class,
             RelevanceScoringStage::class,
+            SortAndLimitStage::class,
         ],
     ],
 

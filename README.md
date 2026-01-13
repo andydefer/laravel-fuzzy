@@ -89,8 +89,8 @@ return [
             \Fuzzy\Stages\NormalizeQueryStage::class,
             \Fuzzy\Stages\MatchDiscoveryStage::class,
             \Fuzzy\Stages\ScoringStage::class,
-            \Fuzzy\Stages\SortAndLimitStage::class,
             \Fuzzy\Stages\RelevanceScoringStage::class,
+            \Fuzzy\Stages\SortAndLimitStage::class,
         ],
     ],
 
