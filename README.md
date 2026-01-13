@@ -90,6 +90,7 @@ return [
             \Fuzzy\Stages\MatchDiscoveryStage::class,
             \Fuzzy\Stages\ScoringStage::class,
             \Fuzzy\Stages\SortAndLimitStage::class,
+            \Fuzzy\Stages\RelevanceScoringStage::class,
         ],
     ],
 
@@ -465,7 +466,7 @@ $words = FuzzySearch::splitIntoWords('hello-world test');
 
 ### 1. Vue d'ensemble de l'architecture
 
-Le package fonctionne via un **pipeline en 4 étapes** qui transforme une requête utilisateur brute en résultats pertinents. Contrairement à une recherche SQL classique, chaque étape ajoute une couche d'intelligence : normalisation des termes, découverte via trigrammes, calcul de score basé sur plusieurs critères, et enfin tri intelligent.
+Le package fonctionne via un **pipeline en 5 étapes** qui transforme une requête utilisateur brute en résultats pertinents. Contrairement à une recherche SQL classique, chaque étape ajoute une couche d'intelligence : normalisation des termes, découverte via trigrammes, calcul de score basé sur plusieurs critères, et enfin tri intelligent.
 
 ### 2. Avant / Après : du SQL LIKE à la recherche fuzzy
 

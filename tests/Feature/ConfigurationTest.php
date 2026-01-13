@@ -9,6 +9,7 @@ use Fuzzy\Tests\Fixtures\User;
 use Fuzzy\Tests\Fixtures\Product;
 use Fuzzy\Stages\NormalizeQueryStage;
 use Fuzzy\Stages\MatchDiscoveryStage;
+use Fuzzy\Stages\RelevanceScoringStage;
 use Fuzzy\Stages\ScoringStage;
 use Fuzzy\Stages\SortAndLimitStage;
 use Illuminate\Support\Facades\Config;
@@ -179,13 +180,14 @@ final class ConfigurationTest extends TestCase
             MatchDiscoveryStage::class,
             ScoringStage::class,
             SortAndLimitStage::class,
+            RelevanceScoringStage::class,
         ]);
 
         // Act: Get configured stages
         $stages = config('fuzzy.pipeline.stages');
 
         // Assert: Verify all stages are configured
-        $this->assertCount(4, $stages);
+        $this->assertCount(5, $stages);
         $this->assertContains(NormalizeQueryStage::class, $stages);
         $this->assertContains(MatchDiscoveryStage::class, $stages);
     }

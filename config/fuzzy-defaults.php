@@ -4,35 +4,41 @@ declare(strict_types=1);
 
 use Fuzzy\Stages\NormalizeQueryStage;
 use Fuzzy\Stages\MatchDiscoveryStage;
+use Fuzzy\Stages\RelevanceScoringStage;
 use Fuzzy\Stages\ScoringStage;
 use Fuzzy\Stages\SortAndLimitStage;
 
 return [
-    /**
-     * Fuzzy search pipeline configuration
-     *
-     * Defines the processing pipeline for search queries.
-     * The order of stages is critical for proper operation.
-     *
-     * @var array<string, mixed>
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | Search Pipeline Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Defines the processing pipeline for search queries.
+    | The order of stages is critical for proper operation.
+    |
+    */
+
     'pipeline' => [
         'stages' => [
             NormalizeQueryStage::class,
             MatchDiscoveryStage::class,
             ScoringStage::class,
             SortAndLimitStage::class,
+            RelevanceScoringStage::class,
         ],
     ],
 
-    /**
-     * Stop words to ignore during indexing and searching
-     *
-     * This list can be extended via configuration but existing words
-     * cannot be removed to ensure consistency.
-     *
-     * @var array<int, string>
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | Stop Words Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Words to ignore during indexing and searching.
+    | You may add custom stop words, but core stop words are always included.
+    |
+    */
+
     'stop_words' => [
         'the',
         'and',
@@ -96,11 +102,15 @@ return [
         'now',
     ],
 
-    /**
-     * Cache configuration for performance optimization
-     *
-     * @var array<string, mixed>
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | Cache Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Control caching behavior for improved search performance.
+    |
+    */
+
     'cache' => [
         'enabled' => env('FUZZY_SEARCH_CACHE_ENABLED', true),
         'prefix' => 'fuzzy_search:',
@@ -117,13 +127,15 @@ return [
         ],
     ],
 
-    /**
-     * Auto-discovery configuration for model detection
-     *
-     * Automatically discovers searchable models in specified directories.
-     *
-     * @var array<string, mixed>
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | Auto-Discovery Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Automatically discover searchable models in specified directories.
+    |
+    */
+
     'auto_discovery' => [
         'enabled' => true,
         'directories' => [
@@ -137,11 +149,15 @@ return [
         ],
     ],
 
-    /**
-     * Default search options applied when not explicitly specified
-     *
-     * @var array<string, mixed>
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | Default Search Options
+    |--------------------------------------------------------------------------
+    |
+    | Fallback search options used when not explicitly provided.
+    |
+    */
+
     'default_options' => [
         'min_score' => 0.1,
         'max_results' => 20,
@@ -149,13 +165,15 @@ return [
         'threshold' => 0.3,
     ],
 
-    /**
-     * Indexing configuration
-     *
-     * Controls how content is indexed for searching.
-     *
-     * @var array<string, mixed>
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | Indexing Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Control how content is indexed for searching.
+    |
+    */
+
     'index' => [
         'min_word_length' => 2,
         'max_word_length' => 50,
@@ -164,13 +182,15 @@ return [
         'queue_name' => env('FUZZY_SEARCH_QUEUE_NAME', 'default'),
     ],
 
-    /**
-     * Similarity algorithm configuration
-     *
-     * Defines thresholds and weights for different similarity algorithms.
-     *
-     * @var array<string, mixed>
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | Similarity Algorithm Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Define thresholds and weights for different similarity algorithms.
+    |
+    */
+
     'similarity' => [
         'min_query_length' => 2,
         'min_similarity_threshold' => 0.1,
@@ -182,14 +202,37 @@ return [
         ],
     ],
 
-    /**
-     * Scoring configuration for result ranking
-     *
-     * Controls how search results are scored and ranked.
-     * Field weights are partially customizable.
-     *
-     * @var array<string, mixed>
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | Word Similarity Algorithm Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Fine-tune parameters for word similarity calculations.
+    |
+    */
+
+    'algorithms' => [
+        'word_similarity' => [
+            'unmatched_letter_penalty' => 0.2,
+            'max_score_cap' => 10.0,
+            'word_penalty_per_char' => 0.05,
+            'length_penalty_multiplier' => 0.05,
+            'minimal_penalty' => 0.1,
+            'match_fuzziness_penalty' => 0.05,
+            'min_word_match_ratio' => 0.7,
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Scoring Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Control how search results are scored and ranked.
+    | Field weights are partially customizable.
+    |
+    */
+
     'scoring' => [
         'field_weights' => [
             'name' => 1.3,

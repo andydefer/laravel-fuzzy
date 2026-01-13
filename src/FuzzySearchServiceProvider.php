@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Fuzzy;
 
+use Fuzzy\Services\Algorithms\WordSimilarityComparator;
 use Fuzzy\Services\Scoring\ScoringStrategies\ExactMatchStrategy;
 use Fuzzy\Services\Scoring\ScoringStrategies\WordMatchStrategy;
 use Fuzzy\Services\Scoring\ScoringStrategies\FuzzyMatchStrategy;
@@ -23,30 +24,35 @@ use Fuzzy\Contracts\IndexRepositoryInterface;
 use Illuminate\Pipeline\Pipeline;
 use Illuminate\Support\ServiceProvider;
 
+/**
+ * Service provider for the Fuzzy Search package.
+ *
+ * Registers all core services, repositories, algorithms, and scoring systems
+ * with appropriate bindings and configurations for dependency injection.
+ */
 class FuzzySearchServiceProvider extends ServiceProvider
 {
     /**
-     * Register services in the container
+     * Register services in the container.
      *
-     * Sets up all core services, repositories, and scoring systems
-     * with their appropriate bindings and aliases
+     * @return void
      */
     public function register(): void
     {
-        $this->mergeDefaultConfig();
+        $this->mergeConfiguration();
         $this->registerCoreServices();
         $this->registerRepository();
         $this->registerSearchService();
         $this->registerScoringSystem();
+        $this->registerAlgorithms();
     }
 
     /**
-     * Merge default configuration with user configuration
+     * Merge default configuration with user configuration.
      *
-     * Loads protected defaults and merges them intelligently
-     * with user-defined configuration while preserving critical values
+     * @return void
      */
-    private function mergeDefaultConfig(): void
+    private function mergeConfiguration(): void
     {
         $defaultConfig = require __DIR__ . '/../config/fuzzy-defaults.php';
         $userConfig = $this->app['config']->get('fuzzy', []);
@@ -57,13 +63,10 @@ class FuzzySearchServiceProvider extends ServiceProvider
     }
 
     /**
-     * Intelligently merge default and user configurations
+     * Intelligently merge default and user configurations.
      *
-     * Applies specific merging rules for different configuration sections
-     * to protect critical values while allowing customization
-     *
-     * @param array<string, mixed> $defaults Protected default configuration
-     * @param array<string, mixed> $userConfig User-defined configuration
+     * @param array<string, mixed> $defaults Default configuration
+     * @param array<string, mixed> $userConfig User configuration
      * @return array<string, mixed> Merged configuration
      */
     private function mergeConfigurations(array $defaults, array $userConfig): array
@@ -79,9 +82,10 @@ class FuzzySearchServiceProvider extends ServiceProvider
             $userValue = $userConfig[$key];
 
             $merged[$key] = match ($key) {
-                'pipeline' => $defaultValue, // Non-modifiable pipeline
+                'pipeline' => $defaultValue,
                 'stop_words' => $this->mergeStopWords($defaultValue, $userValue),
                 'scoring' => $this->mergeScoringConfig($defaultValue, $userValue),
+                'algorithms' => $this->mergeAlgorithmsConfig($defaultValue, $userValue),
                 default => $this->mergeGenericConfig($defaultValue, $userValue),
             };
         }
@@ -90,7 +94,47 @@ class FuzzySearchServiceProvider extends ServiceProvider
     }
 
     /**
-     * Merge stop words arrays while preserving defaults
+     * Merge algorithms configuration.
+     *
+     * @param array<string, mixed> $defaults Default algorithms configuration
+     * @param array<string, mixed> $userConfig User algorithms configuration
+     * @return array<string, mixed> Merged algorithms configuration
+     */
+    private function mergeAlgorithmsConfig(array $defaults, array $userConfig): array
+    {
+        $merged = [];
+
+        foreach ($defaults as $key => $defaultValue) {
+            if (!isset($userConfig[$key])) {
+                $merged[$key] = $defaultValue;
+                continue;
+            }
+
+            $userValue = $userConfig[$key];
+
+            $merged[$key] = match ($key) {
+                'word_similarity' => $this->mergeWordSimilarityConfig($defaultValue, $userValue),
+                default => $this->mergeGenericConfig($defaultValue, $userValue),
+            };
+        }
+
+        return $merged;
+    }
+
+    /**
+     * Merge WordSimilarityComparator configuration.
+     *
+     * @param array<string, mixed> $defaults Default configuration
+     * @param array<string, mixed> $userConfig User configuration
+     * @return array<string, mixed> Merged configuration
+     */
+    private function mergeWordSimilarityConfig(array $defaults, array $userConfig): array
+    {
+        return array_merge($defaults, $userConfig);
+    }
+
+    /**
+     * Merge stop words arrays.
      *
      * @param array<int, string> $defaultStopWords Default stop words
      * @param mixed $userStopWords User-defined stop words
@@ -106,7 +150,7 @@ class FuzzySearchServiceProvider extends ServiceProvider
     }
 
     /**
-     * Merge scoring configuration with protected sections
+     * Merge scoring configuration.
      *
      * @param array<string, mixed> $defaults Default scoring configuration
      * @param array<string, mixed> $userConfig User scoring configuration
@@ -125,7 +169,7 @@ class FuzzySearchServiceProvider extends ServiceProvider
             $userValue = $userConfig[$key];
 
             $merged[$key] = match ($key) {
-                'consecutive_bonus' => $defaultValue, // Protected critical values
+                'consecutive_bonus' => $defaultValue,
                 default => $this->mergeGenericConfig($defaultValue, $userValue),
             };
         }
@@ -134,10 +178,10 @@ class FuzzySearchServiceProvider extends ServiceProvider
     }
 
     /**
-     * Generic configuration merging for standard sections
+     * Merge generic configuration values.
      *
-     * @param mixed $defaultValue Default configuration value
-     * @param mixed $userValue User configuration value
+     * @param mixed $defaultValue Default value
+     * @param mixed $userValue User value
      * @return mixed Merged value
      */
     private function mergeGenericConfig(mixed $defaultValue, mixed $userValue): mixed
@@ -150,50 +194,77 @@ class FuzzySearchServiceProvider extends ServiceProvider
     }
 
     /**
-     * Register core utility services
+     * Register core utility services.
+     *
+     * @return void
      */
     private function registerCoreServices(): void
     {
-        $this->app->singleton(
-            'laravel-fuzzy.normalizer',
-            fn($app): StringNormalizer => new StringNormalizer()
-        );
+        $this->app->singleton('laravel-fuzzy.normalizer', function ($app): StringNormalizer {
+            return new StringNormalizer();
+        });
 
-        $this->app->singleton(
-            'laravel-fuzzy.similarity',
-            fn($app): SimilarityCalculator => new SimilarityCalculator()
-        );
+        $this->app->singleton('laravel-fuzzy.similarity', function ($app): SimilarityCalculator {
+            return new SimilarityCalculator();
+        });
 
-        $this->app->singleton(
-            'laravel-fuzzy.index-builder',
-            fn($app): IndexBuilder => new IndexBuilder(
+        $this->app->singleton('laravel-fuzzy.index-builder', function ($app): IndexBuilder {
+            return new IndexBuilder(
                 normalizer: $app->make('laravel-fuzzy.normalizer')
-            )
-        );
+            );
+        });
 
-        $this->app->singleton(
-            AdvancedScoringCalculator::class,
-            fn($app): AdvancedScoringCalculator => new AdvancedScoringCalculator()
-        );
+        $this->app->singleton(AdvancedScoringCalculator::class, function ($app): AdvancedScoringCalculator {
+            return new AdvancedScoringCalculator();
+        });
 
         $this->app->alias(AdvancedScoringCalculator::class, 'laravel-fuzzy.advanced-scoring');
     }
 
     /**
-     * Register the index repository with its interface
+     * Register algorithm services.
+     *
+     * @return void
+     */
+    private function registerAlgorithms(): void
+    {
+        $this->app->singleton(WordSimilarityComparator::class, function ($app): WordSimilarityComparator {
+            $config = $app['config']->get('fuzzy.algorithms.word_similarity', []);
+
+            return new WordSimilarityComparator(
+                normalizer: $app->make('laravel-fuzzy.normalizer'),
+                unmatchedLetterPenalty: $config['unmatched_letter_penalty'] ?? 0.2,
+                maxScoreCap: $config['max_score_cap'] ?? 10.0,
+                wordPenaltyPerChar: $config['word_penalty_per_char'] ?? 0.05,
+                lengthPenaltyMultiplier: $config['length_penalty_multiplier'] ?? 0.05,
+                minimalPenalty: $config['minimal_penalty'] ?? 0.1,
+                matchFuzzinessPenalty: $config['match_fuzziness_penalty'] ?? 0.05,
+                minWordMatchRatio: $config['min_word_match_ratio'] ?? 0.7
+            );
+        });
+
+        $this->app->alias(WordSimilarityComparator::class, 'laravel-fuzzy.word-similarity');
+        $this->app->bind('laravel-fuzzy.algorithms.word-similarity', WordSimilarityComparator::class);
+    }
+
+    /**
+     * Register the index repository.
+     *
+     * @return void
      */
     private function registerRepository(): void
     {
-        $this->app->singleton(
-            IndexRepositoryInterface::class,
-            fn($app): IndexRepository => new IndexRepository()
-        );
+        $this->app->singleton(IndexRepositoryInterface::class, function ($app): IndexRepository {
+            return new IndexRepository();
+        });
 
         $this->app->alias(IndexRepositoryInterface::class, 'laravel-fuzzy.repository');
     }
 
     /**
-     * Register the main fuzzy search service
+     * Register the fuzzy search service.
+     *
+     * @return void
      */
     private function registerSearchService(): void
     {
@@ -212,7 +283,9 @@ class FuzzySearchServiceProvider extends ServiceProvider
     }
 
     /**
-     * Register the scoring engine with its strategies
+     * Register the scoring engine.
+     *
+     * @return void
      */
     private function registerScoringSystem(): void
     {
@@ -231,7 +304,9 @@ class FuzzySearchServiceProvider extends ServiceProvider
     }
 
     /**
-     * Bootstrap package services and resources
+     * Bootstrap package services and resources.
+     *
+     * @return void
      */
     public function boot(): void
     {
@@ -244,7 +319,9 @@ class FuzzySearchServiceProvider extends ServiceProvider
     }
 
     /**
-     * Publish package resources for customization
+     * Publish package resources for customization.
+     *
+     * @return void
      */
     private function publishResources(): void
     {
@@ -258,7 +335,9 @@ class FuzzySearchServiceProvider extends ServiceProvider
     }
 
     /**
-     * Register console commands
+     * Register console commands.
+     *
+     * @return void
      */
     private function registerCommands(): void
     {
@@ -271,9 +350,9 @@ class FuzzySearchServiceProvider extends ServiceProvider
     }
 
     /**
-     * Get the services provided by the provider
+     * Get the services provided by the provider.
      *
-     * @return array<int, string> List of service identifiers
+     * @return array<int, string> Service identifiers
      */
     public function provides(): array
     {
@@ -284,9 +363,12 @@ class FuzzySearchServiceProvider extends ServiceProvider
             'laravel-fuzzy.index-builder',
             'laravel-fuzzy.advanced-scoring',
             'laravel-fuzzy.scoring',
+            'laravel-fuzzy.word-similarity',
+            'laravel-fuzzy.algorithms.word-similarity',
             IndexRepositoryInterface::class,
             ScoringEngine::class,
             AdvancedScoringCalculator::class,
+            WordSimilarityComparator::class,
         ];
     }
 }

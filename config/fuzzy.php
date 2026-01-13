@@ -3,41 +3,29 @@
 declare(strict_types=1);
 
 return [
-    /**
-     * Fuzzy search package configuration for Laravel applications
-     *
-     * This file allows configuration of fuzzy search behavior.
-     * Some sections are protected to ensure proper operation.
-     *
-     * @var array<string, mixed>
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | Stop Words Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Words to ignore during indexing and searching.
+    | You may add custom stop words, but core stop words are always included.
+    |
+    */
 
-    /**
-     * Stop words to ignore during indexing and searching
-     *
-     * You can add words to this list but cannot remove existing ones.
-     * The base words are always present for consistency.
-     *
-     * Example usage:
-     * // Add your custom stop words here
-     * // 'your_word',
-     * // 'another_word',
-     *
-     * @var array<int, string>
-     */
     'stop_words' => [
-        // Add your custom stop words here
-        // 'your_word',
-        // 'another_word',
+        // Add custom stop words here
     ],
 
-    /**
-     * Cache configuration for performance optimization
-     *
-     * Controls caching behavior to improve search performance.
-     *
-     * @var array<string, mixed>
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | Cache Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Control caching behavior for improved search performance.
+    |
+    */
+
     'cache' => [
         'enabled' => env('FUZZY_SEARCH_CACHE_ENABLED', true),
         'prefix' => 'fuzzy_search:',
@@ -54,13 +42,15 @@ return [
         ],
     ],
 
-    /**
-     * Auto-discovery configuration for model detection
-     *
-     * Automatically discovers searchable models in specified directories.
-     *
-     * @var array<string, mixed>
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | Auto-Discovery Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Automatically discover searchable models in specified directories.
+    |
+    */
+
     'auto_discovery' => [
         'enabled' => true,
         'directories' => [
@@ -74,27 +64,31 @@ return [
         ],
     ],
 
-    /**
-     * Default search options applied when not explicitly specified
-     *
-     * These settings are used as fallback when search options are not provided.
-     *
-     * @var array<string, mixed>
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | Default Search Options
+    |--------------------------------------------------------------------------
+    |
+    | Fallback search options used when not explicitly provided.
+    |
+    */
+
     'default_options' => [
         'min_score' => 0.1,
         'max_results' => 20,
         'fuzzy' => true,
-        'threshold' => 0.3,
+        'threshold' => 0.1,
     ],
 
-    /**
-     * Indexing configuration
-     *
-     * Controls how content is indexed for searching.
-     *
-     * @var array<string, mixed>
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | Indexing Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Control how content is indexed for searching.
+    |
+    */
+
     'index' => [
         'min_word_length' => 2,
         'max_word_length' => 50,
@@ -103,13 +97,15 @@ return [
         'queue_name' => env('FUZZY_SEARCH_QUEUE_NAME', 'default'),
     ],
 
-    /**
-     * Similarity algorithm configuration
-     *
-     * Defines thresholds and weights for different similarity algorithms.
-     *
-     * @var array<string, mixed>
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | Similarity Algorithm Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Define thresholds and weights for different similarity algorithms.
+    |
+    */
+
     'similarity' => [
         'min_query_length' => 2,
         'min_similarity_threshold' => 0.1,
@@ -121,22 +117,17 @@ return [
         ],
     ],
 
-    /**
-     * Scoring configuration for result ranking
-     *
-     * Partially customizable scoring system for search results.
-     * Note: The 'consecutive_bonus' section cannot be modified.
-     *
-     * @var array<string, mixed>
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | Scoring Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Partially customizable scoring system for search result ranking.
+    | The 'consecutive_bonus' section cannot be modified.
+    |
+    */
+
     'scoring' => [
-        /**
-         * Field weights for scoring (customizable)
-         *
-         * You can add or modify field weights to prioritize specific fields.
-         *
-         * @var array<string, float>
-         */
         'field_weights' => [
             'name' => 1.3,
             'title' => 1.2,
@@ -146,42 +137,21 @@ return [
             'default' => 0.6,
         ],
 
-        /**
-         * Penalty configuration (customizable)
-         *
-         * You can adjust penalty values for specific scenarios.
-         *
-         * @var array<string, float>
-         */
         'penalties' => [
-            'short_query' => 0.4,
-            'cross_word_match_multi' => 0.3,
+            'short_query' => 0.5,
+            'cross_word_match_multi' => 0.7,
         ],
 
-        /**
-         * Bonus configuration (customizable)
-         *
-         * You can adjust bonus values for specific match qualities.
-         *
-         * @var array<string, float>
-         */
         'bonuses' => [
             'full_coverage' => 0.3,
             'high_coverage' => 0.15,
             'early_position' => 0.2,
         ],
 
-        /**
-         * Consecutive match bonus (NON-MODIFIABLE)
-         *
-         * WARNING: This section cannot be modified to ensure consistent scoring.
-         *
-         * @var array<int, float>
-         */
         'consecutive_bonus' => [
             2 => 1.05,
-            3 => 1.15,
-            4 => 1.30,
+            3 => 1.10,
+            4 => 1.35,
             5 => 1.50,
         ],
     ],

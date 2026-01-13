@@ -13,6 +13,7 @@ use Fuzzy\SearchContext;
 use Fuzzy\Services\Scoring\ScoringEngine;
 use Fuzzy\Stages\MatchDiscoveryStage;
 use Fuzzy\Stages\NormalizeQueryStage;
+use Fuzzy\Stages\RelevanceScoringStage;
 use Fuzzy\Stages\ScoringStage;
 use Fuzzy\Stages\SortAndLimitStage;
 use Fuzzy\ValueObjects\SearchQuery;
@@ -606,6 +607,7 @@ class FuzzySearchService
             MatchDiscoveryStage::class,
             ScoringStage::class,
             SortAndLimitStage::class,
+            RelevanceScoringStage::class,
         ]);
     }
 
