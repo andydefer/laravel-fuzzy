@@ -1,5 +1,5 @@
 # Pint Formatting Test Report
-*Generated: mar. 13 janv. 2026 23:14:00 WAT*
+*Generated: mar. 13 janv. 2026 23:34:40 WAT*
 
 
   ⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯.⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯.⨯.⨯⨯⨯.⨯⨯
@@ -45,7 +45,7 @@
   ⨯ src/Services/StringNormalizer.php                                                                            function_declaration, not_operator_with_successor_space, phpdoc_align  
   ⨯ src/Stages/MatchDiscoveryStage.php class_attributes_separation, function_declaration, increment_style, concat_space, not_operator_with_successor_space, blank_line_before_stateme…  
   ⨯ src/Stages/NormalizeQueryStage.php                                                                          new_with_parentheses, phpdoc_separation, ordered_imports, phpdoc_align  
-  ⨯ src/Stages/RelevanceScoringStage.php                                                            braces_position, single_line_empty_body, blank_line_before_statement, phpdoc_align  
+  ⨯ src/Stages/RelevanceScoringStage.php                                      braces_position, single_line_empty_body, no_extra_blank_lines, blank_line_before_statement, phpdoc_align  
   ⨯ src/Stages/ScoringStage.php                                                                                                                          ordered_imports, phpdoc_align  
   ⨯ src/Stages/SortAndLimitStage.php                                                                                                                function_declaration, phpdoc_align  
   ⨯ src/Traits/FuzzySearchable.php                                                                                                                                        phpdoc_align  
@@ -54,7 +54,7 @@
   ⨯ tests/Feature/ArtisanCommandsTest.php                                                                                 increment_style, single_quote, concat_space, ordered_imports  
   ⨯ tests/Feature/CommandsTest.php                              function_declaration, increment_style, single_quote, concat_space, php_unit_method_casing, trailing_comma_in_multiline  
   ⨯ tests/Feature/ConfigurationTest.php                                                                                     concat_space, trailing_comma_in_multiline, ordered_imports  
-  ⨯ tests/Feature/FacadeTest.php                                                                                                                         concat_space, ordered_imports  
+  ⨯ tests/Feature/FacadeTest.php                                                                                                   concat_space, no_extra_blank_lines, ordered_imports  
   ⨯ tests/Feature/IntegrationTest.php                                        increment_style, no_superfluous_phpdoc_tags, concat_space, braces_position, ordered_imports, phpdoc_align  
   ⨯ tests/Feature/MonitoringTest.php                                                                                                    increment_style, concat_space, ordered_imports  
   ⨯ tests/Feature/ShouldBeIndexedTest.php                                                             class_attributes_separation, new_with_parentheses, concat_space, braces_position  

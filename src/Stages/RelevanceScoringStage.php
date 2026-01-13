@@ -46,6 +46,7 @@ class RelevanceScoringStage
 
         $context->results = $limitedResults;
 
+
         return $context->results;
     }
 

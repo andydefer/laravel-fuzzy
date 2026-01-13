@@ -105,6 +105,24 @@ final class FacadeTest extends TestCase
         $this->assertNotNull($johnResult, 'Should find John in search results');
     }
 
+    public function test_search_with_fuzzy_matching(): void
+    {
+        // Test avec une faute d'orthographe
+        $results = FuzzySearch::search('johndoe');
+
+        $this->assertInstanceOf(Collection::class, $results);
+
+        if ($results->isNotEmpty()) {
+            $firstResult = $results->first();
+            $this->assertNotNull($firstResult->relevance, 'Relevance should not be null');
+            $this->assertIsFloat($firstResult->relevance, 'Relevance should be a float');
+
+            // Le relevance devrait être > 0 (pas parfaitement identique)
+            // "John Doe" vs "johndoe" (sans espace)
+            $this->assertGreaterThan(0, $firstResult->relevance);
+        }
+    }
+
     /**
      * Test search limited to a specific model class.
      */
@@ -117,6 +135,7 @@ final class FacadeTest extends TestCase
         // Act: Search only in User model for "john"
         /** @var Collection<int, SearchResultData> $results */
         $results = FuzzySearch::searchInModel($targetModel, $searchTerm);
+
 
         // Assert: Verify only users are returned
         $this->assertInstanceOf(Collection::class, $results);
