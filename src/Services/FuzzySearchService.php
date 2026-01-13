@@ -633,7 +633,7 @@ class FuzzySearchService
      */
     private function isCacheEnabled(): bool
     {
-        return config('fuzzy.cache.enabled', true);
+        return (bool) config('fuzzy.cache.enabled', true);
     }
 
     /**
