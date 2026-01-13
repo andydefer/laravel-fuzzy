@@ -54,10 +54,11 @@ final class FuzzySearchServiceTest extends TestCase
      */
     private function createTestData(): void
     {
+        // Create indexable users (type = 'user')
         User::create([
             'name' => 'John Doe',
             'email' => 'john@example.com',
-            'type' => 'admin',
+            'type' => 'user',
         ]);
 
         User::create([
@@ -110,12 +111,12 @@ final class FuzzySearchServiceTest extends TestCase
         $results = $this->service->search('John Doe');
 
         // Assert: Should find John Doe with high score
-        $this->assertGreaterThan(0, $results->count());
+        $this->assertGreaterThan(0, $results->count(), 'Search should find results for "John Doe"');
 
         $johnDoeResult = $this->findResultByName($results, 'John Doe');
-        $this->assertInstanceOf(SearchResultData::class, $johnDoeResult);
+        $this->assertInstanceOf(SearchResultData::class, $johnDoeResult, 'Should find SearchResultData for John Doe');
         $this->assertEquals('John Doe', $johnDoeResult->item->name);
-        $this->assertGreaterThan(0.8, $johnDoeResult->score);
+        $this->assertGreaterThan(0.8, $johnDoeResult->score, 'Exact match should have high score');
     }
 
     /**
@@ -129,7 +130,7 @@ final class FuzzySearchServiceTest extends TestCase
         $results = $this->service->search('jon do', ['fuzzy' => true]);
 
         // Assert: Should find results despite typos
-        $this->assertGreaterThan(0, $results->count());
+        $this->assertGreaterThan(0, $results->count(), 'Fuzzy search should find "John Doe" with query "jon do"');
     }
 
     /**
@@ -143,9 +144,11 @@ final class FuzzySearchServiceTest extends TestCase
         $results = $this->service->searchInModel(User::class, 'john');
 
         // Assert: Should find John Doe as a User
+        $this->assertGreaterThan(0, $results->count(), 'Search in User model should find results');
+
         $johnDoeResult = $this->findResultByName($results, 'John Doe');
-        $this->assertInstanceOf(SearchResultData::class, $johnDoeResult);
-        $this->assertInstanceOf(UserSearchData::class, $johnDoeResult->item);
+        $this->assertInstanceOf(SearchResultData::class, $johnDoeResult, 'Should find SearchResultData for John Doe');
+        $this->assertInstanceOf(UserSearchData::class, $johnDoeResult->item, 'Should use UserSearchData formatter');
     }
 
     /**
@@ -206,7 +209,8 @@ final class FuzzySearchServiceTest extends TestCase
     public function test_remove_model_from_index(): void
     {
         // Arrange: Get existing user
-        $user = User::first();
+        $user = User::where('name', 'John Doe')->first();
+        $this->assertNotNull($user, 'John Doe should exist');
 
         // Act: Remove user from index
         $this->service->removeModelFromIndex($user);
@@ -214,10 +218,10 @@ final class FuzzySearchServiceTest extends TestCase
         // Assert: User should not be found in search
         $results = $this->service->search('john');
         $johnDoeFound = $results->contains(function ($result): bool {
-            return $result->item->name === 'John Doe';
+            return isset($result->item->name) && $result->item->name === 'John Doe';
         });
 
-        $this->assertFalse($johnDoeFound);
+        $this->assertFalse($johnDoeFound, 'John Doe should not be found after removal from index');
     }
 
     /**
@@ -504,7 +508,7 @@ final class FuzzySearchServiceTest extends TestCase
     private function findResultByName(Collection $results, string $name): ?SearchResultData
     {
         return $results->first(function ($result) use ($name): bool {
-            return $result->item->name === $name;
+            return isset($result->item->name) && $result->item->name === $name;
         });
     }
 }

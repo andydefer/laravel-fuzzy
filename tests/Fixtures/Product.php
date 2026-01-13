@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Fuzzy\Tests\Fixtures;
 
-use Illuminate\Database\Eloquent\Model;
 use Fuzzy\Contracts\MustFuzzySearch;
 use Fuzzy\Traits\FuzzySearchable;
+use Illuminate\Database\Eloquent\Model;
 
 /**
  * Test fixture representing a Product model with fuzzy search capabilities.
@@ -30,4 +30,24 @@ class Product extends Model implements MustFuzzySearch
      * @var array<string>
      */
     public array $searchableFields = ['name', 'description'];
+
+    /**
+     * Get the searchable fields for the model.
+     *
+     * @return array<string>
+     */
+    public function getSearchableFields(): array
+    {
+        return $this->searchableFields;
+    }
+
+    /**
+     * Determine if the model should be indexed for search.
+     *
+     * @return bool
+     */
+    public function shouldBeIndexed(): bool
+    {
+        return true;
+    }
 }

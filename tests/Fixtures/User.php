@@ -36,6 +36,16 @@ class User extends Model implements MustFuzzySearch
      * Custom formatter class for search data.
      */
     public ?string $fuzzyFormat = UserSearchData::class;
+
+    /**
+     * Determine if the model should be indexed for search.
+     *
+     * @return bool
+     */
+    public function shouldBeIndexed(): bool
+    {
+        return $this->type === 'user';
+    }
 }
 
 /**

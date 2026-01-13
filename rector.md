@@ -1,13 +1,116 @@
 # Rector Refactoring Report
-*Generated: lun. 12 janv. 2026 17:15:32 WAT*
+*Generated: mar. 13 janv. 2026 01:25:02 WAT*
 
 
-24 files with changes
+29 files with changes
 =====================
 
-1) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Feature/ShouldBeIndexedTest.php:55
+1) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Feature/IntegrationTest.php:130
 
     ---------- begin diff ----------
+@@ @@
+         // Act: Update model and reindex
+         $user1->name = 'Jonathan Smith';
+         $user1->save();
++
+         $searchService->updateModelIndex($user1);
+
+         // Assert: Verify updated data is searchable
+@@ @@
+         // Act: Change user to active and reindex
+         $user->type = 'active';
+         $user->save();
++
+         $searchService->indexModel($user);
+
+         // Assert: Verify active user was indexed
+@@ @@
+      * Check if collection contains result with specific name.
+      *
+      * @param Collection<array-key, mixed> $results
+-     * @param string $searchName
+-     * @return bool
+      */
+     private function containsResultWithName(Collection $results, string $searchName): bool
+     {
+    ----------- end diff -----------
+
+Applied rules:
+ * NewlineBeforeNewAssignSetRector
+ * RemoveUselessParamTagRector
+ * RemoveUselessReturnTagRector
+
+
+2) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Feature/ShouldBeIndexedTest.php:4
+
+    ---------- begin diff ----------
+@@ @@
+
+ namespace Fuzzy\Tests\Feature;
+
++use DateTimeInterface;
+ use Fuzzy\Contracts\MustFuzzySearch;
+ use Fuzzy\Models\FuzzyIndex;
+ use Fuzzy\Tests\Fixtures\User;
+@@ @@
+         $searchService->indexModel($product);
+
+         $inactiveEntry = $this->getProductEntry($product);
+-        $this->assertNull($inactiveEntry);
++        $this->assertNotInstanceOf(FuzzyIndex::class, $inactiveEntry);
+
+         // Test 2: Active product without stock
+         FuzzyIndex::query()->truncate();
+@@ @@
+         $searchService->indexModel($product);
+
+         $outOfStockEntry = $this->getProductEntry($product);
+-        $this->assertNull($outOfStockEntry);
++        $this->assertNotInstanceOf(FuzzyIndex::class, $outOfStockEntry);
+
+         // Test 3: Active product with stock
+         FuzzyIndex::query()->truncate();
+@@ @@
+         $searchService->indexModel($product);
+
+         $availableEntry = $this->getProductEntry($product);
+-        $this->assertNotNull($availableEntry);
++        $this->assertInstanceOf(FuzzyIndex::class, $availableEntry);
+     }
+
+     /**
+@@ @@
+         $searchService->indexModel($article);
+
+         $draftEntry = $this->getArticleEntry($article);
+-        $this->assertNull($draftEntry);
++        $this->assertNotInstanceOf(FuzzyIndex::class, $draftEntry);
+
+         // Test 2: Published article with future date
+         FuzzyIndex::query()->truncate();
+@@ @@
+         $searchService->indexModel($article);
+
+         $futureEntry = $this->getArticleEntry($article);
+-        $this->assertNull($futureEntry);
++        $this->assertNotInstanceOf(FuzzyIndex::class, $futureEntry);
+
+         // Test 3: Published article with past date
+         FuzzyIndex::query()->truncate();
+@@ @@
+         $searchService->indexModel($article);
+
+         $publishedEntry = $this->getArticleEntry($article);
+-        $this->assertNotNull($publishedEntry);
++        $this->assertInstanceOf(FuzzyIndex::class, $publishedEntry);
+     }
+
+     /**
+      * Create a user instance with given attributes.
++     * @param array<string, string>|array<string, int> $attributes
+      */
+     private function createUser(array $attributes): User
+     {
 @@ @@
              use FuzzySearchable;
 
@@ -33,30 +136,6 @@
 
              /**
 @@ @@
-         // Test 1: Inactive product with stock
-         $product->is_active = false;
-         $product->stock = 10;
-+
-         $searchService->indexModel($product);
-
-         $inactiveEntry = FuzzyIndex::where('indexable_type', get_class($product))
-@@ @@
-         FuzzyIndex::query()->truncate();
-         $product->is_active = true;
-         $product->stock = 0;
-+
-         $searchService->indexModel($product);
-
-         $outOfStockEntry = FuzzyIndex::where('indexable_type', get_class($product))
-@@ @@
-         FuzzyIndex::query()->truncate();
-         $product->is_active = true;
-         $product->stock = 5;
-+
-         $searchService->indexModel($product);
-
-         $availableEntry = FuzzyIndex::where('indexable_type', get_class($product))
-@@ @@
              use FuzzySearchable;
 
              protected $table = 'products';
@@ -73,37 +152,183 @@
 
              /**
 @@ @@
-         // Test 1: Draft article with future date
-         $article->status = 'draft';
-         $article->published_at = now()->addDay();
-+
-         $searchService->indexModel($article);
-
-         $draftEntry = FuzzyIndex::where('indexable_type', get_class($article))
-@@ @@
-         FuzzyIndex::query()->truncate();
-         $article->status = 'published';
-         $article->published_at = now()->addDay();
-+
-         $searchService->indexModel($article);
-
-         $futureEntry = FuzzyIndex::where('indexable_type', get_class($article))
-@@ @@
-         FuzzyIndex::query()->truncate();
-         $article->status = 'published';
-         $article->published_at = now()->subDay();
-+
-         $searchService->indexModel($article);
-
-         $publishedEntry = FuzzyIndex::where('indexable_type', get_class($article))
+     /**
+      * Set article state for testing.
+      */
+-    private function setArticleState(Model $article, string $status, \DateTimeInterface $publishedAt): void
++    private function setArticleState(Model $article, string $status, DateTimeInterface $publishedAt): void
+     {
+         $article->status = $status;
+         $article->published_at = $publishedAt;
     ----------- end diff -----------
 
 Applied rules:
  * NewlineBetweenClassLikeStmtsRector
- * NewlineBeforeNewAssignSetRector
+ * AssertEmptyNullableObjectToAssertInstanceofRector
+ * ClassMethodArrayDocblockParamFromLocalCallsRector
 
 
-2) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Models/FuzzyIndexTest.php:350
+3) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Fixtures/Product.php:43
+
+    ---------- begin diff ----------
+@@ @@
+
+     /**
+      * Determine if the model should be indexed for search.
+-     *
+-     * @return bool
+      */
+     public function shouldBeIndexed(): bool
+     {
+    ----------- end diff -----------
+
+Applied rules:
+ * RemoveUselessReturnTagRector
+
+
+4) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Fixtures/User.php:39
+
+    ---------- begin diff ----------
+@@ @@
+
+     /**
+      * Determine if the model should be indexed for search.
+-     *
+-     * @return bool
+      */
+     public function shouldBeIndexed(): bool
+     {
+    ----------- end diff -----------
+
+Applied rules:
+ * RemoveUselessReturnTagRector
+
+
+5) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/CacheTest.php:4
+
+    ---------- begin diff ----------
+@@ @@
+
+ namespace Fuzzy\Tests\Unit;
+
++use PHPUnit\Framework\Attributes\CoversMethod;
+ use Fuzzy\Models\FuzzyIndex;
+ use Fuzzy\Services\FuzzySearchService;
+ use Fuzzy\Tests\Fixtures\Product;
+@@ @@
+
+ /**
+  * Unit tests for fuzzy search caching functionality.
+- *
+- * @covers \Fuzzy\Services\FuzzySearchService::search
+- * @covers \Fuzzy\Services\FuzzySearchService::searchInModel
+- * @covers \Fuzzy\Services\FuzzySearchService::getStats
+- * @covers \Fuzzy\Services\FuzzySearchService::invalidateCacheForModel
+- * @covers \Fuzzy\Services\FuzzySearchService::invalidateAllCache
+  */
++#[CoversMethod(\Fuzzy\Services\FuzzySearchService::class, 'search')]
++#[CoversMethod(\Fuzzy\Services\FuzzySearchService::class, 'searchInModel')]
++#[CoversMethod(\Fuzzy\Services\FuzzySearchService::class, 'getStats')]
++#[CoversMethod(\Fuzzy\Services\FuzzySearchService::class, 'invalidateCacheForModel')]
++#[CoversMethod(\Fuzzy\Services\FuzzySearchService::class, 'invalidateAllCache')]
+ final class CacheTest extends TestCase
+ {
+     /**
+      * Setup test environment.
+-     *
+-     * @return void
+      */
+     protected function setUp(): void
+     {
+@@ @@
+
+     /**
+      * Create minimal test data and reindex.
+-     *
+-     * @return void
+      */
+     protected function createTestData(): void
+     {
+@@ @@
+
+     /**
+      * Test that search results are properly cached.
+-     *
+-     * @return void
+      */
+     public function test_search_results_are_cached(): void
+     {
+@@ @@
+
+     /**
+      * Test that cache invalidation does not affect other application caches.
+-     *
+-     * @return void
+      */
+     public function test_cache_does_not_flush_entire_application_cache(): void
+     {
+@@ @@
+
+     /**
+      * Test that cache is invalidated after indexing new data.
+-     *
+-     * @return void
+      */
+     public function test_cache_is_invalidated_after_indexing(): void
+     {
+@@ @@
+
+     /**
+      * Test that search works correctly when caching is disabled.
+-     *
+-     * @return void
+      */
+     public function test_cache_disabled_works(): void
+     {
+@@ @@
+
+     /**
+      * Test that stats cache has short TTL and expires correctly.
+-     *
+-     * @return void
+      */
+     public function test_stats_cache_has_short_ttl(): void
+     {
+@@ @@
+
+     /**
+      * Test that model-specific cache invalidation works correctly.
+-     *
+-     * @return void
+      */
+     public function test_model_specific_cache_invalidation(): void
+     {
+@@ @@
+
+     /**
+      * Test that cache can be invalidated for specific models only.
+-     *
+-     * @return void
+      */
+     public function test_invalidate_cache_for_specific_model(): void
+     {
+@@ @@
+
+     /**
+      * Test that cache keys are properly managed and cleaned up.
+-     *
+-     * @return void
+      */
+     public function test_cache_keys_are_properly_managed(): void
+     {
+    ----------- end diff -----------
+
+Applied rules:
+ * RemoveUselessReturnTagRector
+ * CoversAnnotationWithValueToAttributeRector
+
+
+6) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Models/FuzzyIndexTest.php:350
 
     ---------- begin diff ----------
 @@ @@
@@ -120,7 +345,7 @@ Applied rules:
  * RemoveUselessReturnTagRector
 
 
-3) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Repositories/IndexRepositoryTest.php:4
+7) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Repositories/IndexRepositoryTest.php:4
 
     ---------- begin diff ----------
 @@ @@
@@ -280,7 +505,7 @@ Applied rules:
  * ClassMethodArrayDocblockParamFromLocalCallsRector
 
 
-4) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/AdvancedScoringCalculatorTest.php:27
+8) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/AdvancedScoringCalculatorTest.php:27
 
     ---------- begin diff ----------
 @@ @@
@@ -297,7 +522,7 @@ Applied rules:
  * NewlineBetweenClassLikeStmtsRector
 
 
-5) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/IndexBuilderTest.php:4
+9) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/IndexBuilderTest.php:4
 
     ---------- begin diff ----------
 @@ @@
@@ -325,7 +550,7 @@ Applied rules:
  * CoversAnnotationWithValueToAttributeRector
 
 
-6) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/ScoringEngineTest.php:20
+10) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/ScoringEngineTest.php:20
 
     ---------- begin diff ----------
 @@ @@
@@ -351,7 +576,7 @@ Applied rules:
  * DocblockReturnArrayFromDirectArrayInstanceRector
 
 
-7) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Stages/MatchDiscoveryStageTest.php:301
+11) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Stages/MatchDiscoveryStageTest.php:301
 
     ---------- begin diff ----------
 @@ @@
@@ -371,7 +596,7 @@ Applied rules:
  * RemoveUselessParamTagRector
 
 
-8) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Stages/ScoringStageTest.php:17
+12) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Stages/ScoringStageTest.php:17
 
     ---------- begin diff ----------
 @@ @@
@@ -387,7 +612,25 @@ Applied rules:
 Applied rules:
 
 
-9) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Commands/ClearCacheCommand.php:37
+13) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/database/migrations/2024_01_01_000000_create_non_indexable_users_table.php:17
+
+    ---------- begin diff ----------
+@@ @@
+      */
+     public function up(): void
+     {
+-        Schema::create('non_indexable_users', function (Blueprint $table) {
++        Schema::create('non_indexable_users', function (Blueprint $table): void {
+             $table->id();
+             $table->string('name');
+             $table->string('email')->unique();
+    ----------- end diff -----------
+
+Applied rules:
+ * AddClosureVoidReturnTypeWhereNoReturnRector
+
+
+14) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Commands/ClearCacheCommand.php:37
 
     ---------- begin diff ----------
 @@ @@
@@ -446,7 +689,7 @@ Applied rules:
  * RemoveUselessReturnTagRector
 
 
-10) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Commands/ClearIndexCommand.php:36
+15) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Commands/ClearIndexCommand.php:36
 
     ---------- begin diff ----------
 @@ @@
@@ -480,7 +723,7 @@ Applied rules:
  * RemoveUselessReturnTagRector
 
 
-11) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Commands/IndexSearchCommand.php:40
+16) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Commands/IndexSearchCommand.php:40
 
     ---------- begin diff ----------
 @@ @@
@@ -576,15 +819,55 @@ Applied rules:
       */
      private function displayModelIndexingStatistics(string $modelClass, FuzzySearchService $searchService): void
      {
+         $stats = $this->calculatePreciseModelStatistics($modelClass, $searchService);
+
+-        $this->info("✓ Indexed {$stats['indexed_entries']} entries for {$modelClass}");
++        $this->info(sprintf('✓ Indexed %d entries for %s', $stats['indexed_entries'], $modelClass));
+
+         if ($stats['indexed_models'] > 0) {
+             $coveragePercentage = $stats['total_records'] > 0
 @@ @@
-         $stats = $searchService->getStats();
-         $indexedCount = $stats['models'][$modelClass]['count'] ?? 0;
+                 ? round(($stats['indexed_models'] / $stats['total_records']) * 100, 1)
+                 : 0;
 
--        $this->info("✓ Indexed {$indexedCount} entries for {$modelClass} ({$totalRecords} total records)");
-+        $this->info(sprintf('✓ Indexed %s entries for %s (%s total records)', $indexedCount, $modelClass, $totalRecords));
-     }
+-            $this->line("  Indexed models: {$stats['indexed_models']} out of {$stats['total_records']} total records ({$coveragePercentage}%)");
++            $this->line(sprintf('  Indexed models: %d out of %d total records (%s%%)', $stats['indexed_models'], $stats['total_records'], $coveragePercentage));
 
+             if ($stats['indexed_models'] < $stats['total_records'] && $stats['skipped_records'] > 0) {
+                 $skippedPercentage = round(($stats['skipped_records'] / $stats['total_records']) * 100, 1);
+-                $this->line("  Skipped records: {$stats['skipped_records']} ({$skippedPercentage}% - due to shouldBeIndexed())");
++                $this->line(sprintf('  Skipped records: %d (%s%% - due to shouldBeIndexed())', $stats['skipped_records'], $skippedPercentage));
+             }
+         } else {
+             $this->warn("  No models were indexed - check shouldBeIndexed() method");
+@@ @@
      /**
+      * Calculate precise statistics for model indexing.
+      *
+-     * @param string $modelClass
+-     * @param FuzzySearchService $searchService
+      * @return array{
+      *     total_records: int,
+      *     indexed_models: int,
+@@ @@
+         $skippedRecords = 0;
+
+         /** @var Model&MustFuzzySearch $modelClass */
+-        $modelClass::chunk(1000, function ($models) use (&$totalRecords, &$indexedModels, &$skippedRecords) {
++        $modelClass::chunk(1000, function ($models) use (&$totalRecords, &$indexedModels, &$skippedRecords): void {
+             $totalRecords += count($models);
+
+             /** @var Model&MustFuzzySearch $model */
+             foreach ($models as $model) {
+                 if ($model->shouldBeIndexed()) {
+-                    $indexedModels++;
++                    ++$indexedModels;
+                 } else {
+-                    $skippedRecords++;
++                    ++$skippedRecords;
+                 }
+             }
+         });
 @@ @@
       * Display models that will be indexed.
       *
@@ -732,11 +1015,13 @@ Applied rules:
 Applied rules:
  * SimplifyEmptyCheckOnEmptyArrayRector
  * EncapsedStringsToSprintfRector
+ * PostIncDecToPreIncDecRector
  * RemoveUselessParamTagRector
  * RemoveUselessReturnTagRector
+ * AddClosureVoidReturnTypeWhereNoReturnRector
 
 
-12) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Commands/StatsIndexCommand.php:33
+17) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Commands/StatsIndexCommand.php:33
 
     ---------- begin diff ----------
 @@ @@
@@ -812,7 +1097,7 @@ Applied rules:
  * RemoveUselessReturnTagRector
 
 
-13) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Contracts/IndexRepositoryInterface.php:4
+18) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Contracts/IndexRepositoryInterface.php:4
 
     ---------- begin diff ----------
 @@ @@
@@ -846,7 +1131,7 @@ Applied rules:
 Applied rules:
 
 
-14) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Repositories/IndexRepository.php:183
+19) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Repositories/IndexRepository.php:183
 
     ---------- begin diff ----------
 @@ @@
@@ -890,7 +1175,7 @@ Applied rules:
  * RemoveUselessReturnTagRector
 
 
-15) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/SearchContext.php:101
+20) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/SearchContext.php:101
 
     ---------- begin diff ----------
 @@ @@
@@ -916,7 +1201,7 @@ Applied rules:
  * RemoveUselessReturnTagRector
 
 
-16) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/Algorithms/LevenshteinSimilarityAlgorithm.php:86
+21) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/Algorithms/LevenshteinSimilarityAlgorithm.php:86
 
     ---------- begin diff ----------
 @@ @@
@@ -935,7 +1220,7 @@ Applied rules:
  * ReturnEarlyIfVariableRector
 
 
-17) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/Algorithms/PrefixSimilarityAlgorithm.php:108
+22) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/Algorithms/PrefixSimilarityAlgorithm.php:108
 
     ---------- begin diff ----------
 @@ @@
@@ -954,7 +1239,7 @@ Applied rules:
  * SimplifyUselessVariableRector
 
 
-18) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/FuzzySearchService.php:58
+23) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/FuzzySearchService.php:58
 
     ---------- begin diff ----------
 @@ @@
@@ -1025,6 +1310,23 @@ Applied rules:
       * @throws ModelNotSearchableException If model does not implement MustFuzzySearch
       */
      public function reindexModel(string $modelClass): void
+@@ @@
+         $totalRecords = 0;
+         $indexableRecords = 0;
+
+-        $modelClass::chunk(1000, function ($models) use (&$totalRecords, &$indexableRecords) {
++        $modelClass::chunk(1000, function ($models) use (&$totalRecords, &$indexableRecords): void {
+             $totalRecords += count($models);
+
+-            /** @var \Fuzzy\Contracts\MustFuzzySearch $model */
++            /** @var MustFuzzySearch $model */
+             foreach ($models as $model) {
+                 if ($model->shouldBeIndexed()) {
+-                    $indexableRecords++;
++                    ++$indexableRecords;
+                 }
+             }
+         });
 @@ @@
      {
          return $this->executeWithCache(
@@ -1106,11 +1408,13 @@ Applied rules:
 
 Applied rules:
  * EncapsedStringsToSprintfRector
+ * PostIncDecToPreIncDecRector
  * RemoveUselessReturnTagRector
  * AddArrowFunctionReturnTypeRector
+ * AddClosureVoidReturnTypeWhereNoReturnRector
 
 
-19) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/IndexBuilder.php:29
+24) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/IndexBuilder.php:29
 
     ---------- begin diff ----------
 @@ @@
@@ -1153,7 +1457,7 @@ Applied rules:
  * RemoveUselessReturnTagRector
 
 
-20) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/SimilarityCalculator.php:164
+25) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/SimilarityCalculator.php:164
 
     ---------- begin diff ----------
 @@ @@
@@ -1170,7 +1474,7 @@ Applied rules:
  * SimplifyEmptyCheckOnEmptyArrayRector
 
 
-21) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Stages/MatchDiscoveryStage.php:13
+26) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Stages/MatchDiscoveryStage.php:13
 
     ---------- begin diff ----------
 @@ @@
@@ -1250,7 +1554,7 @@ Applied rules:
  * ClassMethodArrayDocblockParamFromLocalCallsRector
 
 
-22) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Stages/ScoringStage.php:4
+27) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Stages/ScoringStage.php:4
 
     ---------- begin diff ----------
 @@ @@
@@ -1275,7 +1579,7 @@ Applied rules:
 Applied rules:
 
 
-23) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Traits/FuzzySearchable.php:62
+28) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Traits/FuzzySearchable.php:62
 
     ---------- begin diff ----------
 @@ @@
@@ -1299,30 +1603,60 @@ Applied rules:
  * RemoveNonExistingVarAnnotationRector
 
 
-24) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Feature/IntegrationTest.php:130
+29) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Feature/CommandsTest.php:477
 
     ---------- begin diff ----------
 @@ @@
-         // Act: Update model and reindex
-         $user1->name = 'Jonathan Smith';
-         $user1->save();
-+
-         $searchService->updateModelIndex($user1);
 
-         // Assert: Updated data is searchable
+     /**
+      * Create a user without triggering model events.
++     * @param array<string, string> $attributes
+      */
+     private function createUserWithoutEvents(array $attributes): User
+     {
 @@ @@
-         // Act: Change to active and index
-         $user->type = 'active';
-         $user->save();
-+
-         $searchService->indexModel($user);
 
-         // Assert: Active user was indexed
+     /**
+      * Create a product without triggering model events.
++     * @param array<string, string>|array<string, int> $attributes
+      */
+     private function createProductWithoutEvents(array $attributes): Product
+     {
+@@ @@
+      */
+     private function createIndexableUsers(int $count): void
+     {
+-        for ($i = 1; $i <= $count; $i++) {
++        for ($i = 1; $i <= $count; ++$i) {
+             User::create([
+-                'name' => "User {$i}",
+-                'email' => "user{$i}@example.com",
++                'name' => 'User ' . $i,
++                'email' => sprintf('user%d@example.com', $i),
+                 'type' => 'user',
+             ]);
+         }
+@@ @@
+      */
+     private function createNonIndexableUsers(int $count): void
+     {
+-        for ($i = 1; $i <= $count; $i++) {
++        for ($i = 1; $i <= $count; ++$i) {
+             User::create([
+-                'name' => "Admin User {$i}",
+-                'email' => "admin{$i}@example.com",
++                'name' => 'Admin User ' . $i,
++                'email' => sprintf('admin%d@example.com', $i),
+                 'type' => 'admin',
+             ]);
+         }
     ----------- end diff -----------
 
 Applied rules:
- * NewlineBeforeNewAssignSetRector
+ * EncapsedStringsToSprintfRector
+ * PostIncDecToPreIncDecRector
+ * ClassMethodArrayDocblockParamFromLocalCallsRector
 
 
- [OK] 24 files would have been changed (dry-run) by Rector                                                              
+ [OK] 29 files would have been changed (dry-run) by Rector                                                              
 

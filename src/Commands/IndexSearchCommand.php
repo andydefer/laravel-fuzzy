@@ -12,10 +12,10 @@ use ReflectionClass;
 use Symfony\Component\Finder\Finder;
 
 /**
- * Indexes searchable models for fuzzy search functionality.
+ * Command to index searchable models for fuzzy search functionality.
  *
- * Handles indexing of models implementing the MustFuzzySearch interface,
- * supporting both manual configuration and auto-discovery.
+ * Supports both manual configuration and auto-discovery of models.
+ * Provides detailed progress reporting and statistics.
  */
 class IndexSearchCommand extends Command
 {
@@ -207,11 +207,79 @@ class IndexSearchCommand extends Command
      */
     private function displayModelIndexingStatistics(string $modelClass, FuzzySearchService $searchService): void
     {
-        $totalRecords = $modelClass::count();
-        $stats = $searchService->getStats();
-        $indexedCount = $stats['models'][$modelClass]['count'] ?? 0;
+        $stats = $this->calculatePreciseModelStatistics($modelClass, $searchService);
 
-        $this->info("✓ Indexed {$indexedCount} entries for {$modelClass} ({$totalRecords} total records)");
+        $this->info("✓ Indexed {$stats['indexed_entries']} entries for {$modelClass}");
+
+        if ($stats['indexed_models'] > 0) {
+            $coveragePercentage = $stats['total_records'] > 0
+                ? round(($stats['indexed_models'] / $stats['total_records']) * 100, 1)
+                : 0;
+
+            $this->line("  Indexed models: {$stats['indexed_models']} out of {$stats['total_records']} total records ({$coveragePercentage}%)");
+
+            if ($stats['indexed_models'] < $stats['total_records'] && $stats['skipped_records'] > 0) {
+                $skippedPercentage = round(($stats['skipped_records'] / $stats['total_records']) * 100, 1);
+                $this->line("  Skipped records: {$stats['skipped_records']} ({$skippedPercentage}% - due to shouldBeIndexed())");
+            }
+        } else {
+            $this->warn("  No models were indexed - check shouldBeIndexed() method");
+        }
+    }
+
+    /**
+     * Calculate precise statistics for model indexing.
+     *
+     * @param string $modelClass
+     * @param FuzzySearchService $searchService
+     * @return array{
+     *     total_records: int,
+     *     indexed_models: int,
+     *     skipped_records: int,
+     *     indexed_entries: int,
+     *     fields_per_model: int
+     * }
+     */
+    private function calculatePreciseModelStatistics(string $modelClass, FuzzySearchService $searchService): array
+    {
+        $serviceStats = $searchService->getStats();
+        $indexedEntries = $serviceStats['models'][$modelClass]['count'] ?? 0;
+
+        $modelInstance = new $modelClass();
+        $searchableFields = $modelInstance->getSearchableFields();
+        $fieldsPerModel = count($searchableFields);
+
+        $totalRecords = 0;
+        $indexedModels = 0;
+        $skippedRecords = 0;
+
+        /** @var Model&MustFuzzySearch $modelClass */
+        $modelClass::chunk(1000, function ($models) use (&$totalRecords, &$indexedModels, &$skippedRecords) {
+            $totalRecords += count($models);
+
+            /** @var Model&MustFuzzySearch $model */
+            foreach ($models as $model) {
+                if ($model->shouldBeIndexed()) {
+                    $indexedModels++;
+                } else {
+                    $skippedRecords++;
+                }
+            }
+        });
+
+        if ($indexedModels === 0 && $indexedEntries > 0 && $fieldsPerModel > 0) {
+            $estimatedIndexedModels = (int) round($indexedEntries / $fieldsPerModel);
+            $indexedModels = min($estimatedIndexedModels, $totalRecords);
+            $skippedRecords = $totalRecords - $indexedModels;
+        }
+
+        return [
+            'total_records' => $totalRecords,
+            'indexed_models' => $indexedModels,
+            'skipped_records' => $skippedRecords,
+            'indexed_entries' => $indexedEntries,
+            'fields_per_model' => $fieldsPerModel,
+        ];
     }
 
     /**

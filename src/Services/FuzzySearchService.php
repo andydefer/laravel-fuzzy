@@ -300,6 +300,65 @@ class FuzzySearchService
     }
 
     /**
+     * Get precise indexing statistics for a specific model.
+     *
+     * @param string $modelClass Fully qualified model class name
+     * @return array{
+     *     total_records: int,
+     *     indexable_records: int,
+     *     indexed_entries: int,
+     *     estimated_indexed_models: int,
+     *     fields_per_model: int,
+     *     coverage_percentage: float
+     * }
+     * @throws ModelNotSearchableException If model does not implement MustFuzzySearch
+     */
+    public function getPreciseModelStats(string $modelClass): array
+    {
+        $this->validateModel($modelClass);
+
+        $stats = $this->getStats();
+        $indexedEntries = $stats['models'][$modelClass]['count'] ?? 0;
+
+        $modelInstance = new $modelClass();
+        $searchableFields = $modelInstance->getSearchableFields();
+        $fieldsPerModel = count($searchableFields);
+
+        $totalRecords = 0;
+        $indexableRecords = 0;
+
+        $modelClass::chunk(1000, function ($models) use (&$totalRecords, &$indexableRecords) {
+            $totalRecords += count($models);
+
+            /** @var \Fuzzy\Contracts\MustFuzzySearch $model */
+            foreach ($models as $model) {
+                if ($model->shouldBeIndexed()) {
+                    $indexableRecords++;
+                }
+            }
+        });
+
+        $estimatedIndexedModels = $fieldsPerModel > 0
+            ? (int) round($indexedEntries / $fieldsPerModel)
+            : 0;
+
+        $estimatedIndexedModels = min($estimatedIndexedModels, $indexableRecords);
+
+        $coveragePercentage = $indexableRecords > 0
+            ? round(($estimatedIndexedModels / $indexableRecords) * 100, 1)
+            : 0;
+
+        return [
+            'total_records' => $totalRecords,
+            'indexable_records' => $indexableRecords,
+            'indexed_entries' => $indexedEntries,
+            'estimated_indexed_models' => $estimatedIndexedModels,
+            'fields_per_model' => $fieldsPerModel,
+            'coverage_percentage' => $coveragePercentage,
+        ];
+    }
+
+    /**
      * Calculate similarity score between two strings.
      *
      * @param string $firstString First string to compare

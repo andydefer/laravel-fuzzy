@@ -4,18 +4,21 @@ declare(strict_types=1);
 
 namespace Fuzzy\Tests\Feature;
 
-use Fuzzy\Tests\TestCase;
-use Fuzzy\Tests\Fixtures\User;
-use Fuzzy\Tests\Fixtures\Product;
 use Fuzzy\Models\FuzzyIndex;
+use Fuzzy\Tests\Fixtures\Product;
+use Fuzzy\Tests\Fixtures\User;
+use Fuzzy\Tests\TestCase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Config;
 
 /**
- * Feature tests for console commands.
+ * Feature tests for fuzzy search console commands.
  */
 final class CommandsTest extends TestCase
 {
+    /**
+     * Clean up database before each test.
+     */
     protected function setUp(): void
     {
         parent::setUp();
@@ -25,6 +28,9 @@ final class CommandsTest extends TestCase
         Product::query()->delete();
     }
 
+    /**
+     * Test index command with auto-discovery enabled.
+     */
     public function test_index_command_with_auto_discovery(): void
     {
         // Arrange: Configure auto-discovery with specific models
@@ -50,6 +56,9 @@ final class CommandsTest extends TestCase
         $this->assertGreaterThan(0, $entries);
     }
 
+    /**
+     * Test index command targeting a specific model.
+     */
     public function test_index_command_with_specific_model(): void
     {
         // Arrange: Prepare clean environment with specific models
@@ -57,20 +66,17 @@ final class CommandsTest extends TestCase
         Config::set('fuzzy.searchable_models', []);
         Config::set('fuzzy.auto_discovery.enabled', false);
 
-        User::withoutEvents(
-            fn() => User::create([
-                'name' => 'User One',
-                'email' => 'user1@example.com'
-            ])
-        );
+        $this->createUserWithoutEvents([
+            'name' => 'User One',
+            'email' => 'user1@example.com',
+            'type' => 'user',
+        ]);
 
-        Product::withoutEvents(
-            fn() => Product::create([
-                'name' => 'Product One',
-                'description' => 'Test',
-                'price' => 100
-            ])
-        );
+        $this->createProductWithoutEvents([
+            'name' => 'Product One',
+            'description' => 'Test',
+            'price' => 100
+        ]);
 
         $this->assertEquals(0, FuzzyIndex::count(), 'Index should be empty before indexing');
 
@@ -83,10 +89,13 @@ final class CommandsTest extends TestCase
         $userEntries = FuzzyIndex::where('indexable_type', User::class)->count();
         $productEntries = FuzzyIndex::where('indexable_type', Product::class)->count();
 
-        $this->assertEquals(2, $userEntries); // name + email
-        $this->assertEquals(0, $productEntries); // Should be 0
+        $this->assertEquals(2, $userEntries);
+        $this->assertEquals(0, $productEntries);
     }
 
+    /**
+     * Test index command with force option to rebuild index.
+     */
     public function test_index_command_with_force_option(): void
     {
         // Arrange: Create user and initial index
@@ -120,6 +129,9 @@ final class CommandsTest extends TestCase
         $this->assertEquals('Updated User', $entry->original_value);
     }
 
+    /**
+     * Test index command with chunk option for batch processing.
+     */
     public function test_index_command_with_chunk_option(): void
     {
         // Arrange: Create multiple users for batch processing
@@ -138,9 +150,12 @@ final class CommandsTest extends TestCase
         $this->assertEquals(0, $exitCode);
 
         $entries = FuzzyIndex::count();
-        $this->assertEquals(300, $entries); // 150 users × 2 fields each
+        $this->assertEquals(300, $entries);
     }
 
+    /**
+     * Test index command with list option to display configuration.
+     */
     public function test_index_command_list_option(): void
     {
         // Arrange: Configure models for discovery
@@ -159,6 +174,9 @@ final class CommandsTest extends TestCase
         $this->assertStringContainsString(User::class, $output);
     }
 
+    /**
+     * Test clear command targeting a specific model.
+     */
     public function test_clear_command_with_specific_model(): void
     {
         // Arrange: Create data and build index
@@ -189,6 +207,9 @@ final class CommandsTest extends TestCase
         $this->assertEquals($initialProductEntries, $productEntries);
     }
 
+    /**
+     * Test clear command removing all indexed models.
+     */
     public function test_clear_command_all_models(): void
     {
         // Arrange: Create data and build complete index
@@ -210,6 +231,9 @@ final class CommandsTest extends TestCase
         $this->assertEquals(0, $finalCount);
     }
 
+    /**
+     * Test stats command with populated index.
+     */
     public function test_stats_command(): void
     {
         // Arrange: Create data and build index
@@ -229,6 +253,9 @@ final class CommandsTest extends TestCase
         $this->assertStringContainsString(User::class, $output);
     }
 
+    /**
+     * Test stats command with empty index.
+     */
     public function test_stats_command_empty_index(): void
     {
         // Act: Execute statistics command on empty index
@@ -242,6 +269,9 @@ final class CommandsTest extends TestCase
         $this->assertStringContainsString('No models indexed yet', $output);
     }
 
+    /**
+     * Test clear cache command.
+     */
     public function test_clear_cache_command(): void
     {
         // Act: Execute cache clearing command
@@ -254,6 +284,9 @@ final class CommandsTest extends TestCase
         $this->assertStringContainsString('All fuzzy search cache cleared', $output);
     }
 
+    /**
+     * Test clear cache command for statistics only.
+     */
     public function test_clear_cache_command_stats_only(): void
     {
         // Act: Execute cache clearing for statistics only
@@ -272,6 +305,9 @@ final class CommandsTest extends TestCase
         );
     }
 
+    /**
+     * Test clear cache command for specific model.
+     */
     public function test_clear_cache_command_specific_model(): void
     {
         // Act: Execute cache clearing for specific model
@@ -290,6 +326,9 @@ final class CommandsTest extends TestCase
         );
     }
 
+    /**
+     * Test index command with auto option for discovery.
+     */
     public function test_index_command_with_auto_option(): void
     {
         // Arrange: Configure auto-discovery with empty config
@@ -308,6 +347,9 @@ final class CommandsTest extends TestCase
         $this->assertGreaterThan(0, $entries);
     }
 
+    /**
+     * Test index command with invalid model name.
+     */
     public function test_index_command_invalid_model(): void
     {
         // Act: Execute command with invalid model name
@@ -321,5 +363,159 @@ final class CommandsTest extends TestCase
         $output = Artisan::output();
         $this->assertStringContainsString('must implement', $output);
         $this->assertStringContainsString('Invalid\\Model\\Class', $output);
+    }
+
+    /**
+     * Test index command respects shouldBeIndexed method.
+     */
+    public function test_index_command_should_respect_shouldBeIndexed(): void
+    {
+        // Arrange: Create users with different types
+        $indexableUser = User::create([
+            'name' => 'Indexable User',
+            'email' => 'indexable@example.com',
+            'type' => 'user',
+        ]);
+
+        $nonIndexableUser = User::create([
+            'name' => 'Non-Indexable User',
+            'email' => 'nonindexable@example.com',
+            'type' => 'admin',
+        ]);
+
+        $this->assertTrue($indexableUser->shouldBeIndexed());
+        $this->assertFalse($nonIndexableUser->shouldBeIndexed());
+
+        // Act: Index only valid users
+        $exitCode = Artisan::call('fuzzy:index', ['model' => User::class]);
+
+        // Assert: Verify only indexable users were indexed
+        $this->assertEquals(0, $exitCode);
+
+        $userEntries = FuzzyIndex::where('indexable_type', User::class)->count();
+        $this->assertEquals(2, $userEntries);
+
+        $indexedIds = FuzzyIndex::where('indexable_type', User::class)
+            ->pluck('indexable_id')
+            ->unique()
+            ->toArray();
+
+        $this->assertContains((string) $indexableUser->id, $indexedIds);
+        $this->assertNotContains((string) $nonIndexableUser->id, $indexedIds);
+    }
+
+    /**
+     * Test index command statistics accuracy with mixed indexable users.
+     */
+    public function test_index_command_statistics_accuracy(): void
+    {
+        // Arrange: Create mixed users
+        $this->createIndexableUsers(3);
+        $this->createNonIndexableUsers(2);
+
+        // Act: Index users
+        $exitCode = Artisan::call('fuzzy:index', ['model' => User::class]);
+
+        // Assert: Verify statistics are accurate
+        $this->assertEquals(0, $exitCode);
+
+        $output = Artisan::output();
+
+        $this->assertStringContainsString('out of 5 total records', $output);
+        $this->assertStringContainsString('Indexed models: 3', $output);
+        $this->assertStringContainsString('Skipped records: 2', $output);
+        $this->assertStringContainsString('(60%)', $output);
+
+        $entries = FuzzyIndex::where('indexable_type', User::class)->count();
+        $this->assertEquals(6, $entries);
+    }
+
+    /**
+     * Test index command with all users indexable.
+     */
+    public function test_index_command_with_all_users_indexable(): void
+    {
+        // Arrange: Create only indexable users
+        $this->createIndexableUsers(4);
+
+        // Act: Index all users
+        $exitCode = Artisan::call('fuzzy:index', ['model' => User::class]);
+
+        // Assert: Verify all users are indexed
+        $this->assertEquals(0, $exitCode);
+
+        $output = Artisan::output();
+
+        $this->assertStringContainsString('Indexed models: 4 out of 4 total records (100%)', $output);
+        $this->assertStringNotContainsString('Skipped records', $output);
+
+        $entries = FuzzyIndex::where('indexable_type', User::class)->count();
+        $this->assertEquals(8, $entries);
+    }
+
+    /**
+     * Test index command with all users non-indexable.
+     */
+    public function test_index_command_with_all_users_non_indexable(): void
+    {
+        // Arrange: Create only non-indexable users
+        $this->createNonIndexableUsers(3);
+
+        // Act: Try to index (no users should be indexed)
+        $exitCode = Artisan::call('fuzzy:index', ['model' => User::class]);
+
+        // Assert: Verify no users are indexed
+        $this->assertEquals(0, $exitCode);
+
+        $output = Artisan::output();
+
+        $this->assertStringContainsString('No models were indexed', $output);
+
+        $entries = FuzzyIndex::where('indexable_type', User::class)->count();
+        $this->assertEquals(0, $entries);
+    }
+
+    /**
+     * Create a user without triggering model events.
+     */
+    private function createUserWithoutEvents(array $attributes): User
+    {
+        return User::withoutEvents(fn() => User::create($attributes));
+    }
+
+    /**
+     * Create a product without triggering model events.
+     */
+    private function createProductWithoutEvents(array $attributes): Product
+    {
+        return Product::withoutEvents(fn() => Product::create($attributes));
+    }
+
+    /**
+     * Create indexable users with type 'user'.
+     */
+    private function createIndexableUsers(int $count): void
+    {
+        for ($i = 1; $i <= $count; $i++) {
+            User::create([
+                'name' => "User {$i}",
+                'email' => "user{$i}@example.com",
+                'type' => 'user',
+            ]);
+        }
+    }
+
+    /**
+     * Create non-indexable users with type 'admin'.
+     */
+    private function createNonIndexableUsers(int $count): void
+    {
+        for ($i = 1; $i <= $count; $i++) {
+            User::create([
+                'name' => "Admin User {$i}",
+                'email' => "admin{$i}@example.com",
+                'type' => 'admin',
+            ]);
+        }
     }
 }

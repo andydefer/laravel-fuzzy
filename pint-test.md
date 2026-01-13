@@ -1,11 +1,11 @@
 # Pint Formatting Test Report
-*Generated: lun. 12 janv. 2026 17:15:28 WAT*
+*Generated: mar. 13 janv. 2026 01:24:58 WAT*
 
 
-  ⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯.⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯.⨯⨯⨯⨯⨯⨯
+  ⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯.⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯.⨯.⨯⨯⨯.⨯⨯
 
   ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── Laravel  
-    FAIL   ................................................................................................................................................. 71 files, 69 style issues  
+    FAIL   ................................................................................................................................................. 73 files, 69 style issues  
   ⨯ config/fuzzy-defaults.php                                                                                                                                          ordered_imports  
   ⨯ database/migrations/2024_01_01_000000_create_fuzzy_index_table.php                                      class_definition, no_superfluous_phpdoc_tags, braces_position, phpdoc_trim  
   ⨯ rector.php                                                                                                                                                            concat_space  
@@ -50,16 +50,16 @@
   ⨯ src/ValueObjects/IndexData.php                                                    concat_space, braces_position, single_line_empty_body, blank_line_before_statement, phpdoc_align  
   ⨯ src/ValueObjects/SearchQuery.php                                                                                             braces_position, single_line_empty_body, phpdoc_align  
   ⨯ tests/Feature/ArtisanCommandsTest.php                                                                                 increment_style, single_quote, concat_space, ordered_imports  
-  ⨯ tests/Feature/CommandsTest.php                                     function_declaration, increment_style, single_quote, concat_space, trailing_comma_in_multiline, ordered_imports  
+  ⨯ tests/Feature/CommandsTest.php                              function_declaration, increment_style, single_quote, concat_space, php_unit_method_casing, trailing_comma_in_multiline  
   ⨯ tests/Feature/ConfigurationTest.php                                                                                     concat_space, trailing_comma_in_multiline, ordered_imports  
-  ⨯ tests/Feature/FacadeTest.php                                                                                         concat_space, phpdoc_single_line_var_spacing, ordered_imports  
-  ⨯ tests/Feature/IntegrationTest.php                                                                                  increment_style, concat_space, braces_position, ordered_imports  
+  ⨯ tests/Feature/FacadeTest.php                                                                                                                         concat_space, ordered_imports  
+  ⨯ tests/Feature/IntegrationTest.php                                        increment_style, no_superfluous_phpdoc_tags, concat_space, braces_position, ordered_imports, phpdoc_align  
   ⨯ tests/Feature/MonitoringTest.php                                                                                                    increment_style, concat_space, ordered_imports  
-  ⨯ tests/Feature/ShouldBeIndexedTest.php                                            class_attributes_separation, new_with_parentheses, concat_space, braces_position, ordered_imports  
-  ⨯ tests/Fixtures/Product.php                                                                                                                                         ordered_imports  
-  ⨯ tests/Fixtures/User.php                                                                                                                concat_space, ordered_imports, phpdoc_align  
+  ⨯ tests/Feature/ShouldBeIndexedTest.php                                                             class_attributes_separation, new_with_parentheses, concat_space, braces_position  
+  ⨯ tests/Fixtures/Product.php                                                                                                                 no_superfluous_phpdoc_tags, phpdoc_trim  
+  ⨯ tests/Fixtures/User.php                                                                       no_superfluous_phpdoc_tags, concat_space, phpdoc_trim, ordered_imports, phpdoc_align  
   ⨯ tests/TestCase.php                                                                                                                     concat_space, ordered_imports, phpdoc_align  
-  ⨯ tests/Unit/CacheTest.php                                                                                                                             concat_space, ordered_imports  
+  ⨯ tests/Unit/CacheTest.php                                                                                                     no_superfluous_phpdoc_tags, concat_space, phpdoc_trim  
   ⨯ tests/Unit/FuzzySearchServiceTest.php                                                 increment_style, concat_space, phpdoc_single_line_var_spacing, ordered_imports, phpdoc_align  
   ⨯ tests/Unit/Models/FuzzyIndexTest.php                                                 new_with_parentheses, no_superfluous_phpdoc_tags, concat_space, ordered_imports, phpdoc_align  
   ⨯ tests/Unit/Repositories/IndexRepositoryTest.php                                                                              new_with_parentheses, concat_space, no_unused_imports  
