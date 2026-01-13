@@ -38,6 +38,7 @@ final class RelevanceScoringStageTest extends TestCase
         $this->comparator = new WordSimilarityComparator(
             normalizer: $this->normalizer
         );
+
         $this->stage = new RelevanceScoringStage($this->comparator);
     }
 

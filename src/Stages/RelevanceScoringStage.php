@@ -73,6 +73,7 @@ class RelevanceScoringStage
      * @param SearchContext $context Search context
      * @return float Relevance score (lower = more relevant)
      */
+
     private function calculateRelevanceForResult(object $result, SearchContext $context): float
     {
         $matchedValue = $result->matchedValue ?? '';
@@ -82,7 +83,7 @@ class RelevanceScoringStage
             return 10.0;
         }
 
-        return $this->comparator->compare($matchedValue, $query);
+        return $this->comparator->compare($query, $matchedValue);
     }
 
     /**

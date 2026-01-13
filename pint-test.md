@@ -1,5 +1,5 @@
 # Pint Formatting Test Report
-*Generated: mar. 13 janv. 2026 23:41:32 WAT*
+*Generated: mer. 14 janv. 2026 00:23:47 WAT*
 
 
   ⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯.⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯.⨯.⨯⨯⨯.⨯⨯
@@ -45,7 +45,7 @@
   ⨯ src/Services/StringNormalizer.php                                                                            function_declaration, not_operator_with_successor_space, phpdoc_align  
   ⨯ src/Stages/MatchDiscoveryStage.php class_attributes_separation, function_declaration, increment_style, concat_space, not_operator_with_successor_space, blank_line_before_stateme…  
   ⨯ src/Stages/NormalizeQueryStage.php                                                                          new_with_parentheses, phpdoc_separation, ordered_imports, phpdoc_align  
-  ⨯ src/Stages/RelevanceScoringStage.php                                      braces_position, single_line_empty_body, no_extra_blank_lines, blank_line_before_statement, phpdoc_align  
+  ⨯ src/Stages/RelevanceScoringStage.php         class_attributes_separation, braces_position, single_line_empty_body, no_extra_blank_lines, blank_line_before_statement, phpdoc_align  
   ⨯ src/Stages/ScoringStage.php                                                                                                                          ordered_imports, phpdoc_align  
   ⨯ src/Stages/SortAndLimitStage.php                                                                                                                function_declaration, phpdoc_align  
   ⨯ src/Traits/FuzzySearchable.php                                                                                                                                        phpdoc_align  
