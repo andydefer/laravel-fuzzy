@@ -1,5 +1,5 @@
 # Rector Refactoring Report
-*Generated: ven. 01 mai 2026 18:19:38 WAT*
+*Generated: ven. 01 mai 2026 19:33:43 WAT*
 
 
 85 files with changes
@@ -1767,215 +1767,7 @@ Applied rules:
  * RemoveUnusedForeachKeyRector
 
 
-33) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Stages/RelevanceScoringStageTest.php:5
-
-    ---------- begin diff ----------
-@@ @@
- namespace Fuzzy\Tests\Unit\Stages;
-
- use Fuzzy\Contracts\IndexRepositoryInterface;
--use Fuzzy\Contracts\SearchContextInterface;
- use Fuzzy\Config\RelevanceScoringConfig;
- use Fuzzy\Data\SearchOptionsData;
- use Fuzzy\Data\SearchResultData;
-@@ @@
- use Fuzzy\ValueObjects\SearchQuery;
- use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
- use ReflectionMethod;
--use ReflectionProperty;
-
- #[AllowMockObjectsWithoutExpectations]
- final class RelevanceScoringStageTest extends TestCase
- {
-     private RelevanceScoringStage $stage;
--    private WordSimilarityComparator $comparator;
--    private StringNormalizer $normalizer;
-     private RelevanceScoringConfig $config;
-
-     /**
-@@ @@
-     {
-         parent::setUp();
-
--        $this->normalizer = new StringNormalizer();
--        $this->comparator = new WordSimilarityComparator(
--            normalizer: $this->normalizer
-+        $normalizer = new StringNormalizer();
-+        $comparator = new WordSimilarityComparator(
-+            normalizer: $normalizer
-         );
-         $this->config = RelevanceScoringConfig::createDefault();
-
--        $this->stage = new RelevanceScoringStage($this->comparator, $this->config);
-+        $this->stage = new RelevanceScoringStage($comparator, $this->config);
-     }
-
-     /**
-@@ @@
-     {
-         // Arrange: Many results without explicit maxResults
-         $results = [];
--        for ($i = 0; $i < 30; $i++) {
-+        for ($i = 0; $i < 30; ++$i) {
-             $results[] = $this->createSearchResult('Test ' . $i, 'Test ' . $i);
-         }
-
-         $context = $this->createSearchContext('test', $results);
--        $context->options = new SearchOptionsData(); // Uses default maxResults
-+        $context->options = new SearchOptionsData();
-+         // Uses default maxResults
-         $next = $this->createNextCallback($context);
-
-         // Act: Process without explicit limit
-@@ @@
-         $this->assertCount(1, $processedResults);
-
-         $resultItem = $processedResults[0];
--        $this->assertEquals(85.5, $resultItem->score);
-+        $this->assertEqualsWithDelta(85.5, $resultItem->score, PHP_FLOAT_EPSILON);
-         $this->assertEquals('User', $resultItem->modelType);
-         $this->assertEquals('name', $resultItem->matchedField);
-         $this->assertEquals('John Doe', $resultItem->matchedValue);
-@@ @@
-                 $expected,
-                 $result,
-                 0.01,
--                "Failed for input: $input. Got: $result, Expected: $expected"
-+                sprintf('Failed for input: %s. Got: %s, Expected: %s', $input, $result, $expected)
-             );
-         }
-     }
-@@ @@
-
-         // Verify descending order by combined score
-         $sorted = $combinedResults->values()->all();
--        for ($i = 0; $i < count($sorted) - 1; $i++) {
-+        for ($i = 0; $i < count($sorted) - 1; ++$i) {
-             $this->assertGreaterThanOrEqual($sorted[$i + 1]->combinedScore, $sorted[$i]->combinedScore);
-         }
-     }
-@@ @@
-
-     /**
-      * Create a search context for testing.
-+     * @param SearchResultData[] $results
-      */
-     private function createSearchContext(
-         string $queryString,
-@@ @@
-
-     /**
-      * Invoke a private method on an object.
-+     * @param array<mixed[], mixed> $args
-      */
-     private function invokePrivateMethod(object $object, string $methodName, array $args = []): mixed
-     {
-@@ @@
-         $reflection->setAccessible(true);
-
-         return $reflection->invokeArgs($object, $args);
--    }
--
--    /**
--     * Set a private property value on an object.
--     */
--    private function setPrivateProperty(object $object, string $propertyName, mixed $value): void
--    {
--        $reflection = new ReflectionProperty($object, $propertyName);
--        $reflection->setAccessible(true);
--        $reflection->setValue($object, $value);
-     }
- }
-    ----------- end diff -----------
-
-Applied rules:
- * NewlineBeforeNewAssignSetRector
- * EncapsedStringsToSprintfRector
- * PostIncDecToPreIncDecRector
- * RemoveUnusedPrivateMethodRector
- * NarrowUnusedSetUpDefinedPropertyRector
- * AssertEqualsOrAssertSameFloatParameterToSpecificMethodsTypeRector
- * ClassMethodArrayDocblockParamFromLocalCallsRector
-
-
-34) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Stages/ScoringStageTest.php:17
-
-    ---------- begin diff ----------
-@@ @@
- use Fuzzy\ValueObjects\SearchQuery;
- use InvalidArgumentException;
- use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
--use ReflectionClass;
- use ReflectionMethod;
- use ReflectionProperty;
- use stdClass;
-    ----------- end diff -----------
-
-Applied rules:
-
-
-35) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Stages/SortAndLimitStageTest.php:5
-
-    ---------- begin diff ----------
-@@ @@
- namespace Fuzzy\Tests\Unit\Stages;
-
- use Fuzzy\Contracts\IndexRepositoryInterface;
--use Fuzzy\Contracts\SearchContextInterface;
- use Fuzzy\Services\Scoring\ScoringEngine;
- use Fuzzy\Tests\TestCase;
- use Fuzzy\Stages\SortAndLimitStage;
-@@ @@
-
-     /**
-      * Create a search context for testing.
-+     * @param array<mixed[], mixed> $results
-      */
-     private function createSearchContext(
-         string $queryString,
-    ----------- end diff -----------
-
-Applied rules:
- * ClassMethodArrayDocblockParamFromLocalCallsRector
-
-
-36) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/database/migrations/2024_01_01_000000_create_non_indexable_users_table.php:17
-
-    ---------- begin diff ----------
-@@ @@
-      */
-     public function up(): void
-     {
--        Schema::create('non_indexable_users', function (Blueprint $table) {
-+        Schema::create('non_indexable_users', function (Blueprint $table): void {
-             $table->id();
-             $table->string('name');
-             $table->string('email')->unique();
-    ----------- end diff -----------
-
-Applied rules:
- * AddClosureVoidReturnTypeWhereNoReturnRector
-
-
-37) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/database/migrations/2024_01_01_000000_create_non_searchable_models_table.php:17
-
-    ---------- begin diff ----------
-@@ @@
-      */
-     public function up(): void
-     {
--        Schema::create('non_searchable_models', function (Blueprint $table) {
-+        Schema::create('non_searchable_models', function (Blueprint $table): void {
-             $table->id();
-             $table->string('name');
-             $table->string('email')->unique();
-    ----------- end diff -----------
-
-Applied rules:
- * AddClosureVoidReturnTypeWhereNoReturnRector
-
-
-38) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Feature/IntegrationTest.php:13
+33) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Feature/IntegrationTest.php:13
 
     ---------- begin diff ----------
 @@ @@
@@ -2091,7 +1883,7 @@ Applied rules:
  * AssertEmptyNullableObjectToAssertInstanceofRector
 
 
-39) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Fixtures/CustomStage.php:76
+34) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Fixtures/CustomStage.php:76
 
     ---------- begin diff ----------
 @@ @@
@@ -2108,7 +1900,7 @@ Applied rules:
  * IssetOnPropertyObjectToPropertyExistsRector
 
 
-40) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Fixtures/CustomStage2.php:28
+35) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Fixtures/CustomStage2.php:28
 
     ---------- begin diff ----------
 @@ @@
@@ -2125,7 +1917,7 @@ Applied rules:
  * IssetOnPropertyObjectToPropertyExistsRector
 
 
-41) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Fixtures/NonSearchableModel.php:4
+36) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Fixtures/NonSearchableModel.php:4
 
     ---------- begin diff ----------
 @@ @@
@@ -2141,7 +1933,7 @@ Applied rules:
 Applied rules:
 
 
-42) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Fixtures/Product.php:46
+37) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Fixtures/Product.php:46
 
     ---------- begin diff ----------
 @@ @@
@@ -2159,7 +1951,7 @@ Applied rules:
  * RemoveUselessReturnTagRector
 
 
-43) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Fixtures/User.php:53
+38) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Fixtures/User.php:53
 
     ---------- begin diff ----------
 @@ @@
@@ -2177,7 +1969,7 @@ Applied rules:
  * RemoveUselessReturnTagRector
 
 
-44) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Fixtures/UserSearchData.php:19
+39) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Fixtures/UserSearchData.php:19
 
     ---------- begin diff ----------
 @@ @@
@@ -2194,7 +1986,7 @@ Applied rules:
  * RemoveUselessReturnTagRector
 
 
-45) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Commands/ClearCacheCommandTest.php:4
+40) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Commands/ClearCacheCommandTest.php:4
 
     ---------- begin diff ----------
 @@ @@
@@ -2259,7 +2051,7 @@ Applied rules:
  * StringClassNameToClassConstantRector
 
 
-46) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Commands/ClearIndexCommandTest.php:78
+41) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Commands/ClearIndexCommandTest.php:78
 
     ---------- begin diff ----------
 @@ @@
@@ -2352,7 +2144,7 @@ Applied rules:
  * StringCastAssertStringContainsStringRector
 
 
-47) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Commands/IndexSearchCommandTest.php:83
+42) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Commands/IndexSearchCommandTest.php:83
 
     ---------- begin diff ----------
 @@ @@
@@ -2452,7 +2244,7 @@ Applied rules:
  * StringCastAssertStringContainsStringRector
 
 
-48) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Commands/StatsIndexCommandTest.php:103
+43) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Commands/StatsIndexCommandTest.php:103
 
     ---------- begin diff ----------
 @@ @@
@@ -2522,7 +2314,7 @@ Applied rules:
  * StringCastAssertStringContainsStringRector
 
 
-49) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/FuzzySearchServiceProviderTest.php:4
+44) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/FuzzySearchServiceProviderTest.php:4
 
     ---------- begin diff ----------
 @@ @@
@@ -2594,7 +2386,7 @@ Applied rules:
  * AssertEqualsOrAssertSameFloatParameterToSpecificMethodsTypeRector
 
 
-50) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/FuzzySearchServiceTest.php:4
+45) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/FuzzySearchServiceTest.php:4
 
     ---------- begin diff ----------
 @@ @@
@@ -2735,7 +2527,7 @@ Applied rules:
  * AssertEqualsToSameRector
 
 
-51) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Models/FuzzyIndexTest.php:350
+46) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Models/FuzzyIndexTest.php:350
 
     ---------- begin diff ----------
 @@ @@
@@ -2752,7 +2544,7 @@ Applied rules:
  * RemoveUselessReturnTagRector
 
 
-52) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Repositories/IndexRepositoryTest.php:4
+47) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Repositories/IndexRepositoryTest.php:4
 
     ---------- begin diff ----------
 @@ @@
@@ -2912,7 +2704,7 @@ Applied rules:
  * ClassMethodArrayDocblockParamFromLocalCallsRector
 
 
-53) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/AdvancedScoringCalculatorTest.php:27
+48) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/AdvancedScoringCalculatorTest.php:27
 
     ---------- begin diff ----------
 @@ @@
@@ -2927,6 +2719,214 @@ Applied rules:
 
 Applied rules:
  * NewlineBetweenClassLikeStmtsRector
+
+
+49) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Stages/RelevanceScoringStageTest.php:5
+
+    ---------- begin diff ----------
+@@ @@
+ namespace Fuzzy\Tests\Unit\Stages;
+
+ use Fuzzy\Contracts\IndexRepositoryInterface;
+-use Fuzzy\Contracts\SearchContextInterface;
+ use Fuzzy\Config\RelevanceScoringConfig;
+ use Fuzzy\Data\SearchOptionsData;
+ use Fuzzy\Data\SearchResultData;
+@@ @@
+ use Fuzzy\ValueObjects\SearchQuery;
+ use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
+ use ReflectionMethod;
+-use ReflectionProperty;
+
+ #[AllowMockObjectsWithoutExpectations]
+ final class RelevanceScoringStageTest extends TestCase
+ {
+     private RelevanceScoringStage $stage;
+-    private WordSimilarityComparator $comparator;
+-    private StringNormalizer $normalizer;
+     private RelevanceScoringConfig $config;
+
+     /**
+@@ @@
+     {
+         parent::setUp();
+
+-        $this->normalizer = new StringNormalizer();
+-        $this->comparator = new WordSimilarityComparator(
+-            normalizer: $this->normalizer
++        $normalizer = new StringNormalizer();
++        $comparator = new WordSimilarityComparator(
++            normalizer: $normalizer
+         );
+         $this->config = RelevanceScoringConfig::createDefault();
+
+-        $this->stage = new RelevanceScoringStage($this->comparator, $this->config);
++        $this->stage = new RelevanceScoringStage($comparator, $this->config);
+     }
+
+     /**
+@@ @@
+     {
+         // Arrange: Many results without explicit maxResults
+         $results = [];
+-        for ($i = 0; $i < 30; $i++) {
++        for ($i = 0; $i < 30; ++$i) {
+             $results[] = $this->createSearchResult('Test ' . $i, 'Test ' . $i);
+         }
+
+         $context = $this->createSearchContext('test', $results);
+-        $context->options = new SearchOptionsData(); // Uses default maxResults
++        $context->options = new SearchOptionsData();
++         // Uses default maxResults
+         $next = $this->createNextCallback($context);
+
+         // Act: Process without explicit limit
+@@ @@
+         $this->assertCount(1, $processedResults);
+
+         $resultItem = $processedResults[0];
+-        $this->assertEquals(85.5, $resultItem->score);
++        $this->assertEqualsWithDelta(85.5, $resultItem->score, PHP_FLOAT_EPSILON);
+         $this->assertEquals('User', $resultItem->modelType);
+         $this->assertEquals('name', $resultItem->matchedField);
+         $this->assertEquals('John Doe', $resultItem->matchedValue);
+@@ @@
+                 $expected,
+                 $result,
+                 0.01,
+-                "Failed for input: $input. Got: $result, Expected: $expected"
++                sprintf('Failed for input: %s. Got: %s, Expected: %s', $input, $result, $expected)
+             );
+         }
+     }
+@@ @@
+
+         // Verify descending order by combined score
+         $sorted = $combinedResults->values()->all();
+-        for ($i = 0; $i < count($sorted) - 1; $i++) {
++        for ($i = 0; $i < count($sorted) - 1; ++$i) {
+             $this->assertGreaterThanOrEqual($sorted[$i + 1]->combinedScore, $sorted[$i]->combinedScore);
+         }
+     }
+@@ @@
+
+     /**
+      * Create a search context for testing.
++     * @param SearchResultData[] $results
+      */
+     private function createSearchContext(
+         string $queryString,
+@@ @@
+
+     /**
+      * Invoke a private method on an object.
++     * @param array<mixed[], mixed> $args
+      */
+     private function invokePrivateMethod(object $object, string $methodName, array $args = []): mixed
+     {
+@@ @@
+         $reflection->setAccessible(true);
+
+         return $reflection->invokeArgs($object, $args);
+-    }
+-
+-    /**
+-     * Set a private property value on an object.
+-     */
+-    private function setPrivateProperty(object $object, string $propertyName, mixed $value): void
+-    {
+-        $reflection = new ReflectionProperty($object, $propertyName);
+-        $reflection->setAccessible(true);
+-        $reflection->setValue($object, $value);
+     }
+ }
+    ----------- end diff -----------
+
+Applied rules:
+ * NewlineBeforeNewAssignSetRector
+ * EncapsedStringsToSprintfRector
+ * PostIncDecToPreIncDecRector
+ * RemoveUnusedPrivateMethodRector
+ * NarrowUnusedSetUpDefinedPropertyRector
+ * AssertEqualsOrAssertSameFloatParameterToSpecificMethodsTypeRector
+ * ClassMethodArrayDocblockParamFromLocalCallsRector
+
+
+50) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Stages/ScoringStageTest.php:17
+
+    ---------- begin diff ----------
+@@ @@
+ use Fuzzy\ValueObjects\SearchQuery;
+ use InvalidArgumentException;
+ use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
+-use ReflectionClass;
+ use ReflectionMethod;
+ use ReflectionProperty;
+ use stdClass;
+    ----------- end diff -----------
+
+Applied rules:
+
+
+51) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Stages/SortAndLimitStageTest.php:5
+
+    ---------- begin diff ----------
+@@ @@
+ namespace Fuzzy\Tests\Unit\Stages;
+
+ use Fuzzy\Contracts\IndexRepositoryInterface;
+-use Fuzzy\Contracts\SearchContextInterface;
+ use Fuzzy\Services\Scoring\ScoringEngine;
+ use Fuzzy\Tests\TestCase;
+ use Fuzzy\Stages\SortAndLimitStage;
+@@ @@
+
+     /**
+      * Create a search context for testing.
++     * @param array<mixed[], mixed> $results
+      */
+     private function createSearchContext(
+         string $queryString,
+    ----------- end diff -----------
+
+Applied rules:
+ * ClassMethodArrayDocblockParamFromLocalCallsRector
+
+
+52) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/database/migrations/2024_01_01_000000_create_non_indexable_users_table.php:17
+
+    ---------- begin diff ----------
+@@ @@
+      */
+     public function up(): void
+     {
+-        Schema::create('non_indexable_users', function (Blueprint $table) {
++        Schema::create('non_indexable_users', function (Blueprint $table): void {
+             $table->id();
+             $table->string('name');
+             $table->string('email')->unique();
+    ----------- end diff -----------
+
+Applied rules:
+ * AddClosureVoidReturnTypeWhereNoReturnRector
+
+
+53) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/database/migrations/2024_01_01_000000_create_non_searchable_models_table.php:17
+
+    ---------- begin diff ----------
+@@ @@
+      */
+     public function up(): void
+     {
+-        Schema::create('non_searchable_models', function (Blueprint $table) {
++        Schema::create('non_searchable_models', function (Blueprint $table): void {
+             $table->id();
+             $table->string('name');
+             $table->string('email')->unique();
+    ----------- end diff -----------
+
+Applied rules:
+ * AddClosureVoidReturnTypeWhereNoReturnRector
 
 
 54) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/ResultFilterService.php:4
@@ -3161,7 +3161,6 @@ Applied rules:
  namespace Fuzzy\Services;
 
 +use RuntimeException;
-+use Exception;
  use Fuzzy\Commands\ClearCacheCommand;
  use Fuzzy\Commands\ClearIndexCommand;
  use Fuzzy\Commands\IndexSearchCommand;
@@ -3284,48 +3283,19 @@ Applied rules:
 
              return new ScoringEngine(
 @@ @@
-             }
-         }
+         // Récupérer tous les fichiers de migration
+         $migrationFiles = glob($sourceMigrationsPath . '/*.php');
 
--        if (!empty($filesToPublish)) {
-+        if ($filesToPublish !== []) {
-             $this->publishes($filesToPublish, 'fuzzy-migrations');
-         } else {
-             $this->showAllMigrationsSkippedMessage();
-@@ @@
-         try {
-             $command = $this->getCurrentCommand();
-             if ($command && method_exists($command, 'components')) {
--                $command->components->warn("Migration [{$fileName}] already exists, skipped.");
-+                $command->components->warn(sprintf('Migration [%s] already exists, skipped.', $fileName));
-                 return;
-             }
--        } catch (\Exception $e) {
-+        } catch (Exception $exception) {
-             // Fallback silencieux
-         }
-
-         // Fallback simple
--        error_log("[Fuzzy] Migration [{$fileName}] already exists, skipped.");
-+        error_log(sprintf('[Fuzzy] Migration [%s] already exists, skipped.', $fileName));
-     }
-
-     /**
-@@ @@
-                 $command->components->info('Use --force to overwrite existing migrations.');
-                 return;
-             }
--        } catch (\Exception $e) {
-+        } catch (Exception $exception) {
-             // Fallback silencieux
+-        if (empty($migrationFiles)) {
++        if ($migrationFiles === [] || $migrationFiles === false) {
+             return;
          }
     ----------- end diff -----------
 
 Applied rules:
- * SimplifyEmptyCheckOnEmptyArrayRector
- * CatchExceptionNameMatchingTypeRector
  * EncapsedStringsToSprintfRector
  * NewlineAfterStatementRector
+ * DisallowedEmptyRuleFixerRector
  * AddArrowFunctionReturnTypeRector
  * ClosureReturnTypeRector
 
