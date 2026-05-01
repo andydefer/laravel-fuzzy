@@ -8,6 +8,8 @@ use Error;
 use Fuzzy\Data\SearchResultData;
 use Fuzzy\Tests\TestCase;
 use Fuzzy\FuzzySearch;
+use Fuzzy\Contracts\SearchServiceInterface;
+use Fuzzy\Services\StringNormalizer;
 use Fuzzy\Tests\Fixtures\User;
 use Fuzzy\Tests\Fixtures\Product;
 use Fuzzy\Models\FuzzyIndex;
@@ -21,6 +23,9 @@ use Illuminate\Support\Collection;
  */
 final class FacadeTest extends TestCase
 {
+    private SearchServiceInterface $searchService;
+    private StringNormalizer $normalizer;
+
     /**
      * Set up test environment before each test.
      */
@@ -36,7 +41,12 @@ final class FacadeTest extends TestCase
         Product::query()->delete();
 
         $this->createTestData();
-        FuzzySearch::reindexAll();
+
+        $this->searchService = app(SearchServiceInterface::class);
+        $this->normalizer = app(StringNormalizer::class);
+
+        // Reindex all data via IndexManager
+        $this->searchService->getIndexManager()->reindexAll();
     }
 
     /**
@@ -105,6 +115,9 @@ final class FacadeTest extends TestCase
         $this->assertNotNull($johnResult, 'Should find John in search results');
     }
 
+    /**
+     * Test search with fuzzy matching.
+     */
     public function test_search_with_fuzzy_matching(): void
     {
         // Test avec une faute d'orthographe
@@ -135,7 +148,6 @@ final class FacadeTest extends TestCase
         // Act: Search only in User model for "john"
         /** @var Collection<int, SearchResultData> $results */
         $results = FuzzySearch::searchInModel($targetModel, $searchTerm);
-
 
         // Assert: Verify only users are returned
         $this->assertInstanceOf(Collection::class, $results);
@@ -174,7 +186,7 @@ final class FacadeTest extends TestCase
     }
 
     /**
-     * Test indexing a single model instance.
+     * Test indexing a single model instance via IndexManager.
      */
     public function test_index_model_facade(): void
     {
@@ -185,8 +197,8 @@ final class FacadeTest extends TestCase
             'type' => 'user',
         ]);
 
-        // Act: Index the new user using the facade
-        FuzzySearch::indexModel($newUser);
+        // Act: Index the new user via IndexManager
+        $this->searchService->getIndexManager()->indexModel($newUser);
 
         // Assert: Verify the user is indexed in FuzzyIndex
         $entry = FuzzyIndex::where('indexable_type', User::class)
@@ -199,7 +211,7 @@ final class FacadeTest extends TestCase
     }
 
     /**
-     * Test updating index for a model after changes.
+     * Test updating index for a model after changes via IndexManager.
      */
     public function test_update_model_index_facade(): void
     {
@@ -208,8 +220,8 @@ final class FacadeTest extends TestCase
         $user->name = 'Updated Name';
         $user->save();
 
-        // Act: Update the index for this user
-        FuzzySearch::updateModelIndex($user);
+        // Act: Update the index for this user via IndexManager
+        $this->searchService->getIndexManager()->updateModelIndex($user);
 
         // Assert: Verify index is updated with new value
         $entry = FuzzyIndex::where('indexable_type', User::class)
@@ -222,7 +234,7 @@ final class FacadeTest extends TestCase
     }
 
     /**
-     * Test removing a model from the index.
+     * Test removing a model from the index via IndexManager.
      */
     public function test_remove_model_from_index_facade(): void
     {
@@ -230,8 +242,8 @@ final class FacadeTest extends TestCase
         $user = User::first();
         $initialCount = FuzzyIndex::where('indexable_type', User::class)->count();
 
-        // Act: Remove the user from index
-        FuzzySearch::removeModelFromIndex($user);
+        // Act: Remove the user from index via IndexManager
+        $this->searchService->getIndexManager()->removeModel($user);
 
         // Assert: Verify count decreased and user entry is gone
         $newCount = FuzzyIndex::where('indexable_type', User::class)->count();
@@ -245,7 +257,7 @@ final class FacadeTest extends TestCase
     }
 
     /**
-     * Test reindexing all registered models.
+     * Test reindexing all registered models via IndexManager.
      */
     public function test_reindex_all_facade(): void
     {
@@ -256,8 +268,8 @@ final class FacadeTest extends TestCase
         $afterDeleteCount = FuzzyIndex::count();
         $this->assertLessThan($initialCount, $afterDeleteCount);
 
-        // Act: Reindex all models
-        FuzzySearch::reindexAll();
+        // Act: Reindex all models via IndexManager
+        $this->searchService->getIndexManager()->reindexAll();
 
         // Assert: Verify all entries are restored
         $finalCount = FuzzyIndex::count();
@@ -265,7 +277,7 @@ final class FacadeTest extends TestCase
     }
 
     /**
-     * Test reindexing a specific model class.
+     * Test reindexing a specific model class via IndexManager.
      */
     public function test_reindex_model_facade(): void
     {
@@ -277,8 +289,8 @@ final class FacadeTest extends TestCase
         $afterDeleteUserCount = FuzzyIndex::where('indexable_type', User::class)->count();
         $this->assertEquals(0, $afterDeleteUserCount);
 
-        // Act: Reindex only User model
-        FuzzySearch::reindexModel(User::class);
+        // Act: Reindex only User model via IndexManager
+        $this->searchService->getIndexManager()->reindexModel(User::class);
 
         // Assert: Verify user entries restored, product entries unchanged
         $finalUserCount = FuzzyIndex::where('indexable_type', User::class)->count();
@@ -289,12 +301,12 @@ final class FacadeTest extends TestCase
     }
 
     /**
-     * Test retrieving search index statistics.
+     * Test retrieving search index statistics via IndexManager.
      */
     public function test_get_stats_facade(): void
     {
-        // Act: Get statistics from facade
-        $stats = FuzzySearch::getStats();
+        // Act: Get statistics via IndexManager
+        $stats = $this->searchService->getIndexManager()->getStats();
 
         // Assert: Verify statistics structure and data
         $this->assertIsArray($stats);
@@ -305,28 +317,8 @@ final class FacadeTest extends TestCase
     }
 
     /**
-     * Test similarity calculation between two strings.
-     */
-    public function test_calculate_similarity_facade(): void
-    {
-        // Arrange: Define test strings
-        $identicalString1 = 'hello';
-        $identicalString2 = 'hello';
-        $partialString1 = 'hello';
-        $partialString2 = 'helo';
-
-        // Act: Calculate similarity scores using facade
-        $identicalSimilarity = FuzzySearch::calculateSimilarity($identicalString1, $identicalString2);
-        $partialSimilarity = FuzzySearch::calculateSimilarity($partialString1, $partialString2);
-
-        // Assert: Verify similarity calculations are correct
-        $this->assertEqualsWithDelta(1.0, $identicalSimilarity, PHP_FLOAT_EPSILON);
-        $this->assertGreaterThan(0.0, $partialSimilarity);
-        $this->assertLessThan(1.0, $partialSimilarity);
-    }
-
-    /**
-     * Test string normalization.
+     * Test string normalization via StringNormalizer.
+     * Note: La facade FuzzySearch n'a plus cette méthode, on utilise directement StringNormalizer.
      */
     public function test_normalize_facade(): void
     {
@@ -334,15 +326,16 @@ final class FacadeTest extends TestCase
         $inputString = 'Héllò Wörld!';
         $expectedOutput = 'hello world';
 
-        // Act: Normalize the string using facade
-        $normalized = FuzzySearch::normalize($inputString);
+        // Act: Normalize the string using StringNormalizer
+        $normalized = $this->normalizer->normalize($inputString);
 
         // Assert: Verify normalization removes accents and special chars
         $this->assertEquals($expectedOutput, $normalized);
     }
 
     /**
-     * Test splitting string into words.
+     * Test splitting string into words via StringNormalizer.
+     * Note: La facade FuzzySearch n'a plus cette méthode, on utilise directement StringNormalizer.
      */
     public function test_split_into_words_facade(): void
     {
@@ -350,8 +343,8 @@ final class FacadeTest extends TestCase
         $inputString = 'hello-world test';
         $expectedWords = ['hello', 'world', 'test'];
 
-        // Act: Split string into words using facade
-        $words = FuzzySearch::splitIntoWords($inputString);
+        // Act: Split string into words using StringNormalizer
+        $words = $this->normalizer->splitIntoWords($inputString);
 
         // Assert: Verify correct word splitting
         $this->assertEquals($expectedWords, $words);

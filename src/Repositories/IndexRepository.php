@@ -5,17 +5,28 @@ declare(strict_types=1);
 namespace Fuzzy\Repositories;
 
 use Fuzzy\Contracts\IndexRepositoryInterface;
+use Fuzzy\Contracts\SearchContextInterface;
 use Fuzzy\Models\FuzzyIndex;
-use Fuzzy\SearchContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
  * Repository for managing fuzzy search index data with optimized database operations.
+ *
+ * Handles retrieval of index entries, model preloading, and statistics collection.
+ * Implements caching strategies to reduce database queries during search operations.
+ *
+ * @package Fuzzy\Repositories
  */
 class IndexRepository implements IndexRepositoryInterface
 {
+    /**
+     * Minimum word length to include in word index.
+     * Words shorter than this are filtered out.
+     */
+    private const MIN_WORD_LENGTH = 2;
+
     /**
      * Cache of preloaded models keyed by model type and ID.
      *
@@ -24,19 +35,7 @@ class IndexRepository implements IndexRepositoryInterface
     private array $preloadedModelsMap = [];
 
     /**
-     * Retrieve indexed data for a specific model class.
-     *
-     * Returns a structured array containing word index, item mapping, and model index
-     * for efficient search operations.
-     *
-     * @param string $modelClass Fully qualified model class name
-     * @param array<int> $modelIds Specific model IDs to filter (empty for all)
-     * @return array{
-     *     wordIndex: array<string, array<int, array<string, mixed>>>,
-     *     itemMap: array<string, array{indexable_type: string, indexable_id: int|string}>,
-     *     modelIndex: array<string, array<int, array<string, mixed>>>,
-     *     rawEntries: array<int, array<string, mixed>>
-     * }
+     * {@inheritDoc}
      */
     public function getIndexDataForModel(string $modelClass, array $modelIds = []): array
     {
@@ -52,13 +51,7 @@ class IndexRepository implements IndexRepositoryInterface
     }
 
     /**
-     * Load multiple models efficiently in a single batch query.
-     *
-     * Supports eager loading of configured relationships to prevent N+1 query problems.
-     *
-     * @param string $modelClass Fully qualified model class name
-     * @param array<int|string> $ids Model IDs to retrieve
-     * @return Collection<int, Model>
+     * {@inheritDoc}
      */
     public function getModelsBatch(string $modelClass, array $ids): Collection
     {
@@ -69,7 +62,7 @@ class IndexRepository implements IndexRepositoryInterface
         $modelInstance = new $modelClass();
         $query = $modelClass::whereIn($modelInstance->getKeyName(), $ids);
 
-        $eagerLoadRelations = config('fuzzy.eager_load.' . $modelClass, []);
+        $eagerLoadRelations = $this->getEagerLoadRelations($modelClass);
 
         if ($eagerLoadRelations !== []) {
             $query->with($eagerLoadRelations);
@@ -79,14 +72,9 @@ class IndexRepository implements IndexRepositoryInterface
     }
 
     /**
-     * Preload models referenced in search context for efficient access.
-     *
-     * This method loads all models needed for a search operation in a single query
-     * and stores them in an internal cache for O(1) access.
-     *
-     * @param SearchContext $context Search context containing model IDs to preload
+     * {@inheritDoc}
      */
-    public function preloadModels(SearchContext $context): void
+    public function preloadModels(SearchContextInterface $context): void
     {
         $modelIds = $context->getAllModelIds();
 
@@ -109,9 +97,7 @@ class IndexRepository implements IndexRepositoryInterface
     }
 
     /**
-     * Retrieve the map of preloaded models.
-     *
-     * @return array<string, Model> Models keyed by "ClassName_ID" format
+     * {@inheritDoc}
      */
     public function getPreloadedModelsMap(): array
     {
@@ -119,14 +105,7 @@ class IndexRepository implements IndexRepositoryInterface
     }
 
     /**
-     * Get statistical information about the search index.
-     *
-     * Returns counts of total entries, per-model entries, and per-field distribution.
-     *
-     * @return array{
-     *     total_entries: int,
-     *     models: array<string, array{count: int, fields: array<string, int>}>
-     * }
+     * {@inheritDoc}
      */
     public function getStats(): array
     {
@@ -140,9 +119,20 @@ class IndexRepository implements IndexRepositoryInterface
     }
 
     /**
+     * Get eager load relations for a specific model from configuration.
+     *
+     * @param string $modelClass Fully qualified model class name
+     * @return array<int, string> List of relation names to eager load
+     */
+    private function getEagerLoadRelations(string $modelClass): array
+    {
+        return config('fuzzy.eager_load.' . $modelClass, []);
+    }
+
+    /**
      * Build index structures from raw index entries.
      *
-     * @param Collection<int, FuzzyIndex> $indexEntries
+     * @param Collection<int, FuzzyIndex> $indexEntries Collection of index entries
      * @return array{
      *     wordIndex: array<string, array<int, array<string, mixed>>>,
      *     itemMap: array<string, array{indexable_type: string, indexable_id: int|string}>,
@@ -158,18 +148,11 @@ class IndexRepository implements IndexRepositoryInterface
 
         foreach ($indexEntries as $entry) {
             $modelKey = $this->buildModelKey($entry->indexable_type, $entry->indexable_id);
-
             $matchData = $this->buildMatchData($entry);
 
-            $this->processEntryWords($entry->words, $matchData, $wordIndex);
-            $this->updateModelIndex($modelKey, $matchData, $modelIndex);
-
-            if (!isset($itemMap[$modelKey])) {
-                $itemMap[$modelKey] = [
-                    'indexable_type' => $entry->indexable_type,
-                    'indexable_id' => $entry->indexable_id,
-                ];
-            }
+            $this->addWordIndexEntries($entry->words, $matchData, $wordIndex);
+            $this->addToModelIndex($modelKey, $matchData, $modelIndex);
+            $this->addToItemMap($modelKey, $entry, $itemMap);
         }
 
         return [
@@ -181,10 +164,10 @@ class IndexRepository implements IndexRepositoryInterface
     }
 
     /**
-     * Create match data structure from index entry.
+     * Create match data structure from an index entry.
      *
-     * @param FuzzyIndex $entry
-     * @return array<string, mixed>
+     * @param FuzzyIndex $entry The index entry
+     * @return array<string, mixed> Match data structure
      */
     private function buildMatchData(FuzzyIndex $entry): array
     {
@@ -199,16 +182,18 @@ class IndexRepository implements IndexRepositoryInterface
     }
 
     /**
-     * Process words from an index entry and update word index.
+     * Add word entries to the word index.
      *
-     * @param array<int, string> $words
-     * @param array<string, mixed> $matchData
-     * @param array<string, array<int, array<string, mixed>>> $wordIndex Reference to word index
+     * Filters out words that are too short.
+     *
+     * @param array<int, string> $words Array of words from the index entry
+     * @param array<string, mixed> $matchData Match data to associate with each word
+     * @param array<string, array<int, array<string, mixed>>> $wordIndex Reference to word index (modified in place)
      */
-    private function processEntryWords(array $words, array $matchData, array &$wordIndex): void
+    private function addWordIndexEntries(array $words, array $matchData, array &$wordIndex): void
     {
         foreach ($words as $word) {
-            if (strlen($word) < 2) {
+            if (strlen($word) < self::MIN_WORD_LENGTH) {
                 continue;
             }
 
@@ -221,13 +206,13 @@ class IndexRepository implements IndexRepositoryInterface
     }
 
     /**
-     * Update model index with match data.
+     * Add match data to the model index.
      *
-     * @param string $modelKey
-     * @param array<string, mixed> $matchData
-     * @param array<string, array<int, array<string, mixed>>> $modelIndex Reference to model index
+     * @param string $modelKey Unique model identifier (type_id format)
+     * @param array<string, mixed> $matchData Match data to add
+     * @param array<string, array<int, array<string, mixed>>> $modelIndex Reference to model index (modified in place)
      */
-    private function updateModelIndex(string $modelKey, array $matchData, array &$modelIndex): void
+    private function addToModelIndex(string $modelKey, array $matchData, array &$modelIndex): void
     {
         if (!isset($modelIndex[$modelKey])) {
             $modelIndex[$modelKey] = [];
@@ -237,10 +222,27 @@ class IndexRepository implements IndexRepositoryInterface
     }
 
     /**
+     * Add a model entry to the item map if not already present.
+     *
+     * @param string $modelKey Unique model identifier
+     * @param FuzzyIndex $entry The index entry containing model information
+     * @param array<string, array{indexable_type: string, indexable_id: int|string}> $itemMap Reference to item map (modified in place)
+     */
+    private function addToItemMap(string $modelKey, FuzzyIndex $entry, array &$itemMap): void
+    {
+        if (!isset($itemMap[$modelKey])) {
+            $itemMap[$modelKey] = [
+                'indexable_type' => $entry->indexable_type,
+                'indexable_id' => $entry->indexable_id,
+            ];
+        }
+    }
+
+    /**
      * Cache loaded models in internal map for O(1) access.
      *
-     * @param Collection<int, Model> $models
-     * @param string $modelClass
+     * @param Collection<int, Model> $models Collection of loaded models
+     * @param string $modelClass The model class name
      */
     private function cacheModels(Collection $models, string $modelClass): void
     {
@@ -304,11 +306,11 @@ class IndexRepository implements IndexRepositoryInterface
     /**
      * Generate a consistent key for model identification.
      *
-     * @param string $modelClass
-     * @param int|string $modelId
-     * @return string
+     * @param string $modelClass Fully qualified model class name
+     * @param int|string $modelId Model identifier
+     * @return string Unique key in format "class_id"
      */
-    private function buildModelKey(string $modelClass, $modelId): string
+    private function buildModelKey(string $modelClass, int|string $modelId): string
     {
         return $modelClass . '_' . $modelId;
     }

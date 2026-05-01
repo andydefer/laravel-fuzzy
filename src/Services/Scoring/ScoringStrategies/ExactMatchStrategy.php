@@ -4,30 +4,46 @@ declare(strict_types=1);
 
 namespace Fuzzy\Services\Scoring\ScoringStrategies;
 
-use Fuzzy\SearchContext;
+use Fuzzy\Contracts\SearchContextInterface;
 use Fuzzy\Services\AdvancedScoringCalculator;
-use Fuzzy\Services\Scoring\ScoringStrategy;
+use Fuzzy\Services\Scoring\ScoringStrategyInterface;
 
 /**
  * Scoring strategy for exact matches
  *
  * Provides the highest priority scoring when the search query
  * exactly matches the indexed value.
+ * 
+ * This strategy is applied when the normalized query string
+ * is identical to the original indexed value.
  */
-class ExactMatchStrategy implements ScoringStrategy
+class ExactMatchStrategy implements ScoringStrategyInterface
 {
+    /**
+     * Priority for exact match strategy (highest priority)
+     * 
+     * Exact matches should always be evaluated first as they
+     * represent the most relevant results.
+     */
+    private const PRIORITY = 100;
+
+    /**
+     * Constructor.
+     *
+     * @param AdvancedScoringCalculator $advancedCalculator Service for advanced scoring calculations
+     */
     public function __construct(
         private AdvancedScoringCalculator $advancedCalculator
     ) {}
 
     /**
-     * Determines if this strategy applies to the current search context
+     * {@inheritDoc}
      *
-     * @param SearchContext $context The current search context
-     * @param array<string, mixed> $indexEntry The index entry being evaluated
-     * @return bool True if the normalized query exactly matches the original value
+     * Determines if this strategy applies to the current search context.
+     * Returns true when the normalized query exactly matches the original
+     * value from the index entry.
      */
-    public function supports(SearchContext $context, array $indexEntry): bool
+    public function supports(SearchContextInterface $context, array $indexEntry): bool
     {
         $normalizedQuery = $context->getNormalizedQuery();
         $originalValue = $indexEntry['original_value'] ?? '';
@@ -36,15 +52,15 @@ class ExactMatchStrategy implements ScoringStrategy
     }
 
     /**
-     * Calculates the score for an exact match
+     * {@inheritDoc}
      *
-     * @param SearchContext $context The current search context
-     * @param array<string, mixed> $indexEntry The index entry being scored
-     * @return float The calculated score, enhanced by advanced calculations
+     * Calculates the score for an exact match.
+     * Uses the base score of 1.0 multiplied by field weight,
+     * then applies additional advanced scoring calculations.
      */
-    public function calculate(SearchContext $context, array $indexEntry): float
+    public function calculate(SearchContextInterface $context, array $indexEntry): float
     {
-        $baseScore = 1.0 * ($indexEntry['weight'] ?? 1.0);
+        $baseScore = FUZZY_SCORE_IDENTICAL * ($indexEntry['weight'] ?? FUZZY_BASE_FACTOR);
 
         return $this->advancedCalculator->calculateFinalScore(
             baseScore: $baseScore,
@@ -55,14 +71,14 @@ class ExactMatchStrategy implements ScoringStrategy
     }
 
     /**
-     * Returns the priority of this strategy
+     * {@inheritDoc}
      *
-     * Exact matches have the highest priority in the scoring system.
-     *
-     * @return int Priority value (higher = more important)
+     * Returns the priority of this strategy.
+     * Exact matches have the highest priority in the scoring system
+     * to ensure they are considered first.
      */
     public function getPriority(): int
     {
-        return 100;
+        return self::PRIORITY;
     }
 }

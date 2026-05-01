@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Fuzzy\Commands;
 
+use Fuzzy\Contracts\SearchServiceInterface;
+use Fuzzy\Traits\CommandHelpers;
 use Illuminate\Console\Command;
 
 /**
@@ -11,9 +13,13 @@ use Illuminate\Console\Command;
  *
  * Provides insights into indexed data including total entries,
  * per-model statistics, and field distribution.
+ *
+ * @package Fuzzy\Commands
  */
 class StatsIndexCommand extends Command
 {
+    use CommandHelpers;
+
     /**
      * The name and signature of the console command.
      *
@@ -38,12 +44,22 @@ class StatsIndexCommand extends Command
      */
     public function handle(): void
     {
-        $searchService = app('laravel-fuzzy.search');
-        $statistics = $searchService->getStats();
+        $searchService = $this->getSearchService();
+        $statistics = $searchService->getIndexManager()->getStats();
 
         $this->displayHeader();
         $this->displayTotalEntries($statistics['total_entries']);
         $this->displayModelStatistics($statistics['models']);
+    }
+
+    /**
+     * Get the search service from the container.
+     *
+     * @return SearchServiceInterface
+     */
+    private function getSearchService(): SearchServiceInterface
+    {
+        return app(SearchServiceInterface::class);
     }
 
     /**
@@ -53,7 +69,7 @@ class StatsIndexCommand extends Command
      */
     private function displayHeader(): void
     {
-        $this->info('=== Search Index Statistics ===');
+        $this->showHeader('Search Index Statistics');
     }
 
     /**
@@ -64,8 +80,8 @@ class StatsIndexCommand extends Command
      */
     private function displayTotalEntries(int $totalEntries): void
     {
-        $this->info('Total entries: ' . $totalEntries);
-        $this->newLine();
+        $this->showInfo('Total entries: ' . $totalEntries);
+        $this->showNewLine();
     }
 
     /**
@@ -78,11 +94,11 @@ class StatsIndexCommand extends Command
      */
     private function displayModelStatistics(array $modelsStats): void
     {
-        $this->info('Per model statistics:');
-        $this->newLine();
+        $this->showInfo('Per model statistics:');
+        $this->showNewLine();
 
         if (empty($modelsStats)) {
-            $this->warn('No models indexed yet.');
+            $this->showWarning('No models indexed yet.');
             return;
         }
 
@@ -106,7 +122,7 @@ class StatsIndexCommand extends Command
             $formattedFields = $this->formatFieldCounts($modelData['fields']);
 
             $rows[] = [
-                $modelClass, // Retourner le nom complet de la classe
+                $modelClass,
                 $modelData['count'],
                 $formattedFields ?: 'No fields indexed',
             ];

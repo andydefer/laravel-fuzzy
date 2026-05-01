@@ -28,18 +28,24 @@ class NonIndexableUser extends Model implements MustFuzzySearch
     protected $fillable = ['name', 'email', 'type'];
 
     /**
-     * The fields that should be searchable.
+     * Get the searchable fields for the model.
      *
-     * @var array<string>
+     * @return array<int, string>
      */
-    public array $searchableFields = ['name', 'email'];
+    public function getSearchableFields(): array
+    {
+        return ['name', 'email'];
+    }
 
     /**
-     * Custom formatter class for search data.
+     * Get the custom formatter class for search data.
      *
-     * @var class-string<FuzzySearchableData>|null
+     * @return class-string<FuzzySearchableData>|null
      */
-    public ?string $fuzzyFormat = UserSearchData::class;
+    public function getFuzzyFormat(): ?string
+    {
+        return UserSearchData::class;
+    }
 
     /**
      * Determine if the model should be indexed for search.

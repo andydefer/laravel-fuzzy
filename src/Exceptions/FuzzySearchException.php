@@ -7,14 +7,21 @@ namespace Fuzzy\Exceptions;
 use Exception;
 
 /**
- * Exception for generic fuzzy search errors.
+ * Generic exception for fuzzy search errors.
+ *
+ * This exception is thrown for general errors that occur during
+ * fuzzy search operations, such as configuration issues,
+ * indexing problems, or invalid operations.
+ *
+ * @package Fuzzy\Exceptions
  */
 class FuzzySearchException extends Exception
 {
     /**
-     * Creates an exception for when a model is not searchable.
+     * Create an exception for when a model does not implement the required interface.
      *
-     * @param string $modelClass The model class name
+     * @param string $modelClass The model class name that is not searchable
+     * @return self Configured exception instance
      */
     public static function modelNotSearchable(string $modelClass): self
     {
@@ -24,9 +31,12 @@ class FuzzySearchException extends Exception
     }
 
     /**
-     * Creates an exception for when a search index is not found.
+     * Create an exception for when a search index is not found for a model.
      *
-     * @param string $modelClass The model class name
+     * This typically occurs when attempting to search before running the indexer.
+     *
+     * @param string $modelClass The model class name that has no index
+     * @return self Configured exception instance
      */
     public static function indexNotFound(string $modelClass): self
     {
@@ -36,9 +46,12 @@ class FuzzySearchException extends Exception
     }
 
     /**
-     * Creates an exception for an invalid format class.
+     * Create an exception for an invalid formatter class.
      *
-     * @param string $formatClass The format class name
+     * The formatter class must extend Spatie\LaravelData\Data to be valid.
+     *
+     * @param string $formatClass The invalid formatter class name
+     * @return self Configured exception instance
      */
     public static function invalidFormatClass(string $formatClass): self
     {

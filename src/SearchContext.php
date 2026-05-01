@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace Fuzzy;
 
+use Fuzzy\Contracts\SearchContextInterface;
+use Fuzzy\Contracts\ScoringEngineInterface;
 use Fuzzy\ValueObjects\SearchQuery;
 use Fuzzy\ValueObjects\IndexData;
 use Fuzzy\Data\SearchOptionsData;
 use Fuzzy\Services\StringNormalizer;
 use Fuzzy\Services\SimilarityCalculator;
 use Fuzzy\Services\IndexBuilder;
-use Fuzzy\Services\Scoring\ScoringEngine;
 use Fuzzy\Contracts\IndexRepositoryInterface;
 use Illuminate\Support\Collection;
 
@@ -22,7 +23,7 @@ use Illuminate\Support\Collection;
  *
  * @package Fuzzy
  */
-class SearchContext
+class SearchContext implements SearchContextInterface
 {
     /** @var SearchQuery The original search query with normalized data */
     public SearchQuery $query;
@@ -60,8 +61,8 @@ class SearchContext
     /** @var IndexRepositoryInterface Repository for accessing index data */
     public IndexRepositoryInterface $indexRepository;
 
-    /** @var ScoringEngine Service for scoring and ranking search results */
-    public ScoringEngine $scoringEngine;
+    /** @var ScoringEngineInterface Service for scoring and ranking search results */
+    public ScoringEngineInterface $scoringEngine;
 
     /**
      * Initialize a new search context.
@@ -72,7 +73,7 @@ class SearchContext
      * @param SimilarityCalculator $similarityCalculator String similarity service
      * @param IndexBuilder $indexBuilder Index construction service
      * @param IndexRepositoryInterface $indexRepository Index data repository
-     * @param ScoringEngine $scoringEngine Result scoring engine
+     * @param ScoringEngineInterface $scoringEngine Result scoring engine
      * @param array<string, mixed> $indexDataArray Raw index data
      */
     public function __construct(
@@ -82,7 +83,7 @@ class SearchContext
         SimilarityCalculator $similarityCalculator,
         IndexBuilder $indexBuilder,
         IndexRepositoryInterface $indexRepository,
-        ScoringEngine $scoringEngine,
+        ScoringEngineInterface $scoringEngine,
         array $indexDataArray
     ) {
         $this->query = $query;
@@ -116,10 +117,7 @@ class SearchContext
     }
 
     /**
-     * Retrieve a model instance from preloaded models.
-     *
-     * @param string $key Model identifier (type_id format)
-     * @return object|null The model instance or null if not found
+     * {@inheritDoc}
      */
     public function getModelInstance(string $key): ?object
     {
@@ -127,9 +125,7 @@ class SearchContext
     }
 
     /**
-     * Get all model IDs from the item map.
-     *
-     * @return array<int> Unique model identifiers
+     * {@inheritDoc}
      */
     public function getAllModelIds(): array
     {
@@ -142,9 +138,7 @@ class SearchContext
     }
 
     /**
-     * Check if the query contains multiple words.
-     *
-     * @return bool True if query has multiple words
+     * {@inheritDoc}
      */
     public function hasMultipleWords(): bool
     {
@@ -152,9 +146,7 @@ class SearchContext
     }
 
     /**
-     * Get individual query words.
-     *
-     * @return array<int, string> Array of query words
+     * {@inheritDoc}
      */
     public function getQueryWords(): array
     {
@@ -162,9 +154,7 @@ class SearchContext
     }
 
     /**
-     * Get the normalized query string.
-     *
-     * @return string Normalized search query
+     * {@inheritDoc}
      */
     public function getNormalizedQuery(): string
     {
@@ -172,9 +162,7 @@ class SearchContext
     }
 
     /**
-     * Get the word index from index data.
-     *
-     * @return array<string, mixed> Word index mapping
+     * {@inheritDoc}
      */
     public function getWordIndex(): array
     {
@@ -182,9 +170,7 @@ class SearchContext
     }
 
     /**
-     * Get the item map from index data.
-     *
-     * @return array<string, mixed> Item mapping data
+     * {@inheritDoc}
      */
     public function getItemMap(): array
     {
@@ -192,9 +178,7 @@ class SearchContext
     }
 
     /**
-     * Get the model index from index data.
-     *
-     * @return array<string, mixed> Model index mapping
+     * {@inheritDoc}
      */
     public function getModelIndex(): array
     {
@@ -202,11 +186,7 @@ class SearchContext
     }
 
     /**
-     * Get index entries for a specific model.
-     *
-     * @param string $modelType Type of the model
-     * @param string $modelId Model identifier
-     * @return array<string, mixed> Index entries for the model
+     * {@inheritDoc}
      */
     public function getIndexEntriesForModel(string $modelType, string $modelId): array
     {
@@ -214,9 +194,7 @@ class SearchContext
     }
 
     /**
-     * Get the model class from index data.
-     *
-     * @return string Fully qualified model class name
+     * {@inheritDoc}
      */
     public function getModelClass(): string
     {
@@ -224,10 +202,7 @@ class SearchContext
     }
 
     /**
-     * Add a potential match before scoring.
-     *
-     * @param array<string, mixed> $match Raw match data
-     * @return void
+     * {@inheritDoc}
      */
     public function addPotentialMatch(array $match): void
     {
@@ -245,6 +220,30 @@ class SearchContext
         }
 
         $this->potentialMatches[$key][] = $match;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function getPotentialMatchesForModel(string $key): array
+    {
+        return $this->potentialMatches[$key] ?? [];
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function getAllPotentialMatches(): array
+    {
+        return $this->potentialMatches;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function hasPotentialMatches(string $key): bool
+    {
+        return !empty($this->potentialMatches[$key]);
     }
 
     /**
@@ -293,37 +292,5 @@ class SearchContext
             'field' => $match['field'] ?? null,
             'original_value' => $match['original_value'] ?? null,
         ]));
-    }
-
-    /**
-     * Get all potential matches for a specific model.
-     *
-     * @param string $key Model identifier (type_id format)
-     * @return array<array<string, mixed>> Array of potential matches
-     */
-    public function getPotentialMatchesForModel(string $key): array
-    {
-        return $this->potentialMatches[$key] ?? [];
-    }
-
-    /**
-     * Get all potential matches across all models.
-     *
-     * @return array<string, array<array<string, mixed>>> All potential matches
-     */
-    public function getAllPotentialMatches(): array
-    {
-        return $this->potentialMatches;
-    }
-
-    /**
-     * Check if a model has any potential matches.
-     *
-     * @param string $key Model identifier (type_id format)
-     * @return bool True if model has potential matches
-     */
-    public function hasPotentialMatches(string $key): bool
-    {
-        return !empty($this->potentialMatches[$key]);
     }
 }

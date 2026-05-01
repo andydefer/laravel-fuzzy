@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Fuzzy\Tests\Unit\Stages;
 
 use Fuzzy\Contracts\IndexRepositoryInterface;
+use Fuzzy\Contracts\SearchContextInterface;
 use Fuzzy\Services\Scoring\ScoringEngine;
 use Fuzzy\Tests\TestCase;
 use Fuzzy\Stages\SortAndLimitStage;
@@ -16,7 +17,6 @@ use Fuzzy\Services\IndexBuilder;
 use Fuzzy\ValueObjects\SearchQuery;
 use Fuzzy\SearchContext;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
-use PHPUnit\Framework\MockObject\MockObject;
 
 #[AllowMockObjectsWithoutExpectations]
 final class SortAndLimitStageTest extends TestCase
@@ -29,12 +29,32 @@ final class SortAndLimitStageTest extends TestCase
         $this->stage = new SortAndLimitStage();
     }
 
-    public function test_handle_with_no_results(): void
+    /**
+     * Create a next callback for pipeline testing.
+     * The callback should return the modified context results.
+     */
+    private function createNextCallback(): callable
     {
-        // Arrange: Create a search context with empty results
+        return function ($passedContext) {
+            return $passedContext->results;
+        };
+    }
+
+    /**
+     * Create a search context for testing.
+     */
+    private function createSearchContext(
+        string $queryString,
+        array $results,
+        float $minScore = 0.0,
+        int $maxResults = 20
+    ): SearchContext {
         $normalizer = new StringNormalizer();
-        $query = SearchQuery::create('test', $normalizer);
-        $options = new SearchOptionsData();
+        $query = SearchQuery::create($queryString, $normalizer);
+        $options = new SearchOptionsData(
+            minScore: $minScore,
+            maxResults: $maxResults
+        );
 
         $context = new SearchContext(
             query: $query,
@@ -47,245 +67,184 @@ final class SortAndLimitStageTest extends TestCase
             indexDataArray: []
         );
 
-        $context->results = [];
+        $context->results = $results;
 
-        // Act: Execute the stage with empty results
-        $result = $this->stage->handle(context: $context);
+        return $context;
+    }
 
-        // Assert: Should return empty array without modifying context
-        $this->assertSame([], $result);
-        $this->assertSame([], $context->results);
+    /**
+     * Create a mock search result with a specific score.
+     */
+    private function createMockResult(float $score): SearchResultData
+    {
+        $result = $this->createMock(SearchResultData::class);
+        $result->score = $score;
+        return $result;
+    }
+
+    public function test_handle_with_no_results(): void
+    {
+        $context = $this->createSearchContext('test', []);
+        $next = $this->createNextCallback();
+
+        $result = $this->stage->handle($context, $next);
+
+        $this->assertIsArray($result);
+        $this->assertEmpty($result);
+        $this->assertEmpty($context->results);
     }
 
     public function test_handle_sorts_by_score_descending(): void
     {
-        // Arrange: Create results with different scores in random order
-        $normalizer = new StringNormalizer();
-        $query = SearchQuery::create('test', $normalizer);
-        $options = new SearchOptionsData(minScore: 0.1);
-
-        $context = new SearchContext(
-            query: $query,
-            options: $options,
-            normalizer: $normalizer,
-            similarityCalculator: new SimilarityCalculator(),
-            indexBuilder: $this->createMock(IndexBuilder::class),
-            indexRepository: $this->createMock(IndexRepositoryInterface::class),
-            scoringEngine: $this->createMock(ScoringEngine::class),
-            indexDataArray: []
-        );
-
-        $lowScoreResult = $this->createMock(SearchResultData::class);
-        $lowScoreResult->score = 0.3;
-
-        $highScoreResult = $this->createMock(SearchResultData::class);
-        $highScoreResult->score = 0.8;
-
-        $mediumScoreResult = $this->createMock(SearchResultData::class);
-        $mediumScoreResult->score = 0.5;
-
-        $context->results = [
-            'item1' => $lowScoreResult,
-            'item2' => $highScoreResult,
-            'item3' => $mediumScoreResult,
+        $results = [
+            $this->createMockResult(0.3),
+            $this->createMockResult(0.8),
+            $this->createMockResult(0.5),
         ];
 
-        // Act: Execute the sorting stage
-        $this->stage->handle(context: $context);
+        $context = $this->createSearchContext('test', $results, 0.1);
+        $next = $this->createNextCallback();
 
-        // Assert: Results should be sorted by score in descending order
-        $results = $context->results;
-        $this->assertCount(3, $results);
+        $this->stage->handle($context, $next);
 
-        $actualScores = array_map(
-            fn(SearchResultData&MockObject $result): float => $result->score,
-            $results
-        );
+        $processedResults = $context->results;
+        $this->assertCount(3, $processedResults);
+
+        $actualScores = array_map(fn($result): float => $result->score, $processedResults);
         $this->assertSame([0.8, 0.5, 0.3], $actualScores);
     }
 
     public function test_handle_filters_by_min_score(): void
     {
-        // Arrange: Create results with scores below and above minimum threshold
-        $normalizer = new StringNormalizer();
-        $query = SearchQuery::create('test', $normalizer);
-        $options = new SearchOptionsData(minScore: 0.5);
-
-        $context = new SearchContext(
-            query: $query,
-            options: $options,
-            normalizer: $normalizer,
-            similarityCalculator: new SimilarityCalculator(),
-            indexBuilder: $this->createMock(IndexBuilder::class),
-            indexRepository: $this->createMock(IndexRepositoryInterface::class),
-            scoringEngine: $this->createMock(ScoringEngine::class),
-            indexDataArray: []
-        );
-
-        $belowMinResult1 = $this->createMock(SearchResultData::class);
-        $belowMinResult1->score = 0.3;
-
-        $aboveMinResult = $this->createMock(SearchResultData::class);
-        $aboveMinResult->score = 0.8;
-
-        $belowMinResult2 = $this->createMock(SearchResultData::class);
-        $belowMinResult2->score = 0.4;
-
-        $context->results = [
-            'item1' => $belowMinResult1,
-            'item2' => $aboveMinResult,
-            'item3' => $belowMinResult2,
+        $results = [
+            $this->createMockResult(0.3),
+            $this->createMockResult(0.8),
+            $this->createMockResult(0.4),
         ];
 
-        // Act: Execute the filtering stage
-        $this->stage->handle(context: $context);
+        $context = $this->createSearchContext('test', $results, 0.5);
+        $next = $this->createNextCallback();
 
-        // Assert: Should only keep results with score equal or above minimum threshold
-        $results = $context->results;
-        $this->assertCount(1, $results);
-        $this->assertEqualsWithDelta(0.8, $results[0]->score, PHP_FLOAT_EPSILON);
+        $this->stage->handle($context, $next);
+
+        $processedResults = $context->results;
+        $this->assertCount(1, $processedResults);
+        $this->assertEqualsWithDelta(0.8, $processedResults[0]->score, PHP_FLOAT_EPSILON);
+    }
+
+    public function test_handle_filters_by_min_score_with_exact_threshold(): void
+    {
+        $results = [
+            $this->createMockResult(0.3),
+            $this->createMockResult(0.5),
+            $this->createMockResult(0.7),
+        ];
+
+        $context = $this->createSearchContext('test', $results, 0.5);
+        $next = $this->createNextCallback();
+
+        $this->stage->handle($context, $next);
+
+        $processedResults = $context->results;
+        $this->assertCount(2, $processedResults);
+        $actualScores = array_map(fn($result): float => $result->score, $processedResults);
+        $this->assertContains(0.5, $actualScores);
+        $this->assertContains(0.7, $actualScores);
     }
 
     public function test_handle_limits_results(): void
     {
-        // Arrange: Create more results than the maximum allowed
-        $normalizer = new StringNormalizer();
-        $query = SearchQuery::create('test', $normalizer);
-        $options = new SearchOptionsData(maxResults: 2);
-
-        $context = new SearchContext(
-            query: $query,
-            options: $options,
-            normalizer: $normalizer,
-            similarityCalculator: new SimilarityCalculator(),
-            indexBuilder: $this->createMock(IndexBuilder::class),
-            indexRepository: $this->createMock(IndexRepositoryInterface::class),
-            scoringEngine: $this->createMock(ScoringEngine::class),
-            indexDataArray: []
-        );
-
-        $context->results = [];
+        $results = [];
         for ($i = 1; $i <= 5; ++$i) {
-            $result = $this->createMock(SearchResultData::class);
-            $result->score = $i * 0.2;
-            $context->results['item' . $i] = $result;
+            $results[] = $this->createMockResult($i * 0.2);
         }
 
-        // Act: Execute the limiting stage
-        $this->stage->handle(context: $context);
+        $context = $this->createSearchContext('test', $results, 0.0, 2);
+        $next = $this->createNextCallback();
 
-        // Assert: Should keep only the highest scoring results up to the limit
-        $results = $context->results;
-        $this->assertCount(2, $results);
+        $this->stage->handle($context, $next);
 
-        $actualScores = array_map(fn($result): float => $result->score, $results);
+        $processedResults = $context->results;
+        $this->assertCount(2, $processedResults);
+
+        $actualScores = array_map(fn($result): float => $result->score, $processedResults);
         $this->assertSame([1.0, 0.8], $actualScores);
     }
 
     public function test_handle_combines_filtering_sorting_and_limiting(): void
     {
-        // Arrange: Create results that will be filtered, sorted and limited
-        $normalizer = new StringNormalizer();
-        $query = SearchQuery::create('test', $normalizer);
-        $options = new SearchOptionsData(
-            minScore: 0.4,
-            maxResults: 3
-        );
-
-        $context = new SearchContext(
-            query: $query,
-            options: $options,
-            normalizer: $normalizer,
-            similarityCalculator: new SimilarityCalculator(),
-            indexBuilder: $this->createMock(IndexBuilder::class),
-            indexRepository: $this->createMock(IndexRepositoryInterface::class),
-            scoringEngine: $this->createMock(ScoringEngine::class),
-            indexDataArray: []
-        );
-
         $scores = [0.2, 0.9, 0.3, 0.7, 0.5, 0.8, 0.4, 0.6];
-        $context->results = [];
+        $results = [];
 
-        foreach ($scores as $index => $score) {
-            $result = $this->createMock(SearchResultData::class);
-            $result->score = $score;
-            $context->results['item' . $index] = $result;
+        foreach ($scores as $score) {
+            $results[] = $this->createMockResult($score);
         }
 
-        // Act: Execute the complete processing stage
-        $this->stage->handle(context: $context);
+        $context = $this->createSearchContext('test', $results, 0.4, 3);
+        $next = $this->createNextCallback();
 
-        // Assert: Should filter low scores, sort descending, and apply limit
-        $results = $context->results;
-        $this->assertCount(3, $results);
+        $this->stage->handle($context, $next);
 
-        $actualScores = array_map(fn($result): float => $result->score, $results);
+        $processedResults = $context->results;
+        $this->assertCount(3, $processedResults);
+
+        $actualScores = array_map(fn($result): float => $result->score, $processedResults);
         $this->assertSame([0.9, 0.8, 0.7], $actualScores);
     }
 
     public function test_handle_with_null_results(): void
     {
-        // Arrange: Create results including null values
-        $normalizer = new StringNormalizer();
-        $query = SearchQuery::create('test', $normalizer);
-        $options = new SearchOptionsData();
+        $validResult1 = $this->createMockResult(0.8);
+        $validResult2 = $this->createMockResult(0.6);
 
-        $context = new SearchContext(
-            query: $query,
-            options: $options,
-            normalizer: $normalizer,
-            similarityCalculator: new SimilarityCalculator(),
-            indexBuilder: $this->createMock(IndexBuilder::class),
-            indexRepository: $this->createMock(IndexRepositoryInterface::class),
-            scoringEngine: $this->createMock(ScoringEngine::class),
-            indexDataArray: []
-        );
-
-        $validResult = $this->createMock(SearchResultData::class);
-        $validResult->score = 0.8;
-
-        $context->results = [
-            'item1' => $validResult,
-            'item2' => null,
-            'item3' => $validResult,
+        $results = [
+            $validResult1,
+            null,
+            $validResult2,
+            null,
         ];
 
-        // Act: Execute the stage with null results
-        $this->stage->handle(context: $context);
+        $context = $this->createSearchContext('test', $results);
+        $next = $this->createNextCallback();
 
-        // Assert: Should filter out null results while keeping valid ones
-        $results = $context->results;
-        $this->assertCount(2, $results);
-        $this->assertNotContains(null, $results);
+        $this->stage->handle($context, $next);
+
+        $processedResults = $context->results;
+        $this->assertCount(2, $processedResults);
+        $this->assertNotContains(null, $processedResults);
+    }
+
+    public function test_handle_filters_null_before_sorting(): void
+    {
+        $results = [
+            null,
+            $this->createMockResult(0.9),
+            null,
+            $this->createMockResult(0.5),
+            $this->createMockResult(0.7),
+        ];
+
+        $context = $this->createSearchContext('test', $results);
+        $next = $this->createNextCallback();
+
+        $this->stage->handle($context, $next);
+
+        $processedResults = $context->results;
+        $this->assertCount(3, $processedResults);
+        $actualScores = array_map(fn($result): float => $result->score, $processedResults);
+        $this->assertSame([0.9, 0.7, 0.5], $actualScores);
     }
 
     public function test_handle_returns_results(): void
     {
-        // Arrange: Create context with single result
-        $normalizer = new StringNormalizer();
-        $query = SearchQuery::create('test', $normalizer);
-        $options = new SearchOptionsData();
+        $result = $this->createMockResult(0.8);
+        $results = [$result];
 
-        $context = new SearchContext(
-            query: $query,
-            options: $options,
-            normalizer: $normalizer,
-            similarityCalculator: new SimilarityCalculator(),
-            indexBuilder: $this->createMock(IndexBuilder::class),
-            indexRepository: $this->createMock(IndexRepositoryInterface::class),
-            scoringEngine: $this->createMock(ScoringEngine::class),
-            indexDataArray: []
-        );
+        $context = $this->createSearchContext('test', $results);
+        $next = $this->createNextCallback();
 
-        $result = $this->createMock(SearchResultData::class);
-        $result->score = 0.8;
+        $returnedResults = $this->stage->handle($context, $next);
 
-        $context->results = ['item1' => $result];
-
-        // Act: Execute the stage and capture return value
-        $returnedResults = $this->stage->handle(context: $context);
-
-        // Assert: Should return the processed results array
         $this->assertIsArray($returnedResults);
         $this->assertCount(1, $returnedResults);
         $this->assertSame($context->results, $returnedResults);
@@ -293,37 +252,65 @@ final class SortAndLimitStageTest extends TestCase
 
     public function test_handle_values_reset_indexes(): void
     {
-        // Arrange: Create results with string keys
-        $normalizer = new StringNormalizer();
-        $query = SearchQuery::create('test', $normalizer);
-        $options = new SearchOptionsData(maxResults: 2);
-
-        $context = new SearchContext(
-            query: $query,
-            options: $options,
-            normalizer: $normalizer,
-            similarityCalculator: new SimilarityCalculator(),
-            indexBuilder: $this->createMock(IndexBuilder::class),
-            indexRepository: $this->createMock(IndexRepositoryInterface::class),
-            scoringEngine: $this->createMock(ScoringEngine::class),
-            indexDataArray: []
-        );
-
-        $context->results = [];
+        $results = [];
         for ($i = 5; $i >= 1; --$i) {
-            $result = $this->createMock(SearchResultData::class);
-            $result->score = $i * 0.2;
-            $context->results['key' . $i] = $result;
+            $results['key' . $i] = $this->createMockResult($i * 0.2);
         }
 
-        // Act: Execute the stage which should reset array keys
-        $this->stage->handle(context: $context);
+        $context = $this->createSearchContext('test', $results, 0.0, 2);
+        $next = $this->createNextCallback();
 
-        // Assert: Should have sequential numeric indexes after processing
-        $results = $context->results;
-        $this->assertArrayHasKey(0, $results);
-        $this->assertArrayHasKey(1, $results);
-        $this->assertArrayNotHasKey(2, $results);
-        $this->assertArrayNotHasKey('key5', $results);
+        $this->stage->handle($context, $next);
+
+        $processedResults = $context->results;
+        $this->assertArrayHasKey(0, $processedResults);
+        $this->assertArrayHasKey(1, $processedResults);
+        $this->assertArrayNotHasKey(2, $processedResults);
+        $this->assertArrayNotHasKey('key5', $processedResults);
+    }
+
+    public function test_handle_maintains_scores_in_original_objects(): void
+    {
+        $result1 = $this->createMock(SearchResultData::class);
+        $result1->score = 0.7;
+        $result1->matchedField = 'name';
+        $result1->matchedValue = 'John Doe';
+
+        $result2 = $this->createMock(SearchResultData::class);
+        $result2->score = 0.9;
+        $result2->matchedField = 'email';
+        $result2->matchedValue = 'john@example.com';
+
+        $results = [$result1, $result2];
+
+        $context = $this->createSearchContext('test', $results);
+        $next = $this->createNextCallback();
+
+        $this->stage->handle($context, $next);
+
+        $processedResults = $context->results;
+        $this->assertCount(2, $processedResults);
+
+        // Should be sorted by score (highest first)
+        $this->assertEquals('email', $processedResults[0]->matchedField);
+        $this->assertEquals('john@example.com', $processedResults[0]->matchedValue);
+        $this->assertEquals('name', $processedResults[1]->matchedField);
+        $this->assertEquals('John Doe', $processedResults[1]->matchedValue);
+    }
+
+    public function test_handle_with_default_max_results(): void
+    {
+        $results = [];
+        for ($i = 1; $i <= 30; ++$i) {
+            $results[] = $this->createMockResult($i);
+        }
+
+        $context = $this->createSearchContext('test', $results, 0.0, 20);
+        $next = $this->createNextCallback();
+
+        $this->stage->handle($context, $next);
+
+        $processedResults = $context->results;
+        $this->assertCount(20, $processedResults);
     }
 }

@@ -12,6 +12,8 @@ use Spatie\LaravelData\Data;
  *
  * This object standardizes the format of search results across different model types,
  * providing a consistent interface for search result consumers.
+ *
+ * @package Fuzzy\Data
  */
 class FuzzySearchableData extends Data
 {
@@ -42,6 +44,7 @@ class FuzzySearchableData extends Data
      * Create a FuzzySearchableData instance from an Eloquent model.
      *
      * Automatically extracts key properties from the model to populate the searchable data object.
+     * Falls back to the class basename if no name attribute is present.
      *
      * @param Model $model The Eloquent model to convert to searchable format
      * @return self Configured FuzzySearchableData instance

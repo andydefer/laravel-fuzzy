@@ -29,12 +29,11 @@ final class CommandsTest extends TestCase
     }
 
     /**
-     * Test index command with auto-discovery enabled.
+     * Test index command with auto-discovery (always active).
      */
     public function test_index_command_with_auto_discovery(): void
     {
-        // Arrange: Configure auto-discovery with specific models
-        Config::set('fuzzy.auto_discovery.enabled', true);
+        // Arrange: Configure searchable models
         Config::set('fuzzy.searchable_models', [User::class, Product::class]);
 
         User::create([
@@ -64,7 +63,6 @@ final class CommandsTest extends TestCase
         // Arrange: Prepare clean environment with specific models
         FuzzyIndex::query()->truncate();
         Config::set('fuzzy.searchable_models', []);
-        Config::set('fuzzy.auto_discovery.enabled', false);
 
         $this->createUserWithoutEvents([
             'name' => 'User One',
@@ -160,7 +158,6 @@ final class CommandsTest extends TestCase
     {
         // Arrange: Configure models for discovery
         Config::set('fuzzy.searchable_models', [User::class]);
-        Config::set('fuzzy.auto_discovery.enabled', true);
 
         // Act: Execute command with list option
         $exitCode = Artisan::call('fuzzy:index', ['--list' => true]);
@@ -169,7 +166,7 @@ final class CommandsTest extends TestCase
         $this->assertEquals(0, $exitCode);
 
         $output = Artisan::output();
-        $this->assertStringContainsString('Current Configuration', $output);
+        $this->assertStringContainsString('=== Current Configuration ===', $output);
         $this->assertStringContainsString('Valid searchable models', $output);
         $this->assertStringContainsString(User::class, $output);
     }
@@ -324,27 +321,6 @@ final class CommandsTest extends TestCase
             str_contains($output, "Cache cleared for model: " . User::class) ||
                 str_contains($output, 'Model-specific cache clearing not available')
         );
-    }
-
-    /**
-     * Test index command with auto option for discovery.
-     */
-    public function test_index_command_with_auto_option(): void
-    {
-        // Arrange: Configure auto-discovery with empty config
-        Config::set('fuzzy.auto_discovery.enabled', true);
-        Config::set('fuzzy.searchable_models', []);
-
-        User::create(['name' => 'Test', 'email' => 'test@example.com', 'type' => 'user']);
-
-        // Act: Execute index command with auto option
-        $exitCode = Artisan::call('fuzzy:index', ['--auto' => true]);
-
-        // Assert: Verify auto-discovery worked
-        $this->assertEquals(0, $exitCode);
-
-        $entries = FuzzyIndex::count();
-        $this->assertGreaterThan(0, $entries);
     }
 
     /**

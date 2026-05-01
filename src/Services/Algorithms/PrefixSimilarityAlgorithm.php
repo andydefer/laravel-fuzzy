@@ -5,55 +5,73 @@ declare(strict_types=1);
 namespace Fuzzy\Services\Algorithms;
 
 use Fuzzy\Contracts\SimilarityAlgorithmInterface;
+use Fuzzy\Config\PrefixAlgorithmConfig;
 
 /**
- * Prefix-based similarity algorithm.
+ * Prefix-based similarity algorithm for string comparison.
  *
- * Calculates similarity based on the length of the common prefix between two strings.
- * This algorithm is particularly effective for matching strings that share beginnings,
- * such as abbreviations, acronyms, or similar naming patterns.
+ * Calculates similarity between two strings based on their common prefix length.
+ * This algorithm is particularly effective for:
+ * - Autocomplete and type-ahead suggestions
+ * - Search-as-you-type functionality
+ * - Matching strings that share common beginnings
+ *
+ * The algorithm gives higher scores to strings with longer matching prefixes,
+ * with diminishing returns beyond the base score threshold.
+ *
+ * @package Fuzzy\Services\Algorithms
  */
 class PrefixSimilarityAlgorithm implements SimilarityAlgorithmInterface
 {
-    /**
-     * Minimum prefix length required to consider a match.
-     *
-     * Prefixes shorter than this are considered insignificant for similarity calculation.
-     */
-    private const MIN_PREFIX_LENGTH = 3;
+    private PrefixAlgorithmConfig $config;
 
     /**
-     * Calculate similarity between two strings based on their common prefix.
+     * Constructor for PrefixSimilarityAlgorithm.
      *
-     * The algorithm evaluates the length of the matching prefix relative to the
-     * maximum string length, with a cap to prevent disproportionately high scores
-     * for very short strings with coincidental matches.
-     *
-     * @param string $str1 First string to compare
-     * @param string $str2 Second string to compare
-     * @return float Similarity score between 0.0 and 0.6
+     * @param PrefixAlgorithmConfig|null $config Configuration for algorithm parameters
      */
-    public function calculate(string $str1, string $str2): float
+    public function __construct(?PrefixAlgorithmConfig $config = null)
     {
-        $minLength = min(strlen($str1), strlen($str2));
-
-        if ($minLength < self::MIN_PREFIX_LENGTH) {
-            return 0.0;
-        }
-
-        $prefixLength = $this->calculatePrefixLength($str1, $str2, $minLength);
-
-        if ($prefixLength < self::MIN_PREFIX_LENGTH) {
-            return 0.0;
-        }
-
-        return $this->calculateSimilarityScore($prefixLength, strlen($str1), strlen($str2));
+        $this->config = $config ?? PrefixAlgorithmConfig::fromConfig();
     }
 
     /**
-     * Get the algorithm's identifier.
+     * Calculate similarity between two strings based on common prefix.
      *
-     * @return string Algorithm identifier used in configuration and reporting
+     * Calculation process:
+     * 1. Verify both strings meet minimum length requirements
+     * 2. Count the number of matching characters from the start
+     * 3. Calculate similarity score based on prefix ratio
+     * 4. Apply configured base score and variable multiplier
+     *
+     * @param string $firstString The first string to compare
+     * @param string $secondString The second string to compare
+     * @return float Similarity score between 0.0 (no similarity) and 1.0 (identical)
+     */
+    public function calculate(string $firstString, string $secondString): float
+    {
+        $shorterLength = min(strlen($firstString), strlen($secondString));
+        $minimumRequiredPrefixLength = $this->config->getMinPrefixLength();
+
+        // Strings are too short for meaningful prefix matching
+        if ($shorterLength < $minimumRequiredPrefixLength) {
+            return FUZZY_SCORE_NONE;
+        }
+
+        $matchingPrefixLength = $this->countMatchingPrefixCharacters($firstString, $secondString, $shorterLength);
+
+        // Not enough matching prefix characters to be considered a match
+        if ($matchingPrefixLength < $minimumRequiredPrefixLength) {
+            return FUZZY_SCORE_NONE;
+        }
+
+        return $this->calculateNormalizedScore($matchingPrefixLength, strlen($firstString), strlen($secondString));
+    }
+
+    /**
+     * Get the algorithm identifier name.
+     *
+     * @return string Algorithm name for configuration and debugging
      */
     public function getName(): string
     {
@@ -61,55 +79,69 @@ class PrefixSimilarityAlgorithm implements SimilarityAlgorithmInterface
     }
 
     /**
-     * Get the algorithm's default weight in composite similarity calculations.
+     * Get the algorithm weight in composite similarity calculations.
      *
-     * @return float Weight value between 0.0 and 1.0
+     * This weight determines how much this algorithm's score contributes
+     * when combined with other similarity algorithms.
+     *
+     * @return float Weight between 0.0 and 1.0
      */
     public function getWeight(): float
     {
-        return 0.2;
+        return $this->config->getWeight();
     }
 
     /**
-     * Calculate the length of the common prefix between two strings.
+     * Count the number of matching characters from the start of both strings.
+     *
+     * Iterates character by character until a mismatch is found or
+     * the maximum comparison length is reached.
      *
      * @param string $firstString First string to compare
      * @param string $secondString Second string to compare
-     * @param int $maxComparisonLength Maximum length to compare
-     * @return int Length of the common prefix
+     * @param int $maxComparisonLength Maximum number of characters to compare
+     * @return int Number of consecutive matching prefix characters
      */
-    private function calculatePrefixLength(string $firstString, string $secondString, int $maxComparisonLength): int
+    private function countMatchingPrefixCharacters(string $firstString, string $secondString, int $maxComparisonLength): int
     {
-        $prefixLength = 0;
+        $matchingCount = 0;
 
-        for ($i = 0; $i < $maxComparisonLength; ++$i) {
-            if ($firstString[$i] !== $secondString[$i]) {
+        for ($position = 0; $position < $maxComparisonLength; ++$position) {
+            if ($firstString[$position] !== $secondString[$position]) {
                 break;
             }
 
-            ++$prefixLength;
+            ++$matchingCount;
         }
 
-        return $prefixLength;
+        return $matchingCount;
     }
 
     /**
-     * Calculate the final similarity score based on prefix length.
+     * Calculate the normalized similarity score based on prefix length.
      *
-     * @param int $prefixLength Length of the common prefix
+     * Formula: score = min(maxScore, baseScore + (prefixRatio × variableMultiplier))
+     * Where prefixRatio = matchingPrefixLength / max(stringLengths)
+     *
+     * The result is capped at maxScore to prevent over-scoring.
+     *
+     * @param int $matchingPrefixLength Number of matching prefix characters
      * @param int $firstStringLength Length of the first string
      * @param int $secondStringLength Length of the second string
-     * @return float Normalized similarity score
+     * @return float Normalized similarity score between 0.0 and maxScore
      */
-    private function calculateSimilarityScore(int $prefixLength, int $firstStringLength, int $secondStringLength): float
+    private function calculateNormalizedScore(int $matchingPrefixLength, int $firstStringLength, int $secondStringLength): float
     {
-        $maxLength = max($firstStringLength, $secondStringLength);
-        $prefixRatio = $prefixLength / $maxLength;
+        $longestStringLength = max($firstStringLength, $secondStringLength);
+        $prefixRatio = $matchingPrefixLength / $longestStringLength;
 
-        $baseScore = 0.4;
-        $variableScore = $prefixRatio * 0.3;
-        $cappedScore = min(0.6, $baseScore + $variableScore);
+        $baseScore = $this->config->getPrefixBaseScore();
+        $variableMultiplier = $this->config->getPrefixVariableMultiplier();
+        $maxScore = $this->config->getPrefixMaxScore();
 
-        return $cappedScore;
+        $variableComponent = $prefixRatio * $variableMultiplier;
+        $rawScore = $baseScore + $variableComponent;
+
+        return min($maxScore, $rawScore);
     }
 }

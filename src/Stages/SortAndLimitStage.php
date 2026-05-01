@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Fuzzy\Stages;
 
-use Fuzzy\SearchContext;
+use Fuzzy\Contracts\SearchContextInterface;
+use Fuzzy\Contracts\StageInterface;
+use Fuzzy\Enums\StageType;
 use Illuminate\Support\Collection;
+use Closure;
 
 /**
  * SortAndLimitStage - Results sorting and limiting stage
@@ -13,19 +16,33 @@ use Illuminate\Support\Collection;
  * Filters, sorts, and limits search results based on score thresholds
  * and maximum result count parameters.
  */
-class SortAndLimitStage
+class SortAndLimitStage implements StageInterface
 {
     /**
-     * Process search results by filtering, sorting, and limiting
-     *
-     * Removes null results and those below minimum score threshold,
-     * sorts remaining results by score in descending order,
-     * and limits to maximum configured result count.
-     *
-     * @param SearchContext $context Search context containing results and options
-     * @return array<int, object> Filtered, sorted, and limited results
+     * Priority for this stage (low priority - runs last)
      */
-    public function handle(SearchContext $context): array
+    private const PRIORITY = 20;
+
+    /**
+     * {@inheritDoc}
+     */
+    public function getPriority(): int
+    {
+        return self::PRIORITY;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function getType(): StageType
+    {
+        return StageType::POST_PROCESSING;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function handle(SearchContextInterface $context, Closure $next): mixed
     {
         $filteredResults = $this->filterResultsByScore(
             results: $context->results,
@@ -37,11 +54,11 @@ class SortAndLimitStage
 
         $context->results = $limitedResults;
 
-        return $context->results;
+        return $next($context);
     }
 
     /**
-     * Filter results by removing null entries and those below minimum score
+     * Filter results by removing null entries and those below minimum score.
      *
      * @param array<int, object|null> $results Raw search results
      * @param float $minScore Minimum score threshold for result inclusion
@@ -54,7 +71,7 @@ class SortAndLimitStage
     }
 
     /**
-     * Sort results by score in descending order
+     * Sort results by score in descending order.
      *
      * @param Collection<int, object> $results Collection of result objects
      * @return Collection<int, object> Results sorted by score (highest first)
@@ -65,7 +82,7 @@ class SortAndLimitStage
     }
 
     /**
-     * Limit results to maximum allowed count
+     * Limit results to maximum allowed count.
      *
      * @param Collection<int, object> $results Sorted collection of results
      * @param int $maxResults Maximum number of results to return

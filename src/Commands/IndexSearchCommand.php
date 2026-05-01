@@ -4,21 +4,40 @@ declare(strict_types=1);
 
 namespace Fuzzy\Commands;
 
+use Fuzzy\Contracts\ModelDiscoveryInterface;
 use Fuzzy\Contracts\MustFuzzySearch;
-use Fuzzy\Services\FuzzySearchService;
+use Fuzzy\Contracts\SearchServiceInterface;
+use Fuzzy\Traits\CommandHelpers;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Model;
-use ReflectionClass;
-use Symfony\Component\Finder\Finder;
 
 /**
  * Command to index searchable models for fuzzy search functionality.
  *
  * Supports both manual configuration and auto-discovery of models.
- * Provides detailed progress reporting and statistics.
+ * Provides detailed progress reporting and statistics on indexed entries.
+ *
+ * @package Fuzzy\Commands
  */
 class IndexSearchCommand extends Command
 {
+    use CommandHelpers;
+
+    /**
+     * Default chunk size for batch processing when not specified in options.
+     */
+    private const DEFAULT_CHUNK_SIZE = 100;
+
+    /**
+     * Chunk size used for statistics calculation to avoid memory issues.
+     */
+    private const STATS_CHUNK_SIZE = 1000;
+
+    /**
+     * Percentage multiplier for converting ratios to percentages.
+     */
+    private const PERCENTAGE_MULTIPLIER = 100;
+
     /**
      * The name and signature of the console command.
      *
@@ -28,7 +47,6 @@ class IndexSearchCommand extends Command
                             {model? : Specific model class to index}
                             {--force : Force reindexing of existing data}
                             {--chunk=100 : Number of records to process per batch}
-                            {--auto : Use auto-discovery instead of configuration}
                             {--list : List discoverable models without indexing}';
 
     /**
@@ -55,18 +73,14 @@ class IndexSearchCommand extends Command
             return;
         }
 
-        $searchService = app(FuzzySearchService::class);
-
         if ($specificModel) {
             $this->indexSpecificModel(
                 modelClass: $specificModel,
-                searchService: $searchService,
                 shouldForceReindex: $shouldForceReindex,
                 chunkSize: $chunkSize
             );
         } else {
             $this->indexAllModels(
-                searchService: $searchService,
                 shouldForceReindex: $shouldForceReindex,
                 chunkSize: $chunkSize
             );
@@ -76,49 +90,48 @@ class IndexSearchCommand extends Command
     /**
      * Index a specific model class.
      *
-     * @param string $modelClass
-     * @param FuzzySearchService $searchService
-     * @param bool $shouldForceReindex
-     * @param int $chunkSize
+     * @param string $modelClass The fully qualified model class name
+     * @param bool $shouldForceReindex Whether to clear existing index before indexing
+     * @param int $chunkSize Number of records to process per batch
      * @return void
      */
     protected function indexSpecificModel(
         string $modelClass,
-        FuzzySearchService $searchService,
         bool $shouldForceReindex,
         int $chunkSize
     ): void {
-        if (!$this->isValidSearchableModel($modelClass)) {
-            $this->error("Model {$modelClass} must implement " . MustFuzzySearch::class);
+        $modelDiscovery = $this->getModelDiscovery();
+
+        if (!$modelDiscovery->isValidModel($modelClass)) {
+            $this->showError("Model {$modelClass} must implement " . MustFuzzySearch::class);
             return;
         }
 
-        $this->info("Indexing model: {$modelClass}");
+        $this->showInfo("Indexing model: {$modelClass}");
 
         if ($shouldForceReindex) {
-            $this->warn("Clearing existing index for {$modelClass}...");
-            $searchService->reindexModel($modelClass);
+            $this->showWarning("Clearing existing index for {$modelClass}...");
+            $this->getSearchService()->getIndexManager()->reindexModel($modelClass);
         } else {
-            $this->performBatchIndexing($modelClass, $searchService, $chunkSize);
+            $this->performBatchIndexing($modelClass, $chunkSize);
         }
 
-        $this->displayModelIndexingStatistics($modelClass, $searchService);
+        $this->displayModelIndexingStatistics($modelClass);
     }
 
     /**
      * Index all searchable models.
      *
-     * @param FuzzySearchService $searchService
-     * @param bool $shouldForceReindex
-     * @param int $chunkSize
+     * @param bool $shouldForceReindex Whether to clear existing index before indexing
+     * @param int $chunkSize Number of records to process per batch
      * @return void
      */
     protected function indexAllModels(
-        FuzzySearchService $searchService,
         bool $shouldForceReindex,
         int $chunkSize
     ): void {
-        $models = $this->getAllSearchableModels();
+        $modelDiscovery = $this->getModelDiscovery();
+        $models = $modelDiscovery->getSearchableModels();
 
         if (empty($models)) {
             $this->displayNoModelsWarning();
@@ -128,20 +141,19 @@ class IndexSearchCommand extends Command
         $this->displayModelsForIndexing($models);
 
         if ($shouldForceReindex) {
-            $this->warn('Clearing all existing indexes...');
-            $searchService->reindexAll();
+            $this->showWarning('Clearing all existing indexes...');
+            $this->getSearchService()->getIndexManager()->reindexAll();
         } else {
             foreach ($models as $modelClass) {
                 $this->indexSpecificModel(
                     modelClass: $modelClass,
-                    searchService: $searchService,
                     shouldForceReindex: false,
                     chunkSize: $chunkSize
                 );
             }
         }
 
-        $this->displayFinalStatistics($searchService);
+        $this->displayFinalStatistics();
     }
 
     /**
@@ -151,87 +163,77 @@ class IndexSearchCommand extends Command
      */
     protected function displayDiscoverableModels(): void
     {
-        $this->info('=== Current Configuration ===');
-
+        $modelDiscovery = $this->getModelDiscovery();
         $configuredModels = config('fuzzy.searchable_models', []);
-        $isAutoDiscoveryEnabled = config('fuzzy.auto_discovery.enabled', true);
+        $discoveredModels = $modelDiscovery->getSearchableModels();
 
+        $this->showHeader('Current Configuration');
         $this->displayConfigurationModels($configuredModels);
-
-        if ($isAutoDiscoveryEnabled) {
-            $this->displayAutoDiscoveredModels();
-        } else {
-            $this->warn('Auto-discovery is disabled in configuration');
-        }
-
-        $this->newLine();
-        $this->displayValidModelsSummary();
+        $this->displayAutoDiscoveredModels($discoveredModels);
+        $this->displayValidModelsSummary($configuredModels, $discoveredModels);
         $this->displayUsageGuidance();
     }
 
     /**
-     * Perform batch indexing for a model.
+     * Perform batch indexing for a model with progress bar.
      *
-     * @param string $modelClass
-     * @param FuzzySearchService $searchService
-     * @param int $chunkSize
+     * @param string $modelClass The model class to index
+     * @param int $chunkSize Number of records to process per batch
      * @return void
      */
-    private function performBatchIndexing(string $modelClass, FuzzySearchService $searchService, int $chunkSize): void
+    private function performBatchIndexing(string $modelClass, int $chunkSize): void
     {
         /** @var Model&MustFuzzySearch $modelClass */
-        $modelClass::chunk($chunkSize, function ($models) use ($searchService, $modelClass): void {
+        $modelClass::chunk($chunkSize, function ($models) use ($modelClass): void {
             $progressBar = $this->output->createProgressBar(count($models));
             $progressBar->start();
 
             /** @var Model&MustFuzzySearch $model */
             foreach ($models as $model) {
                 if (get_class($model) === $modelClass && $model->shouldBeIndexed()) {
-                    $searchService->indexModel($model);
+                    $this->getSearchService()->getIndexManager()->indexModel($model);
                 }
 
                 $progressBar->advance();
             }
 
             $progressBar->finish();
-            $this->newLine();
+            $this->showNewLine();
         });
     }
 
     /**
      * Display indexing statistics for a specific model.
      *
-     * @param string $modelClass
-     * @param FuzzySearchService $searchService
+     * @param string $modelClass The model class to display statistics for
      * @return void
      */
-    private function displayModelIndexingStatistics(string $modelClass, FuzzySearchService $searchService): void
+    private function displayModelIndexingStatistics(string $modelClass): void
     {
-        $stats = $this->calculatePreciseModelStatistics($modelClass, $searchService);
+        $stats = $this->calculatePreciseModelStatistics($modelClass);
 
-        $this->info("✓ Indexed {$stats['indexed_entries']} entries for {$modelClass}");
+        $this->showSuccess("Indexed {$stats['indexed_entries']} entries for {$modelClass}");
 
         if ($stats['indexed_models'] > 0) {
             $coveragePercentage = $stats['total_records'] > 0
-                ? round(($stats['indexed_models'] / $stats['total_records']) * 100, 1)
+                ? round(($stats['indexed_models'] / $stats['total_records']) * self::PERCENTAGE_MULTIPLIER, 1)
                 : 0;
 
             $this->line("  Indexed models: {$stats['indexed_models']} out of {$stats['total_records']} total records ({$coveragePercentage}%)");
 
             if ($stats['indexed_models'] < $stats['total_records'] && $stats['skipped_records'] > 0) {
-                $skippedPercentage = round(($stats['skipped_records'] / $stats['total_records']) * 100, 1);
+                $skippedPercentage = round(($stats['skipped_records'] / $stats['total_records']) * self::PERCENTAGE_MULTIPLIER, 1);
                 $this->line("  Skipped records: {$stats['skipped_records']} ({$skippedPercentage}% - due to shouldBeIndexed())");
             }
         } else {
-            $this->warn("  No models were indexed - check shouldBeIndexed() method");
+            $this->showWarning("  No models were indexed - check shouldBeIndexed() method");
         }
     }
 
     /**
      * Calculate precise statistics for model indexing.
      *
-     * @param string $modelClass
-     * @param FuzzySearchService $searchService
+     * @param string $modelClass The model class to calculate statistics for
      * @return array{
      *     total_records: int,
      *     indexed_models: int,
@@ -240,9 +242,10 @@ class IndexSearchCommand extends Command
      *     fields_per_model: int
      * }
      */
-    private function calculatePreciseModelStatistics(string $modelClass, FuzzySearchService $searchService): array
+    private function calculatePreciseModelStatistics(string $modelClass): array
     {
-        $serviceStats = $searchService->getStats();
+        $searchService = $this->getSearchService();
+        $serviceStats = $searchService->getIndexManager()->getStats();
         $indexedEntries = $serviceStats['models'][$modelClass]['count'] ?? 0;
 
         $modelInstance = new $modelClass();
@@ -254,7 +257,7 @@ class IndexSearchCommand extends Command
         $skippedRecords = 0;
 
         /** @var Model&MustFuzzySearch $modelClass */
-        $modelClass::chunk(1000, function ($models) use (&$totalRecords, &$indexedModels, &$skippedRecords) {
+        $modelClass::chunk(self::STATS_CHUNK_SIZE, function ($models) use (&$totalRecords, &$indexedModels, &$skippedRecords) {
             $totalRecords += count($models);
 
             /** @var Model&MustFuzzySearch $model */
@@ -283,41 +286,24 @@ class IndexSearchCommand extends Command
     }
 
     /**
-     * Get all searchable models from configuration and auto-discovery.
-     *
-     * @return array<int, string>
-     */
-    private function getAllSearchableModels(): array
-    {
-        $configuredModels = config('fuzzy.searchable_models', []);
-        $isAutoDiscoveryEnabled = config('fuzzy.auto_discovery.enabled', true);
-
-        $discoveredModels = $isAutoDiscoveryEnabled ? $this->discoverSearchableModels() : [];
-
-        $allModels = array_unique(array_merge($configuredModels, $discoveredModels));
-
-        return array_filter($allModels, fn(string $modelClass): bool => $this->isValidSearchableModel($modelClass));
-    }
-
-    /**
      * Display models that will be indexed.
      *
-     * @param array<int, string> $models
+     * @param array<int, string> $models List of model classes to index
      * @return void
      */
     private function displayModelsForIndexing(array $models): void
     {
-        $this->info('Starting full search index...');
-        $this->info('Found ' . count($models) . ' searchable model(s):');
+        $this->showInfo('Starting full search index...');
+        $this->showInfo('Found ' . count($models) . ' searchable model(s):');
 
         $configuredModels = config('fuzzy.searchable_models', []);
 
         foreach ($models as $model) {
             $source = in_array($model, $configuredModels) ? 'config' : 'auto-discovered';
-            $this->info("  - {$model} ({$source})");
+            $this->line("  - {$model} ({$source})");
         }
 
-        $this->newLine();
+        $this->showNewLine();
     }
 
     /**
@@ -327,96 +313,98 @@ class IndexSearchCommand extends Command
      */
     private function displayNoModelsWarning(): void
     {
-        $this->warn('No searchable models found.');
-        $this->warn('Make sure your models:');
-        $this->warn('1. Implement the MustFuzzySearch interface');
-        $this->warn('2. Use the FuzzySearchable trait');
-        $this->warn('');
-        $this->warn('You can either:');
-        $this->warn('a) Add models to config/fuzzy.php (searchable_models array)');
-        $this->warn('b) Place models in app/Models/ directory');
+        $this->showWarning('No searchable models found.');
+        $this->showWarning('Make sure your models:');
+        $this->showWarning('1. Implement the MustFuzzySearch interface');
+        $this->showWarning('2. Use the FuzzySearchable trait');
+        $this->showWarning('');
+        $this->showWarning('You can either:');
+        $this->showWarning('a) Add models to config/fuzzy.php (searchable_models array)');
+        $this->showWarning('b) Place models in app/Models/ directory (auto-discovery is always active)');
     }
 
     /**
      * Display final indexing statistics.
      *
-     * @param FuzzySearchService $searchService
      * @return void
      */
-    private function displayFinalStatistics(FuzzySearchService $searchService): void
+    private function displayFinalStatistics(): void
     {
-        $stats = $searchService->getStats();
-        $this->info("✓ Indexing complete!");
-        $this->info('Total entries: ' . $stats['total_entries']);
+        $stats = $this->getSearchService()->getIndexManager()->getStats();
+        $this->showSuccess("Indexing complete!");
+        $this->showInfo('Total entries: ' . $stats['total_entries']);
 
         foreach ($stats['models'] as $model => $modelStats) {
-            $this->info("  {$model}: {$modelStats['count']} entries");
+            $this->line("  {$model}: {$modelStats['count']} entries");
         }
     }
 
     /**
      * Display models configured in the configuration file.
      *
-     * @param array<int, string> $configuredModels
+     * @param array<int, string> $configuredModels List of configured model classes
      * @return void
      */
     private function displayConfigurationModels(array $configuredModels): void
     {
         if (empty($configuredModels)) {
-            $this->warn('No models configured in config/fuzzy.php');
+            $this->showWarning('No models configured in config/fuzzy.php');
             return;
         }
 
-        $this->info('Manually configured models:');
+        $this->showInfo('Manually configured models:');
         foreach ($configuredModels as $model) {
             $classExists = class_exists($model) ? '✓' : '✗';
-            $isSearchable = $this->isValidSearchableModel($model) ? '✓' : '✗';
-            $this->info("  {$classExists}{$isSearchable} {$model}");
+            $isSearchable = $this->getModelDiscovery()->isValidModel($model) ? '✓' : '✗';
+            $this->line("  {$classExists}{$isSearchable} {$model}");
         }
     }
 
     /**
      * Display models discovered through auto-discovery.
      *
+     * @param array<int, string> $discoveredModels List of discovered model classes
      * @return void
      */
-    private function displayAutoDiscoveredModels(): void
+    private function displayAutoDiscoveredModels(array $discoveredModels): void
     {
-        $this->info('Auto-discovered models:');
-        $discoveredModels = $this->discoverSearchableModels();
+        $this->showInfo('Auto-discovered models:');
 
         if (empty($discoveredModels)) {
-            $this->warn('No models found via auto-discovery');
+            $this->showWarning('No models found via auto-discovery');
             return;
         }
 
         foreach ($discoveredModels as $model) {
-            $this->info("  ✓ {$model}");
+            $this->line("  ✓ {$model}");
         }
     }
 
     /**
      * Display summary of valid searchable models.
      *
+     * @param array<int, string> $configuredModels Configured model classes
+     * @param array<int, string> $discoveredModels Discovered model classes
      * @return void
      */
-    private function displayValidModelsSummary(): void
+    private function displayValidModelsSummary(array $configuredModels, array $discoveredModels): void
     {
-        $this->info('=== Combined Result (what will be indexed) ===');
+        $this->showHeader('Combined Result (what will be indexed)');
 
-        $models = $this->getAllSearchableModels();
+        $allModels = array_unique(array_merge($configuredModels, $discoveredModels));
+        $modelDiscovery = $this->getModelDiscovery();
+        $validModels = array_filter($allModels, fn($model) => $modelDiscovery->isValidModel($model));
 
-        if (empty($models)) {
-            $this->error('No valid searchable models found!');
+        if (empty($validModels)) {
+            $this->showError('No valid searchable models found!');
             return;
         }
 
-        $this->info('Valid searchable models:');
-        $configuredModels = config('fuzzy.searchable_models', []);
+        $this->showInfo('Valid searchable models:');
 
-        foreach ($models as $model) {
+        foreach ($validModels as $model) {
             $source = in_array($model, $configuredModels) ? 'config' : 'auto';
-            $this->info("  ✓ {$model} ({$source})");
+            $this->line("  ✓ {$model} ({$source})");
         }
     }
 
@@ -427,80 +415,31 @@ class IndexSearchCommand extends Command
      */
     private function displayUsageGuidance(): void
     {
-        $this->newLine();
-        $this->info('Usage:');
-        $this->info('  php artisan fuzzy:index              # Index all (config + auto-discovered)');
-        $this->info('  php artisan fuzzy:index --force      # Force reindex');
-        $this->info('  php artisan fuzzy:index --list       # List models only');
-        $this->info('  php artisan fuzzy:index User         # Index specific model');
+        $this->showNewLine();
+        $this->showInfo('Usage:');
+        $this->line('  php artisan fuzzy:index              # Index all (config + auto-discovered)');
+        $this->line('  php artisan fuzzy:index --force      # Force reindex');
+        $this->line('  php artisan fuzzy:index --list       # List models only');
+        $this->line('  php artisan fuzzy:index User         # Index specific model');
     }
 
     /**
-     * Discover models implementing MustFuzzySearch interface through file scanning.
+     * Get the search service instance from the container.
      *
-     * @return array<int, string>
+     * @return SearchServiceInterface
      */
-    private function discoverSearchableModels(): array
+    private function getSearchService(): SearchServiceInterface
     {
-        $models = [];
-        $finder = new Finder();
-
-        $finder->files()
-            ->in(app_path('Models'))
-            ->name('*.php');
-
-        foreach ($finder as $file) {
-            $modelClass = $this->extractClassNameFromFile($file->getRealPath());
-
-            if ($modelClass && $this->isValidSearchableModel($modelClass)) {
-                $models[] = $modelClass;
-            }
-        }
-
-        return array_unique($models);
+        return app(SearchServiceInterface::class);
     }
 
     /**
-     * Extract fully qualified class name from a PHP file.
+     * Get the model discovery service from the container.
      *
-     * @param string $filePath
-     * @return string|null
+     * @return ModelDiscoveryInterface
      */
-    private function extractClassNameFromFile(string $filePath): ?string
+    private function getModelDiscovery(): ModelDiscoveryInterface
     {
-        $fileContent = file_get_contents($filePath);
-
-        $namespace = '';
-        if (preg_match('/namespace\s+(.+?);/s', $fileContent, $matches)) {
-            $namespace = $matches[1];
-        }
-
-        $className = '';
-        if (preg_match('/class\s+(\w+)(?:\s+extends|\s+implements|\s*\{)/', $fileContent, $matches)) {
-            $className = $matches[1];
-        }
-
-        if ($namespace && $className) {
-            $fullClassName = $namespace . '\\' . $className;
-            return class_exists($fullClassName) ? $fullClassName : null;
-        }
-
-        return null;
-    }
-
-    /**
-     * Validate if a class is a searchable model.
-     *
-     * @param string $modelClass
-     * @return bool
-     */
-    private function isValidSearchableModel(string $modelClass): bool
-    {
-        if (!class_exists($modelClass)) {
-            return false;
-        }
-
-        $reflection = new ReflectionClass($modelClass);
-        return $reflection->implementsInterface(MustFuzzySearch::class);
+        return app(ModelDiscoveryInterface::class);
     }
 }

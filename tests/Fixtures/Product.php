@@ -25,20 +25,23 @@ class Product extends Model implements MustFuzzySearch
     protected $fillable = ['name', 'description', 'price'];
 
     /**
-     * The fields that should be searchable.
-     *
-     * @var array<string>
-     */
-    public array $searchableFields = ['name', 'description'];
-
-    /**
      * Get the searchable fields for the model.
      *
-     * @return array<string>
+     * @return array<int, string>
      */
     public function getSearchableFields(): array
     {
-        return $this->searchableFields;
+        return ['name', 'description'];
+    }
+
+    /**
+     * Get the custom formatter class for search data.
+     *
+     * @return class-string|null
+     */
+    public function getFuzzyFormat(): ?string
+    {
+        return null; // Utiliser le format par défaut
     }
 
     /**

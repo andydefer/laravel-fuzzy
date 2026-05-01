@@ -5,56 +5,90 @@ declare(strict_types=1);
 namespace Fuzzy\Services\Algorithms;
 
 use Fuzzy\Contracts\SimilarityAlgorithmInterface;
+use Fuzzy\Config\LongestCommonSubstringConfig;
 
 /**
- * Implements the Longest Common Substring algorithm for similarity calculation.
+ * Longest Common Substring (LCS) similarity algorithm.
  *
- * This algorithm finds the longest substring that appears in both input strings
- * and calculates similarity as the ratio of this length to the minimum string length.
- * It is particularly effective for detecting partial matches and overlapping content.
+ * Calculates similarity between two strings based on the length of their
+ * longest common contiguous substring. Uses dynamic programming for efficiency.
+ *
+ * The algorithm returns the ratio of the longest common substring length
+ * to the length of the shorter input string.
+ *
+ * @package Fuzzy\Services\Algorithms
  */
 class LongestCommonSubstringAlgorithm implements SimilarityAlgorithmInterface
 {
+    private LongestCommonSubstringConfig $config;
+
     /**
-     * Calculate similarity between two strings using Longest Common Substring.
+     * Constructor for LongestCommonSubstringAlgorithm.
      *
-     * The similarity score is the length of the longest common substring
-     * divided by the length of the shorter string, resulting in a value
-     * between 0.0 (no common substring) and 1.0 (identical strings).
+     * @param LongestCommonSubstringConfig|null $config Configuration for algorithm parameters
+     */
+    public function __construct(?LongestCommonSubstringConfig $config = null)
+    {
+        $this->config = $config ?? LongestCommonSubstringConfig::createDefault();
+    }
+
+    /**
+     * Calculate similarity between two strings using longest common substring.
+     *
+     * Uses dynamic programming to find the longest contiguous substring
+     * common to both input strings, then returns the ratio relative to
+     * the shorter string's length.
+     *
+     * Algorithm steps:
+     * 1. Handle edge cases (empty strings)
+     * 2. Initialize DP table with zeros
+     * 3. Fill DP table while tracking maximum common substring length
+     * 4. Return similarity = maxCommonLength / min(string lengths)
      *
      * @param string $firstString The first string to compare
      * @param string $secondString The second string to compare
-     * @return float Similarity score between 0.0 and 1.0
+     * @return float Similarity score between 0.0 (no similarity) and 1.0 (identical)
      */
     public function calculate(string $firstString, string $secondString): float
     {
+        $baseIndex = $this->config->getBaseIndex();
+        $matchIncrement = $this->config->getMatchIncrement();
+
         $firstLength = strlen($firstString);
         $secondLength = strlen($secondString);
 
-        if ($firstLength === 0 || $secondLength === 0) {
-            return 0.0;
+        // Empty strings have no common substring
+        if ($firstLength === $baseIndex || $secondLength === $baseIndex) {
+            return FUZZY_SCORE_NONE;
         }
 
-        $maxCommonLength = 0;
-        $dp = array_fill(0, $firstLength + 1, array_fill(0, $secondLength + 1, 0));
+        $maxCommonLength = $baseIndex;
+        $dpTable = $this->initializeDpTable($firstLength, $secondLength);
 
-        for ($i = 1; $i <= $firstLength; ++$i) {
-            for ($j = 1; $j <= $secondLength; ++$j) {
-                if ($firstString[$i - 1] === $secondString[$j - 1]) {
-                    $dp[$i][$j] = $dp[$i - 1][$j - 1] + 1;
-                    $maxCommonLength = max($maxCommonLength, $dp[$i][$j]);
+        // Fill DP table to find the longest common substring
+        for ($row = $matchIncrement; $row <= $firstLength; ++$row) {
+            for ($column = $matchIncrement; $column <= $secondLength; ++$column) {
+                $firstCharIndex = $row - $matchIncrement;
+                $secondCharIndex = $column - $matchIncrement;
+
+                if ($firstString[$firstCharIndex] === $secondString[$secondCharIndex]) {
+                    $dpTable[$row][$column] = $dpTable[$row - $matchIncrement][$column - $matchIncrement] + $matchIncrement;
+                    $maxCommonLength = max($maxCommonLength, $dpTable[$row][$column]);
                 }
             }
         }
 
         $minStringLength = min($firstLength, $secondLength);
-        return $minStringLength > 0 ? $maxCommonLength / $minStringLength : 0.0;
+
+        return $minStringLength > $baseIndex
+            ? $maxCommonLength / $minStringLength
+            : FUZZY_SCORE_NONE;
     }
 
     /**
      * Get the algorithm identifier name.
      *
-     * @return string Unique identifier for this algorithm
+     * @return string Algorithm name for configuration and debugging
      */
     public function getName(): string
     {
@@ -62,15 +96,36 @@ class LongestCommonSubstringAlgorithm implements SimilarityAlgorithmInterface
     }
 
     /**
-     * Get the default weight of this algorithm in composite scoring.
+     * Get the algorithm weight in composite similarity calculations.
      *
-     * This weight is used when combining multiple similarity algorithms
-     * to calculate an overall similarity score.
+     * This weight determines how much this algorithm's score contributes
+     * when combined with other similarity algorithms.
      *
      * @return float Weight between 0.0 and 1.0
      */
     public function getWeight(): float
     {
-        return 0.4;
+        return $this->config->getWeight();
+    }
+
+    /**
+     * Initialize the dynamic programming table for LCS calculation.
+     *
+     * Creates a (firstLength + 1) x (secondLength + 1) matrix filled with zeros.
+     *
+     * @param int $firstLength Length of the first string
+     * @param int $secondLength Length of the second string
+     * @return array<int, array<int, int>> DP table initialized with zeros
+     */
+    private function initializeDpTable(int $firstLength, int $secondLength): array
+    {
+        $baseIndex = $this->config->getBaseIndex();
+        $matchIncrement = $this->config->getMatchIncrement();
+
+        return array_fill(
+            $baseIndex,
+            $firstLength + $matchIncrement,
+            array_fill($baseIndex, $secondLength + $matchIncrement, $baseIndex)
+        );
     }
 }

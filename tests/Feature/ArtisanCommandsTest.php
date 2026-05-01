@@ -31,8 +31,6 @@ final class ArtisanCommandsTest extends TestCase
      */
     public function test_clear_cache_command(): void
     {
-        // Arrange: No special setup needed
-
         // Act: Execute clear cache command with force flag
         $exitCode = Artisan::call('fuzzy:clear-cache', [
             '--force' => true,
@@ -72,8 +70,6 @@ final class ArtisanCommandsTest extends TestCase
      */
     public function test_clear_cache_stats_only(): void
     {
-        // Arrange: No special setup needed
-
         // Act: Execute command with stats flag
         $exitCode = Artisan::call('fuzzy:clear-cache', [
             '--stats' => true,
@@ -115,8 +111,7 @@ final class ArtisanCommandsTest extends TestCase
      */
     public function test_index_command_list_option(): void
     {
-        // Arrange: Configure auto-discovery and searchable models
-        Config::set('fuzzy.auto_discovery.enabled', true);
+        // Arrange: Configure searchable models
         Config::set('fuzzy.searchable_models', [User::class]);
 
         // Act: Execute command with list option
@@ -126,7 +121,7 @@ final class ArtisanCommandsTest extends TestCase
         $this->assertEquals(0, $exitCode);
 
         $output = Artisan::output();
-        $this->assertStringContainsString('Current Configuration', $output);
+        $this->assertStringContainsString('=== Current Configuration ===', $output);
         $this->assertStringContainsString('Valid searchable models', $output);
         $this->assertStringContainsString(User::class, $output);
     }
@@ -136,8 +131,6 @@ final class ArtisanCommandsTest extends TestCase
      */
     public function test_clear_command_confirmation(): void
     {
-        // Arrange: Prepare confirmation expectation
-
         // Act & Assert: Execute command expecting "no" confirmation
         $this->artisan('fuzzy:clear')
             ->expectsConfirmation('Clear ALL search indexes?', 'no')
@@ -175,8 +168,6 @@ final class ArtisanCommandsTest extends TestCase
      */
     public function test_stats_command_empty(): void
     {
-        // Arrange: No setup needed (database is cleared in setUp)
-
         // Act: Execute statistics command
         $exitCode = Artisan::call('fuzzy:stats');
 
@@ -186,30 +177,5 @@ final class ArtisanCommandsTest extends TestCase
         $output = Artisan::output();
         $this->assertStringContainsString('Total entries: 0', $output);
         $this->assertStringContainsString('No models indexed yet', $output);
-    }
-
-    /**
-     * Test auto-discovery indexing.
-     */
-    public function test_index_auto_discovery_command(): void
-    {
-        // Arrange: Configure auto-discovery and create test user
-        Config::set('fuzzy.auto_discovery.enabled', true);
-        Config::set('fuzzy.searchable_models', []);
-
-        User::create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-            'type' => 'user',
-        ]);
-
-        // Act: Execute indexing with auto-discovery
-        $exitCode = Artisan::call('fuzzy:index', ['--auto' => true]);
-
-        // Assert: Index should contain entries after auto-discovery
-        $this->assertEquals(0, $exitCode);
-
-        $indexEntries = FuzzyIndex::count();
-        $this->assertGreaterThan(0, $indexEntries);
     }
 }

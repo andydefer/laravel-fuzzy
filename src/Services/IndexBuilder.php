@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Fuzzy\Services;
 
+use Fuzzy\Contracts\ContextualNormalizerInterface;
 use Fuzzy\Contracts\MustFuzzySearch;
 use Fuzzy\Models\FuzzyIndex;
 use Illuminate\Database\Eloquent\Model;
@@ -12,21 +13,34 @@ use Illuminate\Database\Eloquent\Model;
  * Service for building and maintaining search indexes for searchable models.
  *
  * Handles creation, updating, and management of inverted indexes for fuzzy search.
+ * Respects protected fields to preserve stop words in names, emails, etc.
+ *
+ * @package Fuzzy\Services
  */
 class IndexBuilder
 {
     /**
-     * @param StringNormalizer $normalizer Service for text normalization and processing
+     * @var ContextualNormalizerInterface Service for text normalization and processing
+     */
+    private ContextualNormalizerInterface $normalizer;
+
+    /**
+     * Constructor.
+     *
+     * @param ContextualNormalizerInterface $normalizer Service for context-aware text normalization
      */
     public function __construct(
-        private readonly StringNormalizer $normalizer
-    ) {}
+        ContextualNormalizerInterface $normalizer
+    ) {
+        $this->normalizer = $normalizer;
+    }
 
     /**
      * Index all searchable fields of a model instance.
      *
      * Processes each searchable field defined in the model and creates/updates
-     * corresponding index entries.
+     * corresponding index entries. Respects protected fields configuration
+     * from the model to preserve stop words where appropriate.
      *
      * @param MustFuzzySearch $model The searchable model instance to index
      * @return void
@@ -36,9 +50,13 @@ class IndexBuilder
         $modelType = get_class($model);
         $modelId = $model->getIndexableId();
         $searchableFields = $model->getSearchableFields();
+        $protectedFields = $model->getProtectedFields();
+
+        // Set protected fields on the normalizer for this indexing operation
+        $this->normalizer->setProtectedFields($protectedFields);
 
         foreach ($searchableFields as $field) {
-            $fieldValue = $model->getAttribute($field);
+            $fieldValue = $this->getFieldValue($model, $field);
 
             if ($fieldValue !== null) {
                 $this->indexField(
@@ -49,6 +67,54 @@ class IndexBuilder
                 );
             }
         }
+
+        // Reset protected fields after indexing
+        $this->normalizer->setProtectedFields([]);
+    }
+
+    /**
+     * Get the value of a field from a model.
+     *
+     * Supports both Eloquent models (with getAttribute) and plain objects
+     * (with public properties or getters).
+     *
+     * @param MustFuzzySearch $model The model instance
+     * @param string $field The field name
+     * @return mixed The field value or null if not found
+     */
+    private function getFieldValue(MustFuzzySearch $model, string $field): mixed
+    {
+        // Try Eloquent's getAttribute method
+        if (method_exists($model, 'getAttribute')) {
+            /** @var \Illuminate\Database\Eloquent\Model $model */
+            return $model->getAttribute($field);
+        }
+
+        // Try direct property access
+        if (property_exists($model, $field)) {
+            return $model->{$field};
+        }
+
+        // Try getter method (get{Field} or {field})
+        $getterMethods = [
+            'get' . ucfirst($field),
+            'get' . $field,
+            $field,
+        ];
+
+        foreach ($getterMethods as $method) {
+            if (method_exists($model, $method)) {
+                return $model->$method();
+            }
+        }
+
+        // Try array access if model implements ArrayAccess
+        if ($model instanceof \ArrayAccess && isset($model[$field])) {
+            return $model[$field];
+        }
+
+        // Field not found
+        return null;
     }
 
     /**
@@ -65,7 +131,8 @@ class IndexBuilder
      */
     public function indexField(string $modelType, mixed $modelId, string $field, string $value): void
     {
-        $normalizedValue = $this->normalizer->normalize($value);
+        // Use contextual normalization that respects protected fields
+        $normalizedValue = $this->normalizer->normalizeForField($value, $field);
 
         if ($this->isEmptyValue($normalizedValue)) {
             return;
@@ -78,6 +145,7 @@ class IndexBuilder
         }
 
         $fieldWeight = $this->calculateFieldWeight($field);
+        $preservesStopWords = $this->normalizer->shouldPreserveStopWords($field);
 
         FuzzyIndex::updateOrCreate(
             [
@@ -90,7 +158,7 @@ class IndexBuilder
                 'normalized_value' => $normalizedValue,
                 'words' => $words,
                 'weight' => $fieldWeight,
-                'metadata' => $this->generateFieldMetadata($value, $normalizedValue, $words),
+                'metadata' => $this->generateFieldMetadata($value, $normalizedValue, $words, $preservesStopWords),
             ]
         );
     }
@@ -150,14 +218,16 @@ class IndexBuilder
      * @param string $originalValue The original field value
      * @param string $normalizedValue The normalized field value
      * @param array<int, string> $words Array of extracted words
+     * @param bool $preservesStopWords Whether stop words were preserved
      * @return array<string, mixed> Metadata array
      */
-    private function generateFieldMetadata(string $originalValue, string $normalizedValue, array $words): array
+    private function generateFieldMetadata(string $originalValue, string $normalizedValue, array $words, bool $preservesStopWords = false): array
     {
         return [
             'word_count' => count($words),
             'value_length' => strlen($originalValue),
             'normalized_length' => strlen($normalizedValue),
+            'preserves_stop_words' => $preservesStopWords,
         ];
     }
 }

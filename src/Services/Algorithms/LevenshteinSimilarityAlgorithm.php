@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Fuzzy\Services\Algorithms;
 
 use Fuzzy\Contracts\SimilarityAlgorithmInterface;
+use Fuzzy\Config\LevenshteinAlgorithmConfig;
 
 /**
  * Optimized Levenshtein distance-based similarity algorithm.
@@ -14,16 +15,31 @@ use Fuzzy\Contracts\SimilarityAlgorithmInterface;
  *
  * The algorithm applies penalties for large distances and bonuses for
  * close matches, providing a balanced similarity score between 0.0 and 1.0.
+ *
+ * @package Fuzzy\Services\Algorithms
  */
 class LevenshteinSimilarityAlgorithm implements SimilarityAlgorithmInterface
 {
+    private LevenshteinAlgorithmConfig $config;
+
+    /**
+     * Constructor for LevenshteinSimilarityAlgorithm.
+     *
+     * @param LevenshteinAlgorithmConfig|null $config Configuration for algorithm parameters
+     */
+    public function __construct(?LevenshteinAlgorithmConfig $config = null)
+    {
+        $this->config = $config ?? LevenshteinAlgorithmConfig::fromConfig();
+    }
+
     /**
      * Calculate similarity between two strings using Levenshtein distance.
      *
-     * The algorithm:
-     * 1. Normalizes Levenshtein distance to a 0-1 scale
-     * 2. Applies penalties for distances greater than 2
-     * 3. Adds bonuses for very close matches on longer strings
+     * Calculation process:
+     * 1. Handle edge cases (both empty strings, one empty string)
+     * 2. Compute raw similarity: 1.0 - (distance / maxLength)
+     * 3. Apply penalty for distances exceeding the threshold
+     * 4. Apply bonus for very close matches on reasonably long strings
      *
      * @param string $firstString The first string to compare
      * @param string $secondString The second string to compare
@@ -31,71 +47,35 @@ class LevenshteinSimilarityAlgorithm implements SimilarityAlgorithmInterface
      */
     public function calculate(string $firstString, string $secondString): float
     {
+        $emptyStringLength = $this->config->getEmptyStringLength();
+
         $firstLength = strlen($firstString);
         $secondLength = strlen($secondString);
 
-        if ($firstLength === 0 && $secondLength === 0) {
-            return 1.0;
+        // Both strings are empty -> perfect match
+        if ($firstLength === $emptyStringLength && $secondLength === $emptyStringLength) {
+            return FUZZY_SCORE_IDENTICAL;
         }
 
-        if ($firstLength === 0 || $secondLength === 0) {
-            return 0.0;
+        // One string is empty -> no match
+        if ($firstLength === $emptyStringLength || $secondLength === $emptyStringLength) {
+            return FUZZY_SCORE_NONE;
         }
 
-        $maxLength = max($firstLength, $secondLength);
-        $distance = levenshtein($firstString, $secondString);
-        $similarity = 1 - ($distance / $maxLength);
+        $longestLength = max($firstLength, $secondLength);
+        $levenshteinDistance = levenshtein($firstString, $secondString);
+        $rawSimilarity = FUZZY_SCORE_IDENTICAL - ($levenshteinDistance / $longestLength);
 
-        $similarity = $this->applyDistancePenalty($distance, $similarity);
-        $similarity = $this->applyCloseMatchBonus($distance, $maxLength, $similarity);
+        $similarity = $this->applyDistancePenalty($levenshteinDistance, $rawSimilarity);
+        $similarity = $this->applyCloseMatchBonus($levenshteinDistance, $longestLength, $similarity);
 
-        return max($similarity, 0.0);
-    }
-
-    /**
-     * Apply penalty for large Levenshtein distances.
-     *
-     * Distances greater than 2 receive progressively larger penalties
-     * to better differentiate between close and distant matches.
-     *
-     * @param int $distance Levenshtein distance between strings
-     * @param float $currentSimilarity Current similarity score before penalty
-     * @return float Similarity score after applying penalty
-     */
-    private function applyDistancePenalty(int $distance, float $currentSimilarity): float
-    {
-        if ($distance > 2) {
-            $penaltyFactor = min(0.7, 1.0 - ($distance * 0.1));
-            $currentSimilarity *= $penaltyFactor;
-        }
-
-        return $currentSimilarity;
-    }
-
-    /**
-     * Apply bonus for very close matches on longer strings.
-     *
-     * When strings have a small distance (≤2) and reasonable length (≥4),
-     * they likely represent a meaningful match deserving a slight bonus.
-     *
-     * @param int $distance Levenshtein distance between strings
-     * @param int $maxLength Length of the longer string
-     * @param float $currentSimilarity Current similarity score before bonus
-     * @return float Similarity score after applying bonus
-     */
-    private function applyCloseMatchBonus(int $distance, int $maxLength, float $currentSimilarity): float
-    {
-        if ($distance <= 2 && $maxLength >= 4) {
-            $currentSimilarity = min($currentSimilarity + 0.1, 1.0);
-        }
-
-        return $currentSimilarity;
+        return max($similarity, FUZZY_SCORE_NONE);
     }
 
     /**
      * Get the algorithm identifier name.
      *
-     * @return string Algorithm name used for configuration and debugging
+     * @return string Algorithm name for configuration and debugging
      */
     public function getName(): string
     {
@@ -105,13 +85,62 @@ class LevenshteinSimilarityAlgorithm implements SimilarityAlgorithmInterface
     /**
      * Get the algorithm weight in composite similarity calculations.
      *
-     * This weight is used when combining multiple algorithm scores.
-     * It should reflect the algorithm's reliability for the domain.
+     * This weight determines how much this algorithm's score contributes
+     * when combined with other similarity algorithms.
      *
      * @return float Weight between 0.0 and 1.0
      */
     public function getWeight(): float
     {
-        return 0.3;
+        return $this->config->getWeight();
+    }
+
+    /**
+     * Apply penalty for large Levenshtein distances.
+     *
+     * Distances greater than the configured threshold receive progressively
+     * larger penalties to better differentiate between close and distant matches.
+     *
+     * @param int $levenshteinDistance The computed Levenshtein distance
+     * @param float $currentSimilarity Similarity score before penalty
+     * @return float Similarity score after applying penalty
+     */
+    private function applyDistancePenalty(int $levenshteinDistance, float $currentSimilarity): float
+    {
+        $penaltyThreshold = $this->config->getDistancePenaltyThreshold();
+
+        if ($levenshteinDistance > $penaltyThreshold) {
+            $reductionPerDistance = $this->config->getPenaltyReductionPerDistance();
+            $basePenaltyFactor = $this->config->getPenaltyFactorBase();
+
+            $penaltyFactor = min($basePenaltyFactor, FUZZY_BASE_FACTOR - ($levenshteinDistance * $reductionPerDistance));
+            $currentSimilarity *= $penaltyFactor;
+        }
+
+        return $currentSimilarity;
+    }
+
+    /**
+     * Apply bonus for very close matches on longer strings.
+     *
+     * When strings have a small distance (below the threshold) and sufficient length,
+     * they likely represent a meaningful match deserving a slight bonus.
+     *
+     * @param int $levenshteinDistance The computed Levenshtein distance
+     * @param int $longestLength Length of the longer string
+     * @param float $currentSimilarity Similarity score before bonus
+     * @return float Similarity score after applying bonus
+     */
+    private function applyCloseMatchBonus(int $levenshteinDistance, int $longestLength, float $currentSimilarity): float
+    {
+        $closeMatchThreshold = $this->config->getCloseMatchBonusThreshold();
+        $minimumLengthForBonus = $this->config->getMinLengthForBonus();
+        $closeMatchBonus = $this->config->getCloseMatchBonus();
+
+        if ($levenshteinDistance <= $closeMatchThreshold && $longestLength >= $minimumLengthForBonus) {
+            $currentSimilarity = min($currentSimilarity + $closeMatchBonus, FUZZY_SCORE_IDENTICAL);
+        }
+
+        return $currentSimilarity;
     }
 }

@@ -12,9 +12,27 @@ use Illuminate\Database\Eloquent\Model;
  *
  * Provides consistent API responses for fuzzy search results with optional
  * custom formatting and detailed match information.
+ *
+ * @package Fuzzy\Data
  */
 class SearchResultData extends Data
 {
+    /** Number of decimal places for score rounding. */
+    private const SCORE_DECIMAL_PLACES = 2;
+
+    /** Number of decimal places for relevance rounding. */
+    private const RELEVANCE_DECIMAL_PLACES = 4;
+
+    /**
+     * Constructor for SearchResultData.
+     *
+     * @param object $item The original model or entity
+     * @param float $score Relevance score (0-100)
+     * @param string $modelType Class name or type identifier
+     * @param string|null $matchedField Specific field that matched the search query
+     * @param string|null $matchedValue Actual value that triggered the match
+     * @param float|null $relevance Advanced similarity score
+     */
     public function __construct(
         public object $item,
         public float $score,
@@ -32,8 +50,8 @@ class SearchResultData extends Data
      * @param string $modelType Class name or type identifier
      * @param string|null $matchedField Specific field that matched the search query
      * @param string|null $matchedValue Actual value that triggered the match
-     * @param float|null $relevance Advanced similarity score from WordSimilarityComparator
-     * @return self
+     * @param float|null $relevance Advanced similarity score
+     * @return self Configured SearchResultData instance
      */
     public static function create(
         object $item,
@@ -43,15 +61,15 @@ class SearchResultData extends Data
         ?string $matchedValue = null,
         ?float $relevance = null
     ): self {
-        $formattedItem = self::formatItemIfPossible($item);
+        $formattedItem = self::applyCustomFormatter($item);
 
         return new self(
             item: $formattedItem ?? $item,
-            score: round($score, 2),
+            score: round($score, self::SCORE_DECIMAL_PLACES),
             modelType: $modelType,
             matchedField: $matchedField,
             matchedValue: $matchedValue,
-            relevance: $relevance !== null ? round($relevance, 4) : null
+            relevance: $relevance !== null ? round($relevance, self::RELEVANCE_DECIMAL_PLACES) : null
         );
     }
 
@@ -63,7 +81,7 @@ class SearchResultData extends Data
      * @param string|null $matchedField Specific field that matched
      * @param string|null $matchedValue Actual matched value
      * @param float|null $relevance Advanced similarity score
-     * @return self
+     * @return self Configured SearchResultData instance
      */
     public static function fromModel(
         Model $model,
@@ -88,11 +106,11 @@ class SearchResultData extends Data
      * @param object $item The original item
      * @param float $score Relevance score (0-100)
      * @param string $modelType Class name or type identifier
-     * @param callable $formatter Custom formatting callback
+     * @param callable(object): object $formatter Custom formatting callback
      * @param string|null $matchedField Specific field that matched
      * @param string|null $matchedValue Actual matched value
      * @param float|null $relevance Advanced similarity score
-     * @return self
+     * @return self Configured SearchResultData instance
      */
     public static function withFormatter(
         object $item,
@@ -107,11 +125,11 @@ class SearchResultData extends Data
 
         return new self(
             item: $formattedItem,
-            score: round($score, 2),
+            score: round($score, self::SCORE_DECIMAL_PLACES),
             modelType: $modelType,
             matchedField: $matchedField,
             matchedValue: $matchedValue,
-            relevance: $relevance
+            relevance: $relevance !== null ? round($relevance, self::RELEVANCE_DECIMAL_PLACES) : null
         );
     }
 
@@ -124,17 +142,17 @@ class SearchResultData extends Data
      *     matched_field: string|null,
      *     matched_value: string|null,
      *     relevance: float|null,
-     *     item: array
+     *     item: array<string, mixed>
      * }
      */
     public function toArray(): array
     {
         return [
-            'score' => round($this->score, 2),
+            'score' => round($this->score, self::SCORE_DECIMAL_PLACES),
             'model_type' => $this->modelType,
             'matched_field' => $this->matchedField,
             'matched_value' => $this->matchedValue,
-            'relevance' => $this->relevance !== null ? round($this->relevance, 4) : null,
+            'relevance' => $this->relevance !== null ? round($this->relevance, self::RELEVANCE_DECIMAL_PLACES) : null,
             'item' => $this->formatItemForOutput(),
         ];
     }
@@ -142,7 +160,7 @@ class SearchResultData extends Data
     /**
      * Format the item for API output.
      *
-     * @return array Formatted item data
+     * @return array<string, mixed> Formatted item data
      */
     private function formatItemForOutput(): array
     {
@@ -150,7 +168,11 @@ class SearchResultData extends Data
             return $this->item->toArray();
         }
 
-        return FuzzySearchableData::fromModel($this->item)->toArray();
+        if ($this->item instanceof Model) {
+            return FuzzySearchableData::fromModel($this->item)->toArray();
+        }
+
+        return (array) $this->item;
     }
 
     /**
@@ -159,11 +181,11 @@ class SearchResultData extends Data
      * @param object $item The item to format
      * @return object|null Formatted item or null if no formatter available
      */
-    private static function formatItemIfPossible(object $item): ?object
+    private static function applyCustomFormatter(object $item): ?object
     {
         $formatterClass = self::extractFormatterClass($item);
 
-        if (!$formatterClass) {
+        if ($formatterClass === null) {
             return null;
         }
 
@@ -177,10 +199,10 @@ class SearchResultData extends Data
     /**
      * Extract formatter class name from an item.
      *
-     * Priority:
+     * Priority order:
      * 1. getFuzzyFormat() method
      * 2. fuzzyFormat property
-     * 3. null (no formatter)
+     * 3. null (no formatter available)
      *
      * @param object $item The item to check for formatter
      * @return string|null Formatter class name or null
@@ -189,12 +211,12 @@ class SearchResultData extends Data
     {
         if (method_exists($item, 'getFuzzyFormat')) {
             $formatter = $item->getFuzzyFormat();
-            if ($formatter && is_string($formatter)) {
+            if (is_string($formatter) && $formatter !== '') {
                 return $formatter;
             }
         }
 
-        if (property_exists($item, 'fuzzyFormat') && $item->fuzzyFormat) {
+        if (property_exists($item, 'fuzzyFormat') && is_string($item->fuzzyFormat) && $item->fuzzyFormat !== '') {
             return $item->fuzzyFormat;
         }
 

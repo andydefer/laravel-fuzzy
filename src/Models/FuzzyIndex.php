@@ -9,23 +9,25 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 /**
- * Represents a search index entry for fuzzy search functionality
+ * Represents a search index entry for fuzzy search functionality.
  *
  * This model stores indexed data for searchable models, including original and normalized
  * field values, word breakdowns, and weighting information for relevance scoring.
  * Each entry is associated with a specific field of a searchable model instance.
+ *
+ * @package Fuzzy\Models
  */
 class FuzzyIndex extends Model
 {
     /**
-     * The table associated with the model
+     * The database table associated with the model.
      *
      * @var string
      */
     protected $table = 'fuzzy_index';
 
     /**
-     * The attributes that are mass assignable
+     * The attributes that are mass assignable.
      *
      * @var array<int, string>
      */
@@ -41,7 +43,7 @@ class FuzzyIndex extends Model
     ];
 
     /**
-     * The attributes that should be cast
+     * The attributes that should be cast to native types.
      *
      * @var array<string, string>
      */
@@ -54,11 +56,11 @@ class FuzzyIndex extends Model
     ];
 
     /**
-     * Scope query to a specific model type
+     * Scope query to a specific model type.
      *
-     * @param Builder $query The Eloquent query builder
+     * @param Builder<self> $query The Eloquent query builder
      * @param string $modelType The fully qualified model class name
-     * @return Builder The scoped query builder
+     * @return Builder<self> The scoped query builder
      */
     public function scopeForModel(Builder $query, string $modelType): Builder
     {
@@ -66,12 +68,12 @@ class FuzzyIndex extends Model
     }
 
     /**
-     * Scope query to a specific model instance
+     * Scope query to a specific model instance.
      *
-     * @param Builder $query The Eloquent query builder
+     * @param Builder<self> $query The Eloquent query builder
      * @param string $modelType The fully qualified model class name
      * @param int|string $modelId The identifier of the model instance
-     * @return Builder The scoped query builder
+     * @return Builder<self> The scoped query builder
      */
     public function scopeForModelInstance(Builder $query, string $modelType, int|string $modelId): Builder
     {
@@ -81,11 +83,11 @@ class FuzzyIndex extends Model
     }
 
     /**
-     * Scope query to a specific field
+     * Scope query to entries for a specific field.
      *
-     * @param Builder $query The Eloquent query builder
+     * @param Builder<self> $query The Eloquent query builder
      * @param string $field The field name to filter by
-     * @return Builder The scoped query builder
+     * @return Builder<self> The scoped query builder
      */
     public function scopeForField(Builder $query, string $field): Builder
     {
@@ -93,11 +95,11 @@ class FuzzyIndex extends Model
     }
 
     /**
-     * Scope query to entries containing a specific word
+     * Scope query to entries containing a specific word in their words array.
      *
-     * @param Builder $query The Eloquent query builder
+     * @param Builder<self> $query The Eloquent query builder
      * @param string $word The word to search for in the JSON array
-     * @return Builder The scoped query builder
+     * @return Builder<self> The scoped query builder
      */
     public function scopeWithWord(Builder $query, string $word): Builder
     {
@@ -105,21 +107,21 @@ class FuzzyIndex extends Model
     }
 
     /**
-     * Scope query to entries with normalized values containing the given substring
+     * Scope query to entries with normalized values containing the given substring.
      *
-     * @param Builder $query The Eloquent query builder
-     * @param string $value The substring to search for in normalized values
-     * @return Builder The scoped query builder
+     * @param Builder<self> $query The Eloquent query builder
+     * @param string $substring The substring to search for in normalized values
+     * @return Builder<self> The scoped query builder
      */
-    public function scopeWithNormalizedValue(Builder $query, string $value): Builder
+    public function scopeWithNormalizedValue(Builder $query, string $substring): Builder
     {
-        return $query->where('normalized_value', 'like', sprintf('%%%s%%', $value));
+        return $query->where('normalized_value', 'like', sprintf('%%%s%%', $substring));
     }
 
     /**
-     * Get the polymorphic relationship to the indexable model
+     * Get the polymorphic relationship to the indexable model.
      *
-     * @return MorphTo The morphTo relationship
+     * @return MorphTo The morphTo relationship instance
      */
     public function indexable(): MorphTo
     {

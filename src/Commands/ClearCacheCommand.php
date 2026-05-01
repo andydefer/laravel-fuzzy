@@ -4,17 +4,22 @@ declare(strict_types=1);
 
 namespace Fuzzy\Commands;
 
+use Fuzzy\Contracts\SearchServiceInterface;
+use Fuzzy\Traits\CommandHelpers;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Cache;
 
 /**
  * Clear fuzzy search cache command.
  *
  * Provides functionality to clear cached search results and statistics.
  * Supports selective cache invalidation by model or cache type.
+ *
+ * @package Fuzzy\Commands
  */
 class ClearCacheCommand extends Command
 {
+    use CommandHelpers;
+
     /**
      * The name and signature of the console command.
      *
@@ -35,9 +40,6 @@ class ClearCacheCommand extends Command
     /**
      * Execute the console command.
      *
-     * Determines the cache clearing strategy based on provided options
-     * and delegates to appropriate handler methods.
-     *
      * @return void
      */
     public function handle(): void
@@ -46,88 +48,61 @@ class ClearCacheCommand extends Command
         $targetModel = $this->option('model');
         $shouldClearStatsOnly = $this->option('stats');
 
-        if (!$shouldSkipConfirmation && !$this->confirmClearCacheRequest()) {
-            $this->info('Cache clearing cancelled.');
+        if (!$this->confirmAction('Are you sure you want to clear fuzzy search cache?', $shouldSkipConfirmation)) {
+            $this->showInfo('Cache clearing cancelled.');
             return;
         }
 
-        $searchService = app('laravel-fuzzy.search');
-
         if ($shouldClearStatsOnly) {
-            $this->clearStatisticsCache($searchService);
+            $this->clearStatisticsCache();
         } elseif ($targetModel) {
-            $this->clearCacheForSpecificModel($searchService, $targetModel);
+            $this->clearCacheForSpecificModel($targetModel);
         } else {
-            $this->clearEntireCache($searchService);
+            $this->clearEntireCache();
         }
-    }
-
-    /**
-     * Request confirmation from user before clearing cache.
-     *
-     * @return bool
-     */
-    private function confirmClearCacheRequest(): bool
-    {
-        return $this->confirm('Are you sure you want to clear fuzzy search cache?');
     }
 
     /**
      * Clear only statistics cache.
      *
-     * Invalidates cache containing search statistics and usage metrics.
-     *
-     * @param mixed $searchService
      * @return void
      */
-    private function clearStatisticsCache(mixed $searchService): void
+    private function clearStatisticsCache(): void
     {
-        if (method_exists($searchService, 'getStats')) {
-            $cachePrefix = config('fuzzy.cache.prefix', 'fuzzy_search:');
-            Cache::forget($cachePrefix . 'stats');
-
-            $this->info('Statistics cache cleared successfully.');
-        } else {
-            $this->warn('Statistics cache clearing is not available.');
-        }
+        $this->getSearchService()->getCacheManager()->invalidateStatsCache();
+        $this->showSuccess('Statistics cache cleared successfully.');
     }
 
     /**
      * Clear cache for a specific model.
      *
-     * Invalidates all cached search results for the given model class.
-     *
-     * @param mixed $searchService
-     * @param string $modelClass
+     * @param string $modelClass The model class to clear cache for
      * @return void
      */
-    private function clearCacheForSpecificModel(mixed $searchService, string $modelClass): void
+    private function clearCacheForSpecificModel(string $modelClass): void
     {
-        if (method_exists($searchService, 'invalidateCacheForModel')) {
-            $searchService->invalidateCacheForModel($modelClass);
-
-            $this->info(sprintf('Cache cleared for model: %s', $modelClass));
-        } else {
-            $this->warn('Model-specific cache clearing is not available.');
-        }
+        $this->getSearchService()->getCacheManager()->invalidateForModel($modelClass);
+        $this->showSuccess(sprintf('Cache cleared for model: %s', $modelClass));
     }
 
     /**
      * Clear entire fuzzy search cache.
      *
-     * Invalidates all cached search results and statistics.
-     *
-     * @param mixed $searchService
      * @return void
      */
-    private function clearEntireCache(mixed $searchService): void
+    private function clearEntireCache(): void
     {
-        if (method_exists($searchService, 'invalidateAllCache')) {
-            $searchService->invalidateAllCache();
+        $this->getSearchService()->getCacheManager()->invalidateAll();
+        $this->showSuccess('All fuzzy search cache cleared successfully.');
+    }
 
-            $this->info('All fuzzy search cache cleared successfully.');
-        } else {
-            $this->warn('Cache service is not available.');
-        }
+    /**
+     * Get the search service instance from the container.
+     *
+     * @return SearchServiceInterface
+     */
+    private function getSearchService(): SearchServiceInterface
+    {
+        return app(SearchServiceInterface::class);
     }
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Fuzzy\Commands;
 
 use Fuzzy\Models\FuzzyIndex;
+use Fuzzy\Traits\CommandHelpers;
 use Illuminate\Console\Command;
 
 /**
@@ -12,9 +13,13 @@ use Illuminate\Console\Command;
  *
  * This command provides safe deletion of fuzzy search index entries with
  * confirmation prompts to prevent accidental data loss.
+ *
+ * @package Fuzzy\Commands
  */
 class ClearIndexCommand extends Command
 {
+    use CommandHelpers;
+
     /**
      * The name and signature of the console command.
      *
@@ -60,16 +65,13 @@ class ClearIndexCommand extends Command
      */
     protected function clearModelIndex(string $modelClass, bool $shouldSkipConfirmation): void
     {
-        if (!$this->shouldProceedWithDeletion(
-            sprintf('Clear index for model %s?', $modelClass),
-            $shouldSkipConfirmation
-        )) {
+        if (!$this->confirmAction(sprintf('Clear index for model %s?', $modelClass), $shouldSkipConfirmation)) {
             return;
         }
 
         $deletedCount = $this->deleteModelIndex($modelClass);
 
-        $this->info(sprintf('✓ Cleared %s entries for %s', $deletedCount, $modelClass));
+        $this->showSuccess(sprintf('Cleared %s entries for %s', $deletedCount, $modelClass));
     }
 
     /**
@@ -80,32 +82,13 @@ class ClearIndexCommand extends Command
      */
     protected function clearAllIndexes(bool $shouldSkipConfirmation): void
     {
-        if (!$this->shouldProceedWithDeletion(
-            'Clear ALL search indexes?',
-            $shouldSkipConfirmation
-        )) {
+        if (!$this->confirmAction('Clear ALL search indexes?', $shouldSkipConfirmation)) {
             return;
         }
 
         $totalCount = $this->deleteAllIndexes();
 
-        $this->info(sprintf('✓ Cleared all indexes (%s entries)', $totalCount));
-    }
-
-    /**
-     * Determine if the deletion operation should proceed.
-     *
-     * @param string $message The confirmation message to display
-     * @param bool $shouldSkipConfirmation Whether to skip confirmation
-     * @return bool True if the operation should proceed, false otherwise
-     */
-    private function shouldProceedWithDeletion(string $message, bool $shouldSkipConfirmation): bool
-    {
-        if ($shouldSkipConfirmation) {
-            return true;
-        }
-
-        return $this->confirm($message);
+        $this->showSuccess(sprintf('Cleared all indexes (%s entries)', $totalCount));
     }
 
     /**
@@ -116,7 +99,6 @@ class ClearIndexCommand extends Command
      */
     private function deleteModelIndex(string $modelClass): int
     {
-        // Note: Cannot use named parameters here as forModel() is a scope that doesn't support them
         $entryCount = FuzzyIndex::forModel($modelClass)->count();
         FuzzyIndex::forModel($modelClass)->delete();
 

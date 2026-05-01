@@ -6,20 +6,21 @@ namespace Fuzzy\Tests\Unit\Services;
 
 use Fuzzy\Services\IndexBuilder;
 use Fuzzy\Contracts\IndexRepositoryInterface;
+use Fuzzy\Contracts\ScoringEngineInterface;
 use Fuzzy\Tests\TestCase;
 use Fuzzy\Services\Scoring\ScoringEngine;
-use Fuzzy\Services\Scoring\ScoringStrategy;
 use Fuzzy\Data\SearchOptionsData;
 use Fuzzy\Services\SimilarityCalculator;
 use Fuzzy\Services\StringNormalizer;
 use Fuzzy\ValueObjects\SearchQuery;
 use Fuzzy\SearchContext;
+use Fuzzy\Services\Scoring\ScoringStrategyInterface;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 
 #[AllowMockObjectsWithoutExpectations]
 final class ScoringEngineTest extends TestCase
 {
-    private ScoringEngine $scoringEngine;
+    private ScoringEngineInterface $scoringEngine;
     private SearchContext $searchContext;
 
     protected function setUp(): void
@@ -39,9 +40,9 @@ final class ScoringEngineTest extends TestCase
     /**
      * Creates a mock scoring strategy.
      */
-    private function createMockStrategy(int $priority, float $score): ScoringStrategy
+    private function createMockStrategy(int $priority, float $score): ScoringStrategyInterface
     {
-        $strategy = $this->createMock(ScoringStrategy::class);
+        $strategy = $this->createMock(ScoringStrategyInterface::class);
         $strategy->method('getPriority')->willReturn($priority);
         $strategy->method('supports')->willReturn(true);
         $strategy->method('calculate')->willReturn($score);
@@ -84,6 +85,9 @@ final class ScoringEngineTest extends TestCase
         ];
     }
 
+    /**
+     * Test that calculate score uses the best strategy.
+     */
     public function test_calculate_score_uses_strategies(): void
     {
         // Arrange: Create test index entry
@@ -96,10 +100,13 @@ final class ScoringEngineTest extends TestCase
         $this->assertEqualsWithDelta(0.95, $score, PHP_FLOAT_EPSILON);
     }
 
+    /**
+     * Test that score is clamped to maximum 1.0.
+     */
     public function test_calculate_score_clamping(): void
     {
         // Arrange: Create strategy returning out-of-bounds score
-        $strategy = $this->createMock(ScoringStrategy::class);
+        $strategy = $this->createMock(ScoringStrategyInterface::class);
         $strategy->method('getPriority')->willReturn(100);
         $strategy->method('supports')->willReturn(true);
         $strategy->method('calculate')->willReturn(2.0);
@@ -114,10 +121,13 @@ final class ScoringEngineTest extends TestCase
         $this->assertEqualsWithDelta(1.0, $score, PHP_FLOAT_EPSILON);
     }
 
+    /**
+     * Test fallback when no strategy supports the entry.
+     */
     public function test_calculate_score_no_strategy_supports(): void
     {
         // Arrange: Create strategy that doesn't support calculation
-        $strategy = $this->createMock(ScoringStrategy::class);
+        $strategy = $this->createMock(ScoringStrategyInterface::class);
         $strategy->method('getPriority')->willReturn(100);
         $strategy->method('supports')->willReturn(false);
 
@@ -132,6 +142,9 @@ final class ScoringEngineTest extends TestCase
         $this->assertLessThanOrEqual(1.0, $score);
     }
 
+    /**
+     * Test multi-word score calculation.
+     */
     public function test_calculate_multi_word_score(): void
     {
         // Arrange: Create multiple index entries
@@ -153,6 +166,9 @@ final class ScoringEngineTest extends TestCase
         $this->assertLessThanOrEqual(1.0, $score);
     }
 
+    /**
+     * Test multi-word score with empty entries.
+     */
     public function test_calculate_multi_word_score_empty(): void
     {
         // Arrange: Empty index entries array
@@ -164,6 +180,9 @@ final class ScoringEngineTest extends TestCase
         $this->assertEqualsWithDelta(0.0, $score, PHP_FLOAT_EPSILON);
     }
 
+    /**
+     * Test multi-word score with single word query.
+     */
     public function test_calculate_multi_word_score_single_word_query(): void
     {
         // Arrange: Create context with single word query
@@ -189,9 +208,12 @@ final class ScoringEngineTest extends TestCase
         $this->assertEqualsWithDelta(0.0, $score, PHP_FLOAT_EPSILON);
     }
 
+    /**
+     * Test multi-word score with field weighting.
+     */
     public function test_calculate_multi_word_score_with_field_weighting(): void
     {
-        // Arrange: Configure field weights and create index entry
+        // Arrange: Configure field weights
         config(['fuzzy.scoring.field_weights' => [
             'name' => 1.3,
             'description' => 0.8,
@@ -207,9 +229,12 @@ final class ScoringEngineTest extends TestCase
         $this->assertGreaterThan(0.0, $score);
     }
 
+    /**
+     * Test multi-word score with coverage bonus.
+     */
     public function test_calculate_multi_word_score_with_coverage_bonus(): void
     {
-        // Arrange: Create context with 2-word query and configure bonuses
+        // Arrange: Create context with 2-word query
         $normalizer = new StringNormalizer();
         $query = SearchQuery::create('test query', $normalizer);
         $context = new SearchContext(
@@ -240,5 +265,78 @@ final class ScoringEngineTest extends TestCase
 
         // Assert: Should apply coverage bonus
         $this->assertGreaterThan(0.0, $score);
+    }
+
+    /**
+     * Test strategies are sorted by priority.
+     */
+    public function test_strategies_are_sorted_by_priority(): void
+    {
+        // Arrange: Create strategies with mixed priorities
+        $lowPriority = $this->createMockStrategy(50, 0.5);
+        $highPriority = $this->createMockStrategy(100, 0.9);
+        $mediumPriority = $this->createMockStrategy(75, 0.7);
+
+        $engine = new ScoringEngine($lowPriority, $highPriority, $mediumPriority);
+
+        // Act: Calculate score
+        $indexEntry = $this->createTestIndexEntry();
+        $score = $engine->calculateScore($this->searchContext, $indexEntry);
+
+        // Assert: Should use highest priority (100) score first
+        $this->assertEqualsWithDelta(0.9, $score, PHP_FLOAT_EPSILON);
+    }
+
+    /**
+     * Test perfect score stops early.
+     */
+    public function test_perfect_score_stops_early(): void
+    {
+        // Arrange: Create strategies where first returns perfect score
+        $perfectStrategy = $this->createMock(ScoringStrategyInterface::class);
+        $perfectStrategy->method('getPriority')->willReturn(100);
+        $perfectStrategy->method('supports')->willReturn(true);
+        $perfectStrategy->method('calculate')->willReturn(1.0);
+
+        $otherStrategy = $this->createMock(ScoringStrategyInterface::class);
+        $otherStrategy->method('getPriority')->willReturn(90);
+        $otherStrategy->method('supports')->willReturn(true);
+        $otherStrategy->expects($this->never())->method('calculate');
+
+        $engine = new ScoringEngine($perfectStrategy, $otherStrategy);
+        $indexEntry = $this->createTestIndexEntry();
+
+        // Act: Calculate score
+        $score = $engine->calculateScore($this->searchContext, $indexEntry);
+
+        // Assert: Should return perfect score
+        $this->assertEqualsWithDelta(1.0, $score, PHP_FLOAT_EPSILON);
+    }
+    /**
+     * Test fallback score uses similarity calculator.
+     */
+    public function test_fallback_score_uses_similarity_calculator(): void
+    {
+        // Arrange: Create strategy that doesn't support
+        $strategy = $this->createMock(ScoringStrategyInterface::class);
+        $strategy->method('supports')->willReturn(false);
+        $strategy->method('getPriority')->willReturn(100);
+
+        $engine = new ScoringEngine($strategy);
+
+        // Create index entry with original value
+        $indexEntry = [
+            'field' => 'name',
+            'original_value' => 'test product',
+            'normalized_words' => ['test', 'product'],
+            'weight' => 1.0,
+        ];
+
+        // Act: Calculate score
+        $score = $engine->calculateScore($this->searchContext, $indexEntry);
+
+        // Assert: Should return a score (fallback uses similarity)
+        $this->assertGreaterThanOrEqual(0.0, $score);
+        $this->assertLessThanOrEqual(1.0, $score);
     }
 }

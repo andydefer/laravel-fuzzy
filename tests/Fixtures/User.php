@@ -7,7 +7,6 @@ namespace Fuzzy\Tests\Fixtures;
 use Illuminate\Database\Eloquent\Model;
 use Fuzzy\Contracts\MustFuzzySearch;
 use Fuzzy\Traits\FuzzySearchable;
-use Fuzzy\Data\FuzzySearchableData;
 
 /**
  * Test fixture representing a User model with fuzzy search capabilities.
@@ -19,6 +18,13 @@ class User extends Model implements MustFuzzySearch
     use FuzzySearchable;
 
     /**
+     * The table associated with the model.
+     *
+     * @var string
+     */
+    protected $table = 'users';
+
+    /**
      * The attributes that are mass assignable.
      *
      * @var array<string>
@@ -28,14 +34,22 @@ class User extends Model implements MustFuzzySearch
     /**
      * The fields that should be searchable.
      *
-     * @var array<string>
+     * @return array<int, string>
      */
-    public array $searchableFields = ['name', 'email'];
+    public function getSearchableFields(): array
+    {
+        return ['name', 'email'];
+    }
 
     /**
      * Custom formatter class for search data.
+     *
+     * @return class-string|null
      */
-    public ?string $fuzzyFormat = UserSearchData::class;
+    public function getFuzzyFormat(): ?string
+    {
+        return UserSearchData::class;
+    }
 
     /**
      * Determine if the model should be indexed for search.
@@ -46,30 +60,17 @@ class User extends Model implements MustFuzzySearch
     {
         return $this->type === 'user';
     }
-}
 
-/**
- * Custom search data formatter for User model.
- *
- * Transforms User model instances into structured search data with specific
- * field mappings and formatting.
- */
-class UserSearchData extends FuzzySearchableData
-{
     /**
-     * Create a search data instance from a User model.
+     * Protected fields that should preserve stop words.
      *
-     * @param Model $user The User model instance
+     * For users, name and email should preserve stop words to maintain
+     * search accuracy for names like "Jean de La Fontaine".
+     *
+     * @return array<int, string>
      */
-    public static function fromModel(Model $user): self
+    public function getProtectedFields(): array
     {
-        return new self(
-            id: $user->id,
-            name: $user->name,
-            type: 'user',
-            data: $user->toArray(),
-            description: $user->email,
-            url: '/users/' . $user->id,
-        );
+        return ['name', 'email'];
     }
 }

@@ -39,6 +39,11 @@ class SearchQuery
         $normalizedQuery = $normalizer->normalizeQuery($query);
         $words = $normalizer->splitIntoWords($normalizedQuery);
 
+        // Si la requête normalisée contient des mots, mais que tous sont des stop words,
+        // normalizeQuery peut retourner une chaîne non vide avec des stop words
+        // Cela dépend de la logique de normalizeQuery
+        $words = $normalizer->splitIntoWords($normalizedQuery);
+
         return new self(
             originalQuery: $query,
             normalizedQuery: $normalizedQuery,
@@ -56,6 +61,14 @@ class SearchQuery
      */
     public function isEmpty(): bool
     {
-        return $this->normalizedQuery === '' || $this->normalizedQuery === '0' || $this->words === [];
+        // Une requête est vide si :
+        // 1. La chaîne normalisée est vide
+        // 2. La chaîne normalisée est "0"
+        // 3. Il n'y a aucun mot après normalisation
+        // 4. Tous les mots sont des stop words (détecté par le fait que normalizedQuery peut être non vide
+        //    mais words est vide après filtrage - selon l'implémentation de normalizeQuery)
+        return $this->normalizedQuery === ''
+            || $this->normalizedQuery === '0'
+            || $this->words === [];
     }
 }

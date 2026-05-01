@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Fuzzy\Contracts;
 
-use Fuzzy\SearchContext;
 use Illuminate\Support\Collection;
 
 /**
@@ -55,9 +54,9 @@ interface IndexRepositoryInterface
      * Optimizes performance by loading all required models before
      * processing search results.
      *
-     * @param SearchContext $context Search context containing model references
+     * @param SearchContextInterface $context Search context containing model references
      */
-    public function preloadModels(SearchContext $context): void;
+    public function preloadModels(SearchContextInterface $context): void;
 
     /**
      * Returns statistical information about the index.

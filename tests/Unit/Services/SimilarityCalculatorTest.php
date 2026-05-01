@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace Fuzzy\Tests\Unit\Services;
 
 use Fuzzy\Contracts\SimilarityAlgorithmInterface;
+use Fuzzy\Services\Algorithms\LongestCommonSubstringAlgorithm;
+use Fuzzy\Services\Algorithms\LevenshteinSimilarityAlgorithm;
+use Fuzzy\Services\Algorithms\PrefixSimilarityAlgorithm;
 use Fuzzy\Services\SimilarityCalculator;
 use Fuzzy\Tests\TestCase;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
@@ -21,6 +24,11 @@ final class SimilarityCalculatorTest extends TestCase
     {
         parent::setUp();
         $this->calculator = new SimilarityCalculator();
+
+        // Register default algorithms for tests
+        $this->calculator->addAlgorithm(app(LongestCommonSubstringAlgorithm::class));
+        $this->calculator->addAlgorithm(app(LevenshteinSimilarityAlgorithm::class));
+        $this->calculator->addAlgorithm(app(PrefixSimilarityAlgorithm::class));
     }
 
     /**

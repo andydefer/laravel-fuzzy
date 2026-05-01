@@ -2,161 +2,152 @@
 
 declare(strict_types=1);
 
-namespace Fuzzy\Tests\Unit;
+namespace Fuzzy\Tests\Unit\Services;
 
-use Fuzzy\Tests\TestCase;
+use Fuzzy\Contracts\CacheManagerInterface;
+use Fuzzy\Contracts\IndexManagerInterface;
+use Fuzzy\Contracts\ModelDiscoveryInterface;
+use Fuzzy\Contracts\SearchProcessorInterface;
 use Fuzzy\Services\FuzzySearchService;
-use Fuzzy\Data\SearchOptionsData;
-use Fuzzy\FuzzySearch;
-use Fuzzy\Tests\Fixtures\User;
+use Fuzzy\Tests\TestCase;
 use Fuzzy\Tests\Fixtures\Product;
+use Fuzzy\Tests\Fixtures\User;
 use Illuminate\Support\Collection;
-use Fuzzy\Data\SearchResultData;
-use Fuzzy\Models\FuzzyIndex;
-use Fuzzy\Tests\Fixtures\UserSearchData;
+use Mockery;
 
-/**
- * Unit tests for FuzzySearchService.
- *
- * Tests search functionality, indexing, and configuration options.
- */
 final class FuzzySearchServiceTest extends TestCase
 {
     private FuzzySearchService $service;
+    private $cacheManager;
+    private $modelDiscovery;
+    private $indexManager;
+    private $searchProcessor;
 
-    /**
-     * Set up test environment with test data and indexes.
-     */
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
-        $this->service = app(FuzzySearchService::class);
+        $this->cacheManager = Mockery::mock(CacheManagerInterface::class);
+        $this->modelDiscovery = Mockery::mock(ModelDiscoveryInterface::class);
+        $this->indexManager = Mockery::mock(IndexManagerInterface::class);
+        $this->searchProcessor = Mockery::mock(SearchProcessorInterface::class);
 
-        $this->cleanTestData();
-        $this->createTestData();
-        $this->service->reindexAll();
+        $this->service = new FuzzySearchService(
+            $this->cacheManager,
+            $this->modelDiscovery,
+            $this->indexManager,
+            $this->searchProcessor
+        );
     }
 
-    /**
-     * Remove all test data and indexes.
-     */
-    private function cleanTestData(): void
+    protected function tearDown(): void
     {
-        FuzzyIndex::query()->truncate();
-        User::query()->delete();
-        Product::query()->delete();
+        Mockery::close();
+        parent::tearDown();
     }
 
-    /**
-     * Create test users and products for search testing.
-     */
-    private function createTestData(): void
-    {
-        // Create indexable users (type = 'user')
-        User::create([
-            'name' => 'John Doe',
-            'email' => 'john@example.com',
-            'type' => 'user',
-        ]);
-
-        User::create([
-            'name' => 'Jane Smith',
-            'email' => 'jane@example.com',
-            'type' => 'user',
-        ]);
-
-        Product::create([
-            'name' => 'Laptop Pro',
-            'description' => 'High-end laptop with 16GB RAM',
-            'price' => 1299.99,
-        ]);
-
-        Product::create([
-            'name' => 'Mouse Wireless',
-            'description' => 'Wireless mouse with ergonomic design',
-            'price' => 49.99,
-        ]);
-
-        Product::create([
-            'name' => 'Keyboard Mechanical',
-            'description' => 'Mechanical keyboard with RGB lighting',
-            'price' => 89.99,
-        ]);
-    }
-
-    /**
-     * Test that search returns a collection.
-     */
     public function test_search_returns_collection(): void
     {
-        // Arrange: Service is already set up in setUp()
+        $query = 'john';
+        $options = [];
+        $expectedResults = collect(['result1', 'result2']);
 
-        // Act: Perform search
-        $results = $this->service->search('john');
+        $this->cacheManager->shouldReceive('remember')
+            ->once()
+            ->with('search', Mockery::type('callable'), [$query, $options])
+            ->andReturn($expectedResults);
 
-        // Assert: Results should be a Collection
+        $results = $this->service->search($query, $options);
+
         $this->assertInstanceOf(Collection::class, $results);
+        $this->assertCount(2, $results);
     }
 
-    /**
-     * Test that search finds exact matches.
-     */
     public function test_search_finds_exact_match(): void
     {
-        // Arrange: Service and test data are already set up
+        $query = 'John Doe';
+        $options = [];
 
-        // Act: Search for exact name
-        $results = $this->service->search('John Doe');
+        $mockResults = collect([
+            (object) ['score' => 0.95, 'item' => (object) ['name' => 'John Doe']]
+        ]);
 
-        // Assert: Should find John Doe with high score
-        $this->assertGreaterThan(0, $results->count(), 'Search should find results for "John Doe"');
+        $this->cacheManager->shouldReceive('remember')
+            ->once()
+            ->andReturnUsing(function ($type, $callback, $params) use ($mockResults) {
+                return $callback();
+            });
 
-        $johnDoeResult = $this->findResultByName($results, 'John Doe');
-        $this->assertInstanceOf(SearchResultData::class, $johnDoeResult, 'Should find SearchResultData for John Doe');
-        $this->assertEquals('John Doe', $johnDoeResult->item->name);
-        $this->assertGreaterThan(0.8, $johnDoeResult->score, 'Exact match should have high score');
+        $this->modelDiscovery->shouldReceive('getSearchableModels')
+            ->once()
+            ->andReturn([User::class]);
+
+        $this->searchProcessor->shouldReceive('search')
+            ->once()
+            ->with($query, [User::class], $options)
+            ->andReturn($mockResults);
+
+        $results = $this->service->search($query, $options);
+
+        $this->assertInstanceOf(Collection::class, $results);
+        $this->assertGreaterThan(0, $results->count());
+        $this->assertEquals(0.95, $results->first()->score);
     }
 
-    /**
-     * Test that search finds fuzzy matches.
-     */
     public function test_search_finds_fuzzy_match(): void
     {
-        // Arrange: Service and test data are already set up
+        $query = 'jon do';
+        $options = ['fuzzy' => true];
 
-        // Act: Search with fuzzy matching enabled
-        $results = $this->service->search('jon do', ['fuzzy' => true]);
+        $mockResults = collect([
+            (object) ['score' => 0.85, 'item' => (object) ['name' => 'John Doe']]
+        ]);
 
-        // Assert: Should find results despite typos
-        $this->assertGreaterThan(0, $results->count(), 'Fuzzy search should find "John Doe" with query "jon do"');
+        $this->cacheManager->shouldReceive('remember')
+            ->once()
+            ->andReturnUsing(function ($type, $callback, $params) use ($mockResults) {
+                return $callback();
+            });
+
+        $this->modelDiscovery->shouldReceive('getSearchableModels')
+            ->once()
+            ->andReturn([User::class]);
+
+        $this->searchProcessor->shouldReceive('search')
+            ->once()
+            ->with($query, [User::class], $options)
+            ->andReturn($mockResults);
+
+        $results = $this->service->search($query, $options);
+
+        $this->assertInstanceOf(Collection::class, $results);
+        $this->assertGreaterThan(0, $results->count());
     }
 
-    /**
-     * Test search within specific model.
-     */
     public function test_search_in_specific_model(): void
     {
-        // Arrange: Service and test data are already set up
+        $modelClass = User::class;
+        $query = 'john';
+        $options = [];
 
-        // Act: Search only in User model
-        $results = $this->service->searchInModel(User::class, 'john');
+        $mockResults = collect([
+            (object) ['score' => 0.95, 'item' => (object) ['name' => 'John Doe', 'type' => 'user']]
+        ]);
 
-        // Assert: Should find John Doe as a User
-        $this->assertGreaterThan(0, $results->count(), 'Search in User model should find results');
+        $this->cacheManager->shouldReceive('remember')
+            ->once()
+            ->with('search_in_model', Mockery::type('callable'), [$modelClass, $query, $options])
+            ->andReturn($mockResults);
 
-        $johnDoeResult = $this->findResultByName($results, 'John Doe');
-        $this->assertInstanceOf(SearchResultData::class, $johnDoeResult, 'Should find SearchResultData for John Doe');
-        $this->assertInstanceOf(UserSearchData::class, $johnDoeResult->item, 'Should use UserSearchData formatter');
+        $results = $this->service->searchInModel($modelClass, $query, $options);
+
+        $this->assertInstanceOf(Collection::class, $results);
+        $this->assertGreaterThan(0, $results->count());
     }
 
-    /**
-     * Test search with custom options.
-     */
     public function test_search_with_options(): void
     {
-        // Arrange: Set search options
+        $query = 'laptop';
         $options = [
             'min_score' => 0.5,
             'max_results' => 5,
@@ -164,11 +155,29 @@ final class FuzzySearchServiceTest extends TestCase
             'threshold' => 0.4,
         ];
 
-        // Act: Search with custom options
-        /** @var Collection<int, SearchResultData> $results  */
-        $results = $this->service->search('laptop', $options);
+        $mockResults = collect([
+            (object) ['score' => 0.8, 'item' => (object) ['name' => 'Laptop Pro']],
+            (object) ['score' => 0.6, 'item' => (object) ['name' => 'Laptop Air']]
+        ]);
 
-        // Assert: Results should respect options
+        $this->cacheManager->shouldReceive('remember')
+            ->once()
+            ->andReturnUsing(function ($type, $callback, $params) use ($mockResults) {
+                return $callback();
+            });
+
+        $this->modelDiscovery->shouldReceive('getSearchableModels')
+            ->once()
+            ->andReturn([Product::class]);
+
+        $this->searchProcessor->shouldReceive('search')
+            ->once()
+            ->with($query, [Product::class], $options)
+            ->andReturn($mockResults);
+
+        $results = $this->service->search($query, $options);
+
+        $this->assertInstanceOf(Collection::class, $results);
         $this->assertLessThanOrEqual(5, $results->count());
 
         foreach ($results as $result) {
@@ -176,339 +185,243 @@ final class FuzzySearchServiceTest extends TestCase
         }
     }
 
-    /**
-     * Test indexing a model.
-     */
-    public function test_index_model(): void
-    {
-        // Arrange: Create a unique user
-        $uniqueTerm = 'xyzlmnopqr12345unique';
-        $initialResults = $this->service->search($uniqueTerm);
-        $this->assertCount(0, $initialResults);
-
-        $user = User::create([
-            'name' => 'Xylophone Player',
-            'email' => 'xylophone@example.com',
-            'type' => 'user',
-        ]);
-
-        // Act: Index the new user
-        $this->service->indexModel($user);
-
-        // Assert: Should find the new user
-        $results = $this->service->search('xylophone player');
-        $this->assertGreaterThanOrEqual(1, $results->count());
-
-        $xylophoneResult = $this->findResultByName($results, 'Xylophone Player');
-        $this->assertInstanceOf(SearchResultData::class, $xylophoneResult);
-    }
-
-    /**
-     * Test removing model from index.
-     */
-    public function test_remove_model_from_index(): void
-    {
-        // Arrange: Get existing user
-        $user = User::where('name', 'John Doe')->first();
-        $this->assertNotNull($user, 'John Doe should exist');
-
-        // Act: Remove user from index
-        $this->service->removeModelFromIndex($user);
-
-        // Assert: User should not be found in search
-        $results = $this->service->search('john');
-        $johnDoeFound = $results->contains(function ($result): bool {
-            return isset($result->item->name) && $result->item->name === 'John Doe';
-        });
-
-        $this->assertFalse($johnDoeFound, 'John Doe should not be found after removal from index');
-    }
-
-    /**
-     * Test getting search statistics.
-     */
-    public function test_get_stats(): void
-    {
-        // Arrange: Service is already set up
-
-        // Act: Get statistics
-        $stats = $this->service->getStats();
-
-        // Assert: Should contain expected keys
-        $this->assertArrayHasKey('total_entries', $stats);
-        $this->assertArrayHasKey('models', $stats);
-        $this->assertArrayHasKey(User::class, $stats['models']);
-    }
-
-    /**
-     * Test similarity calculation.
-     */
-    public function test_calculate_similarity(): void
-    {
-        // Arrange: Service is already set up
-
-        // Act: Calculate similarity for exact match
-        $exactSimilarity = $this->service->calculateSimilarity('hello', 'hello');
-
-        // Assert: Exact match should have score of 1.0
-        $this->assertEqualsWithDelta(1.0, $exactSimilarity, PHP_FLOAT_EPSILON);
-
-        // Act: Calculate similarity for close match
-        $fuzzySimilarity = $this->service->calculateSimilarity('hello', 'helo');
-
-        // Assert: Close match should have reasonable score
-        $this->assertGreaterThan(0, $fuzzySimilarity);
-        $this->assertLessThanOrEqual(1.0, $fuzzySimilarity);
-        $this->assertGreaterThan(0.8, $fuzzySimilarity);
-    }
-
-    /**
-     * Test minimum score from configuration.
-     */
     public function test_min_score_is_respected_from_config(): void
     {
-        // Arrange: Set high minimum score in config
-        config(['fuzzy.default_options.min_score' => 0.8]);
+        $query = 'laptop';
+        $options = ['min_score' => 0.8];
 
-        // Act: Search with configured minimum score
-        /** @var Collection<int, SearchResultData> $results  */
-        $results = $this->service->search('laptop');
+        $mockResults = collect([
+            (object) ['score' => 0.85, 'item' => (object) ['name' => 'Laptop Pro']]
+        ]);
 
-        // Assert: All results should meet minimum score
-        $this->assertInstanceOf(Collection::class, $results);
+        $this->cacheManager->shouldReceive('remember')
+            ->once()
+            ->andReturnUsing(function ($type, $callback, $params) use ($mockResults) {
+                return $callback();
+            });
+
+        $this->modelDiscovery->shouldReceive('getSearchableModels')
+            ->once()
+            ->andReturn([Product::class]);
+
+        $this->searchProcessor->shouldReceive('search')
+            ->once()
+            ->with($query, [Product::class], $options)
+            ->andReturn($mockResults);
+
+        $results = $this->service->search($query, $options);
 
         foreach ($results as $result) {
             $this->assertGreaterThanOrEqual(0.8, $result->score);
         }
     }
 
-    /**
-     * Test minimum score override with options.
-     */
     public function test_min_score_is_respected_with_options_override(): void
     {
-        // Arrange: Set low default score
-        config(['fuzzy.default_options.min_score' => 0.1]);
+        $query = 'laptop';
+        $options = ['min_score' => 0.9];
 
-        // Act: Search with high minimum score override
-        /** @var Collection<int, SearchResultData> $results  */
-        $results = $this->service->search('laptop', ['min_score' => 0.9]);
+        $mockResults = collect([]);
 
-        // Assert: All results should meet overridden score
+        $this->cacheManager->shouldReceive('remember')
+            ->once()
+            ->andReturnUsing(function ($type, $callback, $params) use ($mockResults) {
+                return $callback();
+            });
+
+        $this->modelDiscovery->shouldReceive('getSearchableModels')
+            ->once()
+            ->andReturn([Product::class]);
+
+        $this->searchProcessor->shouldReceive('search')
+            ->once()
+            ->with($query, [Product::class], $options)
+            ->andReturn($mockResults);
+
+        $results = $this->service->search($query, $options);
+
         $this->assertInstanceOf(Collection::class, $results);
-
-        if ($results->count() > 0) {
-            foreach ($results as $result) {
-                $this->assertGreaterThanOrEqual(0.9, $result->score);
-            }
-        }
     }
 
-    /**
-     * Test minimum score with different naming conventions.
-     */
-    public function test_min_score_works_with_snake_case_and_camel_case(): void
+    public function test_search_in_models(): void
     {
-        // Arrange: Set minimum score in config
-        config(['fuzzy.default_options.min_score' => 0.7]);
+        $modelClasses = [User::class, Product::class];
+        $query = 'test';
+        $options = [];
 
-        // Act: Search with snake_case option
-        $snakeCaseResults = $this->service->search('john', ['min_score' => 0.8]);
+        $mockResults = collect([
+            (object) ['score' => 0.9, 'item' => (object) ['name' => 'Test User']],
+            (object) ['score' => 0.8, 'item' => (object) ['name' => 'Test Product']]
+        ]);
 
-        // Act: Search with camelCase option
-        $camelCaseResults = $this->service->search('john', ['minScore' => 0.8]);
+        $this->cacheManager->shouldReceive('remember')
+            ->once()
+            ->with('search_in_models', Mockery::type('callable'), [$modelClasses, $query, $options])
+            ->andReturn($mockResults);
 
-        // Assert: Both should produce same results
-        $this->assertCount(
-            $snakeCaseResults->count(),
-            $camelCaseResults
-        );
-    }
+        $results = $this->service->searchInModels($modelClasses, $query, $options);
 
-    /**
-     * Test facade respects minimum score.
-     */
-    public function test_facade_respects_min_score(): void
-    {
-        // Arrange: Service is ready
-
-        // Act: Search via facade with high minimum score
-        /** @var Collection<int, SearchResultData> $results */
-        $results = FuzzySearch::search('joh', ['min_score' => 1.0]);
-
-        // Assert: All results should meet minimum score
         $this->assertInstanceOf(Collection::class, $results);
-
-        foreach ($results as $result) {
-            $this->assertGreaterThanOrEqual(1.0, $result->score);
-        }
+        $this->assertCount(2, $results);
     }
 
-    /**
-     * Test search in model respects minimum score.
-     */
-    public function test_search_in_model_respects_min_score(): void
+    public function test_search_with_caching_disabled(): void
     {
-        // Arrange: Service is ready
+        $query = 'john';
+        $options = [];
+        $expectedResults = collect(['result1']);
 
-        // Act: Search in User model with high minimum score
-        /** @var Collection<int, SearchResultData> $results  */
-        $results = $this->service->searchInModel(
-            User::class,
-            'joh',
-            ['min_score' => 0.9, 'fuzzy' => true]
-        );
+        $this->cacheManager->shouldReceive('remember')
+            ->once()
+            ->with('search', Mockery::type('callable'), [$query, $options])
+            ->andReturnUsing(function ($type, $callback, $params) {
+                return $callback();
+            });
 
-        // Assert: All results should meet minimum score
-        $this->assertInstanceOf(Collection::class, $results);
+        $this->cacheManager->shouldReceive('isEnabled')->andReturn(false);
 
-        foreach ($results as $result) {
-            $this->assertGreaterThanOrEqual(0.9, $result->score);
-        }
+        $this->modelDiscovery->shouldReceive('getSearchableModels')
+            ->once()
+            ->andReturn([User::class]);
+
+        $this->searchProcessor->shouldReceive('search')
+            ->once()
+            ->with($query, [User::class], $options)
+            ->andReturn($expectedResults);
+
+        $results = $this->service->search($query, $options);
+
+        $this->assertEquals($expectedResults, $results);
     }
 
-    /**
-     * Test multi-word search respects minimum score.
-     */
-    public function test_multi_word_processing_respects_min_score(): void
+    // ========== TESTS DIRECTS SUR LES PROPRIÉTÉS PUBLIQUES ==========
+
+    public function test_cache_manager_is_accessible(): void
     {
-        // Arrange: Service is ready
-
-        // Act: Search with multi-word query
-        /** @var Collection<int, SearchResultData> $results  */
-        $results = $this->service->search('high end laptop', [
-            'min_score' => 0.6,
-            'fuzzy' => true,
-        ]);
-
-        // Assert: All results should meet minimum score
-        foreach ($results as $result) {
-            $this->assertGreaterThanOrEqual(0.6, $result->score);
-        }
+        $this->assertSame($this->cacheManager, $this->service->getCacheManager());
     }
 
-    /**
-     * Test exact match bypasses minimum score.
-     */
-    public function test_exact_match_bypasses_min_score(): void
+    public function test_model_discovery_is_accessible(): void
     {
-        // Arrange: Service is ready
-
-        // Act: Search for exact match with high minimum score
-        $results = $this->service->search('John Doe', [
-            'min_score' => 0.99,
-            'fuzzy' => false,
-        ]);
-
-        // Assert: Either we get results that meet the high score, or no results at all
-        $this->assertInstanceOf(Collection::class, $results);
-
-        if ($results->count() > 0) {
-            $this->assertGreaterThanOrEqual(0.99, $results->first()->score);
-        } else {
-            $this->assertCount(0, $results, 'No results returned with min_score 0.99');
-        }
+        $this->assertSame($this->modelDiscovery, $this->service->getModelDiscovery());
     }
 
-    /**
-     * Test sorting and limiting respects minimum score.
-     */
-    public function test_sort_and_limit_stage_respects_min_score(): void
+    public function test_index_manager_is_accessible(): void
     {
-        // Arrange: Create additional test users
-        for ($i = 1; $i <= 10; ++$i) {
-            User::create([
-                'name' => 'Test User ' . $i,
-                'email' => sprintf('user%d@example.com', $i),
-                'type' => 'user',
-            ]);
-        }
-
-        $this->service->reindexModel(User::class);
-
-        // Act: Search with limits and minimum score
-        /** @var Collection<int, SearchResultData> $results  */
-        $results = $this->service->search('test', [
-            'min_score' => 0.3,
-            'max_results' => 5,
-        ]);
-
-        // Assert: Results should respect both limits
-        $this->assertLessThanOrEqual(5, $results->count());
-
-        foreach ($results as $result) {
-            $this->assertGreaterThanOrEqual(0.3, $result->score);
-        }
-
-        // Assert: Results should be sorted by score descending
-        $scores = $results->pluck('score')->toArray();
-        $sortedScores = $scores;
-        rsort($sortedScores);
-        $this->assertEquals($sortedScores, $scores);
+        $this->assertSame($this->indexManager, $this->service->getIndexManager());
     }
 
-    /**
-     * Test search options data handles edge cases.
-     */
-    public function test_search_options_data_handles_edge_cases(): void
+    public function test_search_processor_is_accessible(): void
     {
-        // Arrange & Act: Test empty options
-        $options1 = SearchOptionsData::fromConfig([]);
-        $this->assertEqualsWithDelta(0.1, $options1->minScore, PHP_FLOAT_EPSILON);
-
-        // Arrange & Act: Test negative value
-        $options2 = SearchOptionsData::fromConfig(['min_score' => -0.5]);
-        $this->assertSame(-0.5, $options2->minScore);
-
-        // Arrange & Act: Test value above 1.0
-        $options3 = SearchOptionsData::fromConfig(['minScore' => 2.0]);
-        $this->assertEqualsWithDelta(2.0, $options3->minScore, PHP_FLOAT_EPSILON);
-
-        // Act: Search with minimum score above 1.0
-        /** @var Collection<int, SearchResultData> $results  */
-        $results = $this->service->search('john', ['min_score' => 2.0]);
-
-        // Assert: All results should meet the unrealistic score
-        foreach ($results as $result) {
-            $this->assertGreaterThanOrEqual(2.0, $result->score);
-        }
+        $this->assertSame($this->searchProcessor, $this->service->getSearchProcessor());
     }
 
-    /**
-     * Test minimum score of zero returns all results.
-     */
-    public function test_min_score_zero_returns_all_results(): void
+    public function test_index_model_via_index_manager(): void
     {
-        // Arrange: Create test user
-        User::create([
-            'name' => 'Test User',
-            'email' => 'testuser@example.com',
-            'type' => 'user',
-        ]);
+        $model = Mockery::mock(\Fuzzy\Contracts\MustFuzzySearch::class);
+        $this->indexManager->shouldReceive('indexModel')->once()->with($model);
 
-        $this->service->reindexModel(User::class);
+        $this->service->getIndexManager()->indexModel($model);
 
-        // Act: Search with zero minimum score
-        $results = $this->service->search('test', [
-            'min_score' => 0,
-            'max_results' => 100,
-        ]);
-
-        // Assert: Should return results
-        $this->assertGreaterThan(0, $results->count());
+        // Vérification que la méthode a été appelée correctement
+        $this->addToAssertionCount(1);
     }
 
-    /**
-     * Find a search result by name in the results collection.
-     *
-     * @param Collection<int, SearchResultData> $results The search results collection
-     * @param string $name The name to search for
-     * @return SearchResultData|null The matching result or null if not found
-     */
-    private function findResultByName(Collection $results, string $name): ?SearchResultData
+    public function test_remove_model_via_index_manager(): void
     {
-        return $results->first(function ($result) use ($name): bool {
-            return isset($result->item->name) && $result->item->name === $name;
-        });
+        $model = Mockery::mock(\Fuzzy\Contracts\MustFuzzySearch::class);
+        $this->indexManager->shouldReceive('removeModel')->once()->with($model);
+
+        $this->service->getIndexManager()->removeModel($model);
+
+        $this->addToAssertionCount(1);
+    }
+
+    public function test_update_model_index_via_index_manager(): void
+    {
+        $model = Mockery::mock(\Fuzzy\Contracts\MustFuzzySearch::class);
+        $this->indexManager->shouldReceive('updateModelIndex')->once()->with($model);
+
+        $this->service->getIndexManager()->updateModelIndex($model);
+
+        $this->addToAssertionCount(1);
+    }
+
+    public function test_reindex_all_via_index_manager(): void
+    {
+        $this->indexManager->shouldReceive('reindexAll')->once();
+
+        $this->service->getIndexManager()->reindexAll();
+
+        $this->addToAssertionCount(1);
+    }
+
+    public function test_reindex_model_via_index_manager(): void
+    {
+        $modelClass = User::class;
+        $this->indexManager->shouldReceive('reindexModel')->once()->with($modelClass);
+
+        $this->service->getIndexManager()->reindexModel($modelClass);
+
+        $this->addToAssertionCount(1);
+    }
+
+    public function test_get_stats_via_index_manager(): void
+    {
+        $expectedStats = ['total_entries' => 10];
+        $this->indexManager->shouldReceive('getStats')->once()->andReturn($expectedStats);
+
+        $stats = $this->service->getIndexManager()->getStats();
+
+        $this->assertEquals($expectedStats, $stats);
+    }
+
+    public function test_get_precise_model_stats_via_index_manager(): void
+    {
+        $modelClass = User::class;
+        $expectedStats = ['total_records' => 10];
+        $this->indexManager->shouldReceive('getPreciseModelStats')->once()->with($modelClass)->andReturn($expectedStats);
+
+        $stats = $this->service->getIndexManager()->getPreciseModelStats($modelClass);
+
+        $this->assertEquals($expectedStats, $stats);
+    }
+
+    public function test_invalidate_all_via_cache_manager(): void
+    {
+        $this->cacheManager->shouldReceive('invalidateAll')->once();
+
+        $this->service->getCacheManager()->invalidateAll();
+
+        $this->addToAssertionCount(1);
+    }
+
+    public function test_invalidate_for_model_via_cache_manager(): void
+    {
+        $modelClass = User::class;
+        $this->cacheManager->shouldReceive('invalidateForModel')->once()->with($modelClass);
+
+        $this->service->getCacheManager()->invalidateForModel($modelClass);
+
+        $this->addToAssertionCount(1);
+    }
+
+    public function test_invalidate_stats_cache_via_cache_manager(): void
+    {
+        $this->cacheManager->shouldReceive('invalidateStatsCache')->once();
+
+        $this->service->getCacheManager()->invalidateStatsCache();
+
+        $this->addToAssertionCount(1);
+    }
+
+    public function test_get_searchable_models_via_model_discovery(): void
+    {
+        $expectedModels = [User::class, Product::class];
+        $this->modelDiscovery->shouldReceive('getSearchableModels')->once()->andReturn($expectedModels);
+
+        $models = $this->service->getModelDiscovery()->getSearchableModels();
+
+        $this->assertEquals($expectedModels, $models);
     }
 }

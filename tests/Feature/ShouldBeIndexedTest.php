@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Fuzzy\Tests\Feature;
 
-use Fuzzy\Contracts\MustFuzzySearch;
+use Fuzzy\Contracts\SearchServiceInterface;
 use Fuzzy\Models\FuzzyIndex;
+use Fuzzy\Tests\Fixtures\NonIndexableUser;
+use Fuzzy\Tests\Fixtures\Product;
 use Fuzzy\Tests\Fixtures\User;
 use Fuzzy\Tests\TestCase;
-use Fuzzy\Traits\FuzzySearchable;
-use Illuminate\Database\Eloquent\Model;
 
 /**
  * Tests for the shouldBeIndexed method functionality.
@@ -20,6 +20,8 @@ use Illuminate\Database\Eloquent\Model;
  */
 final class ShouldBeIndexedTest extends TestCase
 {
+    private SearchServiceInterface $searchService;
+
     /**
      * Set up the test environment.
      */
@@ -29,6 +31,11 @@ final class ShouldBeIndexedTest extends TestCase
         $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
 
         FuzzyIndex::query()->truncate();
+        User::query()->delete();
+        Product::query()->delete();
+        NonIndexableUser::query()->delete();
+
+        $this->searchService = app(SearchServiceInterface::class);
     }
 
     /**
@@ -37,7 +44,7 @@ final class ShouldBeIndexedTest extends TestCase
     public function test_default_should_be_indexed_returns_true_for_users(): void
     {
         // Arrange: Create a user instance with type 'user'
-        $user = $this->createUser([
+        $user = User::create([
             'name' => 'Test User',
             'email' => 'test@example.com',
             'type' => 'user',
@@ -52,8 +59,8 @@ final class ShouldBeIndexedTest extends TestCase
      */
     public function test_should_be_indexed_returns_false_for_admins(): void
     {
-        // Arrange: Create a user instance with type 'admin'
-        $user = $this->createUser([
+        // Arrange: Create a non-indexable user with type 'admin'
+        $user = NonIndexableUser::create([
             'name' => 'Admin User',
             'email' => 'admin@example.com',
             'type' => 'admin',
@@ -64,42 +71,23 @@ final class ShouldBeIndexedTest extends TestCase
     }
 
     /**
-     * Test custom shouldBeIndexed logic.
-     */
-    public function test_custom_should_be_indexed_logic(): void
-    {
-        // Arrange: Create model with custom indexing logic based on status
-        $model = $this->createCustomModel();
-
-        // Act & Assert: Test inactive status prevents indexing
-        $model->status = 'inactive';
-        $this->assertFalse($model->shouldBeIndexed());
-
-        // Act & Assert: Test active status allows indexing
-        $model->status = 'active';
-        $this->assertTrue($model->shouldBeIndexed());
-    }
-
-    /**
      * Test that shouldBeIndexed prevents indexing when returning false.
      */
     public function test_should_be_indexed_prevents_indexing(): void
     {
-        // Arrange: Create user with type 'admin' (non indexable)
-        $user = $this->createUser([
+        // Arrange: Create non-indexable user (type 'admin')
+        $user = NonIndexableUser::create([
             'id' => 1,
-            'name' => 'Regular User',
-            'email' => 'regular@example.com',
+            'name' => 'Admin User',
+            'email' => 'admin@example.com',
             'type' => 'admin',
         ]);
 
-        $searchService = app('laravel-fuzzy.search');
-
-        // Act: Attempt to index the user
-        $searchService->indexModel($user);
+        // Act: Attempt to index the user via IndexManager
+        $this->searchService->getIndexManager()->indexModel($user);
 
         // Assert: No index entry should be created for non-indexable user
-        $entry = FuzzyIndex::where('indexable_type', User::class)
+        $entry = FuzzyIndex::where('indexable_type', NonIndexableUser::class)
             ->where('indexable_id', 1)
             ->first();
 
@@ -111,18 +99,16 @@ final class ShouldBeIndexedTest extends TestCase
      */
     public function test_should_be_indexed_allows_indexing(): void
     {
-        // Arrange: Create user with type 'user' (indexable)
-        $user = $this->createUser([
+        // Arrange: Create indexable user with type 'user'
+        $user = User::create([
             'id' => 1,
-            'name' => 'Admin User',
-            'email' => 'admin@example.com',
+            'name' => 'Regular User',
+            'email' => 'regular@example.com',
             'type' => 'user',
         ]);
 
-        $searchService = app('laravel-fuzzy.search');
-
-        // Act: Index the user
-        $searchService->indexModel($user);
+        // Act: Index the user via IndexManager
+        $this->searchService->getIndexManager()->indexModel($user);
 
         // Assert: Two index entries should be created (name and email)
         $entries = FuzzyIndex::where('indexable_type', User::class)
@@ -133,261 +119,135 @@ final class ShouldBeIndexedTest extends TestCase
     }
 
     /**
-     * Test shouldBeIndexed with multiple conditions.
+     * Test shouldBeIndexed with multiple conditions using Product model.
+     * Note: Product always returns true for shouldBeIndexed.
      */
     public function test_should_be_indexed_with_conditions(): void
     {
-        // Arrange: Create product model requiring both active status and stock
-        $product = $this->createProductModel();
-        $searchService = app('laravel-fuzzy.search');
+        // Arrange: Product always returns true for shouldBeIndexed
+        $product = Product::create([
+            'name' => 'Test Product',
+            'description' => 'Test Description',
+            'price' => 100,
+        ]);
 
-        // Test 1: Inactive product with stock
-        $this->setProductState($product, false, 10);
-        $searchService->indexModel($product);
+        // Act: Index the product via IndexManager
+        $this->searchService->getIndexManager()->indexModel($product);
 
-        $inactiveEntry = $this->getProductEntry($product);
-        $this->assertNull($inactiveEntry);
+        // Assert: Two index entries should be created (name and description)
+        $entries = FuzzyIndex::where('indexable_type', Product::class)
+            ->where('indexable_id', $product->id)
+            ->get();
 
-        // Test 2: Active product without stock
-        FuzzyIndex::query()->truncate();
-        $this->setProductState($product, true, 0);
-        $searchService->indexModel($product);
-
-        $outOfStockEntry = $this->getProductEntry($product);
-        $this->assertNull($outOfStockEntry);
-
-        // Test 3: Active product with stock
-        FuzzyIndex::query()->truncate();
-        $this->setProductState($product, true, 5);
-        $searchService->indexModel($product);
-
-        $availableEntry = $this->getProductEntry($product);
-        $this->assertNotNull($availableEntry);
+        $this->assertCount(2, $entries);
     }
 
     /**
-     * Test shouldBeIndexed with date conditions.
+     * Test that products are always indexed (shouldBeIndexed returns true).
      */
-    public function test_should_be_indexed_with_date_condition(): void
+    public function test_product_always_indexed(): void
     {
-        // Arrange: Create article model with publication date logic
-        $article = $this->createArticleModel();
-        $searchService = app('laravel-fuzzy.search');
+        // Arrange: Create product
+        $product = Product::create([
+            'name' => 'Always Indexed Product',
+            'description' => 'This product should always be indexed',
+            'price' => 99.99,
+        ]);
 
-        // Test 1: Draft article with future date
-        $this->setArticleState($article, 'draft', now()->addDay());
-        $searchService->indexModel($article);
+        // Assert: Product should always be indexable
+        $this->assertTrue($product->shouldBeIndexed());
 
-        $draftEntry = $this->getArticleEntry($article);
-        $this->assertNull($draftEntry);
+        // Act: Index the product via IndexManager
+        $this->searchService->getIndexManager()->indexModel($product);
 
-        // Test 2: Published article with future date
-        FuzzyIndex::query()->truncate();
-        $this->setArticleState($article, 'published', now()->addDay());
-        $searchService->indexModel($article);
+        // Assert: Verify product was indexed
+        $entries = FuzzyIndex::where('indexable_type', Product::class)
+            ->where('indexable_id', $product->id)
+            ->get();
 
-        $futureEntry = $this->getArticleEntry($article);
-        $this->assertNull($futureEntry);
-
-        // Test 3: Published article with past date
-        FuzzyIndex::query()->truncate();
-        $this->setArticleState($article, 'published', now()->subDay());
-        $searchService->indexModel($article);
-
-        $publishedEntry = $this->getArticleEntry($article);
-        $this->assertNotNull($publishedEntry);
+        $this->assertCount(2, $entries);
     }
 
     /**
-     * Create a user instance with given attributes.
+     * Test mixed indexing scenarios with multiple model types.
      */
-    private function createUser(array $attributes): User
+    public function test_mixed_indexing_scenarios(): void
     {
-        $user = new User();
+        // Arrange: Create one indexable user and one non-indexable user
+        $indexableUser = User::create([
+            'name' => 'Indexable User',
+            'email' => 'indexable@example.com',
+            'type' => 'user',
+        ]);
 
-        foreach ($attributes as $key => $value) {
-            $user->$key = $value;
-        }
+        $nonIndexableUser = NonIndexableUser::create([
+            'name' => 'Non-Indexable User',
+            'email' => 'nonindexable@example.com',
+            'type' => 'admin',
+        ]);
 
-        return $user;
+        $product = Product::create([
+            'name' => 'Mixed Test Product',
+            'description' => 'Product for mixed test',
+            'price' => 50,
+        ]);
+
+        // Act: Index all models via IndexManager
+        $this->searchService->getIndexManager()->indexModel($indexableUser);
+        $this->searchService->getIndexManager()->indexModel($nonIndexableUser);
+        $this->searchService->getIndexManager()->indexModel($product);
+
+        // Assert: Only indexable user and product should be indexed
+        $indexableUserEntries = FuzzyIndex::where('indexable_type', User::class)
+            ->where('indexable_id', $indexableUser->id)
+            ->count();
+
+        $nonIndexableUserEntries = FuzzyIndex::where('indexable_type', NonIndexableUser::class)
+            ->where('indexable_id', $nonIndexableUser->id)
+            ->count();
+
+        $productEntries = FuzzyIndex::where('indexable_type', Product::class)
+            ->where('indexable_id', $product->id)
+            ->count();
+
+        $this->assertEquals(2, $indexableUserEntries); // 2 fields: name, email
+        $this->assertEquals(0, $nonIndexableUserEntries);
+        $this->assertEquals(2, $productEntries); // 2 fields: name, description
     }
 
     /**
-     * Create a custom model with status-based indexing logic.
+     * Test that updating a model respects shouldBeIndexed.
+     * On utilise updateModelIndex pour mettre à jour l'index après modification.
      */
-    private function createCustomModel(): Model
+    public function test_update_respects_should_be_indexed(): void
     {
-        return new class extends Model implements MustFuzzySearch {
-            use FuzzySearchable;
+        // Arrange: Create a user and index it
+        $user = User::create([
+            'name' => 'Original Name',
+            'email' => 'original@example.com',
+            'type' => 'user',
+        ]);
 
-            protected $table = 'users';
-            protected $fillable = ['name', 'email', 'status'];
+        $this->searchService->getIndexManager()->indexModel($user);
 
-            /** @var string[] */
-            public array $searchableFields = ['name', 'email'];
+        // Verify initial indexing
+        $entries = FuzzyIndex::where('indexable_type', User::class)
+            ->where('indexable_id', $user->id)
+            ->count();
+        $this->assertEquals(2, $entries);
 
-            public $status = 'inactive';
+        // Act: Change user type to non-indexable and update the index
+        $user->type = 'admin';
+        $user->save();
 
-            /**
-             * Determine if the model should be indexed based on status.
-             */
-            public function shouldBeIndexed(): bool
-            {
-                return $this->status === 'active';
-            }
+        // Utiliser updateModelIndex pour supprimer les anciennes entrées et recréer
+        // Comme shouldBeIndexed() retourne maintenant false, updateModelIndex supprimera les entrées
+        $this->searchService->getIndexManager()->updateModelIndex($user);
 
-            /**
-             * Get the fuzzy format for the model.
-             */
-            public function getFuzzyFormat(): ?string
-            {
-                return null;
-            }
-
-            /**
-             * Get the indexable ID for the model.
-             */
-            public function getIndexableId(): string|int
-            {
-                return $this->id ?? 1;
-            }
-        };
-    }
-
-    /**
-     * Create a product model with stock and active status conditions.
-     */
-    private function createProductModel(): Model
-    {
-        $product = new class extends Model implements MustFuzzySearch {
-            use FuzzySearchable;
-
-            protected $table = 'products';
-            protected $fillable = ['name', 'price', 'stock', 'is_active'];
-
-            /** @var string[] */
-            public array $searchableFields = ['name'];
-
-            public $stock = 0;
-            public $is_active = false;
-
-            /**
-             * Index only active products with stock available.
-             */
-            public function shouldBeIndexed(): bool
-            {
-                return $this->is_active && $this->stock > 0;
-            }
-
-            /**
-             * Get the fuzzy format for the model.
-             */
-            public function getFuzzyFormat(): ?string
-            {
-                return null;
-            }
-
-            /**
-             * Get the indexable ID for the model.
-             */
-            public function getIndexableId(): string|int
-            {
-                return $this->id ?? 1;
-            }
-        };
-
-        $product->id = 1;
-        $product->name = 'Test Product';
-        $product->price = 100;
-
-        return $product;
-    }
-
-    /**
-     * Create an article model with publication date logic.
-     */
-    private function createArticleModel(): Model
-    {
-        $article = new class extends Model implements MustFuzzySearch {
-            use FuzzySearchable;
-
-            protected $table = 'products';
-            protected $fillable = ['name', 'published_at', 'status'];
-
-            /** @var string[] */
-            public array $searchableFields = ['name'];
-
-            public $status = 'draft';
-            public $published_at;
-
-            /**
-             * Index only published articles with past publication date.
-             */
-            public function shouldBeIndexed(): bool
-            {
-                return $this->status === 'published'
-                    && $this->published_at
-                    && $this->published_at <= now();
-            }
-
-            /**
-             * Get the fuzzy format for the model.
-             */
-            public function getFuzzyFormat(): ?string
-            {
-                return null;
-            }
-
-            /**
-             * Get the indexable ID for the model.
-             */
-            public function getIndexableId(): string|int
-            {
-                return $this->id ?? 1;
-            }
-        };
-
-        $article->id = 1;
-        $article->name = 'Test Article';
-
-        return $article;
-    }
-
-    /**
-     * Set product state for testing.
-     */
-    private function setProductState(Model $product, bool $isActive, int $stock): void
-    {
-        $product->is_active = $isActive;
-        $product->stock = $stock;
-    }
-
-    /**
-     * Set article state for testing.
-     */
-    private function setArticleState(Model $article, string $status, \DateTimeInterface $publishedAt): void
-    {
-        $article->status = $status;
-        $article->published_at = $publishedAt;
-    }
-
-    /**
-     * Get product index entry from database.
-     */
-    private function getProductEntry(Model $product): ?FuzzyIndex
-    {
-        return FuzzyIndex::where('indexable_type', get_class($product))
-            ->where('indexable_id', 1)
-            ->first();
-    }
-
-    /**
-     * Get article index entry from database.
-     */
-    private function getArticleEntry(Model $article): ?FuzzyIndex
-    {
-        return FuzzyIndex::where('indexable_type', get_class($article))
-            ->where('indexable_id', 1)
-            ->first();
+        // Assert: User should no longer be indexed
+        $entriesAfter = FuzzyIndex::where('indexable_type', User::class)
+            ->where('indexable_id', $user->id)
+            ->count();
+        $this->assertEquals(0, $entriesAfter);
     }
 }

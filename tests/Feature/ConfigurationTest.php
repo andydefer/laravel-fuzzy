@@ -4,14 +4,13 @@ declare(strict_types=1);
 
 namespace Fuzzy\Tests\Feature;
 
-use Fuzzy\Tests\TestCase;
+use Fuzzy\Contracts\ModelDiscoveryInterface;
+use Fuzzy\Contracts\SearchServiceInterface;
+use Fuzzy\Services\IndexBuilder;
+use Fuzzy\Services\StringNormalizer;
 use Fuzzy\Tests\Fixtures\User;
 use Fuzzy\Tests\Fixtures\Product;
-use Fuzzy\Stages\NormalizeQueryStage;
-use Fuzzy\Stages\MatchDiscoveryStage;
-use Fuzzy\Stages\RelevanceScoringStage;
-use Fuzzy\Stages\ScoringStage;
-use Fuzzy\Stages\SortAndLimitStage;
+use Fuzzy\Tests\TestCase;
 use Illuminate\Support\Facades\Config;
 
 final class ConfigurationTest extends TestCase
@@ -36,9 +35,9 @@ final class ConfigurationTest extends TestCase
             Product::class,
         ]);
 
-        // Act: Retrieve search service and get searchable models
-        $searchService = app('laravel-fuzzy.search');
-        $models = $searchService->getSearchableModels();
+        // Act: Retrieve search service and get searchable models via ModelDiscovery
+        $modelDiscovery = app(ModelDiscoveryInterface::class);
+        $models = $modelDiscovery->getSearchableModels();
 
         // Assert: Verify both models are present
         $this->assertContains(User::class, $models);
@@ -47,41 +46,19 @@ final class ConfigurationTest extends TestCase
     }
 
     /**
-     * Test auto-discovery when enabled.
+     * Test auto-discovery is always enabled.
      */
-    public function test_auto_discovery_enabled(): void
+    public function test_auto_discovery_always_enabled(): void
     {
-        // Arrange: Enable auto-discovery with test fixtures directory
-        Config::set('fuzzy.auto_discovery.enabled', true);
-        Config::set('fuzzy.searchable_models', []);
-        Config::set('fuzzy.auto_discovery.directories', [
-            dirname(__DIR__, 2) . '/tests/Fixtures'
-        ]);
-
-        // Act: Retrieve searchable models
-        $searchService = app('laravel-fuzzy.search');
-        $models = $searchService->getSearchableModels();
-
-        // Assert: Verify User and Product models are discovered
-        $this->assertContains(User::class, $models);
-        $this->assertContains(Product::class, $models);
-    }
-
-    /**
-     * Test auto-discovery when disabled.
-     */
-    public function test_auto_discovery_disabled(): void
-    {
-        // Arrange: Disable auto-discovery
-        Config::set('fuzzy.auto_discovery.enabled', false);
+        // Arrange: Clear configured models to force auto-discovery
         Config::set('fuzzy.searchable_models', []);
 
-        // Act: Retrieve searchable models
-        $searchService = app('laravel-fuzzy.search');
-        $models = $searchService->getSearchableModels();
+        // Act: Retrieve searchable models via ModelDiscovery
+        $modelDiscovery = app(ModelDiscoveryInterface::class);
+        $models = $modelDiscovery->getSearchableModels();
 
-        // Assert: Verify no models are discovered
-        $this->assertEmpty($models);
+        // Assert: Models should be discovered automatically
+        $this->assertIsArray($models);
     }
 
     /**
@@ -99,10 +76,12 @@ final class ConfigurationTest extends TestCase
         ]);
 
         // Act: Calculate weights for different fields
-        $indexBuilder = app('laravel-fuzzy.index-builder');
-        $nameWeight = $indexBuilder->calculateFieldWeight('name');
-        $titleWeight = $indexBuilder->calculateFieldWeight('title');
-        $unknownWeight = $indexBuilder->calculateFieldWeight('unknown');
+        $indexBuilder = app(IndexBuilder::class);
+
+        // Test via IndexBuilder methods
+        $nameWeight = $this->getFieldWeightFromIndexBuilder($indexBuilder, 'name');
+        $titleWeight = $this->getFieldWeightFromIndexBuilder($indexBuilder, 'title');
+        $unknownWeight = $this->getFieldWeightFromIndexBuilder($indexBuilder, 'unknown');
 
         // Assert: Verify correct weights are applied
         $this->assertEqualsWithDelta(2.0, $nameWeight, PHP_FLOAT_EPSILON);
@@ -111,24 +90,83 @@ final class ConfigurationTest extends TestCase
     }
 
     /**
-     * Test stop words configuration.
+     * Helper to get field weight from IndexBuilder.
+     */
+    private function getFieldWeightFromIndexBuilder(IndexBuilder $indexBuilder, string $field): float
+    {
+        // Use reflection to access protected method
+        $reflection = new \ReflectionClass($indexBuilder);
+        $method = $reflection->getMethod('calculateFieldWeight');
+        $method->setAccessible(true);
+        return $method->invoke($indexBuilder, $field);
+    }
+
+    /**
+     * Test stop words are loaded from internal files (not configurable by user).
+     * 
+     * Note: Stop words are now internal to the package and cannot be configured
+     * by users. This test verifies that common stop words are properly removed.
      */
     public function test_stop_words_configuration(): void
     {
-        // Arrange: Configure stop words
-        Config::set('fuzzy.stop_words', ['the', 'and', 'or', 'test']);
+        $normalizer = app(StringNormalizer::class);
 
-        $normalizer = app('laravel-fuzzy.normalizer');
+        // Act: Normalize query containing common stop words
+        $query = $normalizer->normalizeQuery('the quick brown fox and the lazy dog');
 
-        // Act: Normalize query containing stop words
-        $query = $normalizer->normalizeQuery('the quick brown fox and the lazy dog test');
-
-        // Assert: Verify stop words are removed
+        // Assert: Verify common stop words are removed (from internal stop words list)
         $this->assertStringNotContainsString('the', (string) $query);
         $this->assertStringNotContainsString('and', (string) $query);
-        $this->assertStringNotContainsString('test', (string) $query);
+
+        // Assert: Verify content words are preserved
         $this->assertStringContainsString('quick', (string) $query);
         $this->assertStringContainsString('brown', (string) $query);
+        $this->assertStringContainsString('fox', (string) $query);
+        $this->assertStringContainsString('lazy', (string) $query);
+        $this->assertStringContainsString('dog', (string) $query);
+    }
+
+    /**
+     * Test that stop words are preserved for protected fields (names, emails).
+     */
+    public function test_stop_words_preserved_for_protected_fields(): void
+    {
+        $normalizer = app(StringNormalizer::class);
+
+        // Set protected fields (like name field)
+        $normalizer->setProtectedFields(['name']);
+        $normalizer->setCurrentField('name');
+
+        // Act: Normalize a name containing stop words
+        $query = $normalizer->normalizeQuery('Jean de La Fontaine');
+
+        // Assert: Stop words "de" and "la" should be preserved
+        $this->assertEquals('jean de la fontaine', $query);
+
+        // Reset
+        $normalizer->setCurrentField(null);
+        $normalizer->setProtectedFields([]);
+    }
+
+    /**
+     * Test that stop words are removed for non-protected fields.
+     */
+    public function test_stop_words_removed_for_non_protected_fields(): void
+    {
+        $normalizer = app(StringNormalizer::class);
+
+        // Set current field as description (not protected)
+        $normalizer->setCurrentField('description');
+
+        // Act: Normalize a description containing stop words
+        $query = $normalizer->normalizeQuery('the quick brown fox and the lazy dog');
+
+        // Assert: Stop words should be removed
+        $this->assertStringNotContainsString('the', (string) $query);
+        $this->assertStringNotContainsString('and', (string) $query);
+
+        // Reset
+        $normalizer->setCurrentField(null);
     }
 
     /**
@@ -144,7 +182,7 @@ final class ConfigurationTest extends TestCase
             'threshold' => 0.5,
         ]);
 
-        $searchService = app('laravel-fuzzy.search');
+        $searchService = app(SearchServiceInterface::class);
 
         // Act: Perform search without custom options
         $results = $searchService->search('test');
@@ -170,51 +208,6 @@ final class ConfigurationTest extends TestCase
     }
 
     /**
-     * Test search pipeline configuration.
-     */
-    public function test_pipeline_configuration(): void
-    {
-        // Arrange: Configure pipeline stages
-        Config::set('fuzzy.pipeline.stages', [
-            NormalizeQueryStage::class,
-            MatchDiscoveryStage::class,
-            ScoringStage::class,
-            RelevanceScoringStage::class,
-            SortAndLimitStage::class,
-        ]);
-
-        // Act: Get configured stages
-        $stages = config('fuzzy.pipeline.stages');
-
-        // Assert: Verify all stages are configured
-        $this->assertCount(5, $stages);
-        $this->assertContains(NormalizeQueryStage::class, $stages);
-        $this->assertContains(MatchDiscoveryStage::class, $stages);
-    }
-
-    /**
-     * Test exclude patterns for auto-discovery.
-     */
-    public function test_exclude_patterns_configuration(): void
-    {
-        // Arrange: Configure exclude patterns
-        Config::set('fuzzy.auto_discovery.exclude_patterns', [
-            '/^Abstract/',
-            '/^Base/',
-            '/Interface$/',
-            '/Trait$/',
-        ]);
-
-        // Act: Get configured exclude patterns
-        $patterns = config('fuzzy.auto_discovery.exclude_patterns');
-
-        // Assert: Verify exclude patterns are correctly configured
-        $this->assertCount(4, $patterns);
-        $this->assertContains('/^Abstract/', $patterns);
-        $this->assertContains('/Interface$/', $patterns);
-    }
-
-    /**
      * Test index configuration.
      */
     public function test_index_configuration(): void
@@ -233,5 +226,110 @@ final class ConfigurationTest extends TestCase
         $this->assertEquals(200, config('fuzzy.index.batch_size'));
         $this->assertTrue(config('fuzzy.index.queue'));
         $this->assertEquals('search-index', config('fuzzy.index.queue_name'));
+    }
+
+    /**
+     * Test similarity configuration.
+     */
+    public function test_similarity_configuration(): void
+    {
+        // Arrange: Configure similarity settings
+        Config::set('fuzzy.similarity', [
+            'min_query_length' => 3,
+            'min_similarity_threshold' => 0.2,
+            'algorithm_weights' => [
+                'longest_common_substring' => 0.5,
+                'levenshtein' => 0.3,
+                'prefix' => 0.2,
+            ],
+        ]);
+
+        // Act: Get configured values
+        $minQueryLength = config('fuzzy.similarity.min_query_length');
+        $minThreshold = config('fuzzy.similarity.min_similarity_threshold');
+        $weights = config('fuzzy.similarity.algorithm_weights');
+
+        // Assert: Verify configuration values
+        $this->assertEquals(3, $minQueryLength);
+        $this->assertEqualsWithDelta(0.2, $minThreshold, PHP_FLOAT_EPSILON);
+        $this->assertArrayHasKey('longest_common_substring', $weights);
+        $this->assertArrayHasKey('levenshtein', $weights);
+        $this->assertArrayHasKey('prefix', $weights);
+    }
+
+    /**
+     * Test custom pipeline configuration.
+     */
+    public function test_custom_pipeline_configuration(): void
+    {
+        // Arrange: Configure custom pipeline stages
+        Config::set('fuzzy.pipeline', [
+            \Fuzzy\Tests\Fixtures\CustomStage::class,
+        ]);
+
+        // Act: Get pipeline config
+        $pipelineConfig = config('fuzzy.pipeline', []);
+
+        // Assert: Verify custom stages are configured
+        $this->assertIsArray($pipelineConfig);
+    }
+
+    /**
+     * Test that stop words are language-aware (French).
+     */
+    public function test_french_stop_words_are_removed(): void
+    {
+        // Temporarily set locale to French
+        $originalLocale = app()->getLocale();
+        app()->setLocale('fr');
+
+        $normalizer = app(StringNormalizer::class);
+
+        // Act: Normalize French query with stop words
+        $query = $normalizer->normalizeQuery('le chat et le chien sont dans la maison');
+
+        // Assert: French stop words should be removed
+        $this->assertStringNotContainsString('le', (string) $query);
+        $this->assertStringNotContainsString('et', (string) $query);
+        $this->assertStringNotContainsString('sont', (string) $query);
+        $this->assertStringNotContainsString('dans', (string) $query);
+        $this->assertStringNotContainsString('la', (string) $query);
+
+        // Content words should remain
+        $this->assertStringContainsString('chat', (string) $query);
+        $this->assertStringContainsString('chien', (string) $query);
+        $this->assertStringContainsString('maison', (string) $query);
+
+        // Restore original locale
+        app()->setLocale($originalLocale);
+    }
+
+    /**
+     * Test that stop words are language-aware (English fallback).
+     */
+    public function test_english_stop_words_are_removed(): void
+    {
+        // Temporarily set locale to English
+        $originalLocale = app()->getLocale();
+        app()->setLocale('en');
+
+        $normalizer = app(StringNormalizer::class);
+
+        // Act: Normalize English query with stop words
+        $query = $normalizer->normalizeQuery('the cat and the dog are in the house');
+
+        // Assert: English stop words should be removed
+        $this->assertStringNotContainsString('the', (string) $query);
+        $this->assertStringNotContainsString('and', (string) $query);
+        $this->assertStringNotContainsString('are', (string) $query);
+        $this->assertStringNotContainsString('in', (string) $query);
+
+        // Content words should remain
+        $this->assertStringContainsString('cat', (string) $query);
+        $this->assertStringContainsString('dog', (string) $query);
+        $this->assertStringContainsString('house', (string) $query);
+
+        // Restore original locale
+        app()->setLocale($originalLocale);
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Fuzzy\Tests\Feature;
 
+use Fuzzy\Contracts\SearchServiceInterface;
 use Fuzzy\Tests\TestCase;
 use Fuzzy\Tests\Fixtures\User;
 use Fuzzy\Tests\Fixtures\Product;
@@ -15,11 +16,15 @@ use Illuminate\Support\Facades\Artisan;
  */
 final class MonitoringTest extends TestCase
 {
+    private SearchServiceInterface $searchService;
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
         $this->cleanupTestData();
+
+        $this->searchService = app(SearchServiceInterface::class);
     }
 
     /**
@@ -54,11 +59,11 @@ final class MonitoringTest extends TestCase
             'price' => 100,
         ]);
 
-        $searchService = app('laravel-fuzzy.search');
-        $searchService->reindexAll();
+        // Act: Reindex all data via IndexManager
+        $this->searchService->getIndexManager()->reindexAll();
 
-        // Act: Retrieve statistics
-        $stats = $searchService->getStats();
+        // Retrieve statistics via IndexManager
+        $stats = $this->searchService->getIndexManager()->getStats();
 
         // Assert: Verify statistics structure and values
         $this->assertArrayHasKey('total_entries', $stats);
@@ -73,6 +78,7 @@ final class MonitoringTest extends TestCase
 
     /**
      * Test stats command output.
+     * La commande utilise déjà le bon service via le conteneur.
      */
     public function test_stats_command_output(): void
     {
@@ -100,9 +106,8 @@ final class MonitoringTest extends TestCase
      */
     public function test_stats_with_empty_index(): void
     {
-        // Act: Retrieve statistics from empty index
-        $searchService = app('laravel-fuzzy.search');
-        $stats = $searchService->getStats();
+        // Act: Retrieve statistics from empty index via IndexManager
+        $stats = $this->searchService->getIndexManager()->getStats();
 
         // Assert: Verify empty statistics
         $this->assertEquals(0, $stats['total_entries']);
@@ -121,11 +126,9 @@ final class MonitoringTest extends TestCase
             'type' => 'user',
         ]);
 
-        $searchService = app('laravel-fuzzy.search');
-        $searchService->reindexAll();
-
-        // Act: Retrieve statistics
-        $stats = $searchService->getStats();
+        // Act: Reindex and get stats via IndexManager
+        $this->searchService->getIndexManager()->reindexAll();
+        $stats = $this->searchService->getIndexManager()->getStats();
 
         // Assert: Verify field count details
         $this->assertArrayHasKey('fields', $stats['models'][User::class]);
@@ -149,20 +152,20 @@ final class MonitoringTest extends TestCase
             'type' => 'user',
         ]);
 
-        $searchService = app('laravel-fuzzy.search');
-        $searchService->reindexAll();
-
         // Act: Get stats before and after cache invalidation
-        $initialStats = $searchService->getStats();
+        $this->searchService->getIndexManager()->reindexAll();
+        $initialStats = $this->searchService->getIndexManager()->getStats();
 
         User::create([
             'name' => 'New User',
             'email' => 'new@example.com',
             'type' => 'user',
         ]);
-        $searchService->reindexAll();
+        $this->searchService->getIndexManager()->reindexAll();
 
-        $updatedStats = $searchService->getStats();
+        // Invalidate stats cache to get fresh data
+        $this->searchService->getCacheManager()->invalidateStatsCache();
+        $updatedStats = $this->searchService->getIndexManager()->getStats();
 
         // Assert: Verify cache invalidation works
         $this->assertNotEquals($initialStats['total_entries'], $updatedStats['total_entries']);
@@ -175,13 +178,12 @@ final class MonitoringTest extends TestCase
     public function test_performance_monitoring(): void
     {
         // Arrange: Create bulk test data
-        $searchService = app('laravel-fuzzy.search');
         $this->createBulkTestUsers(100);
-        $searchService->reindexAll();
+        $this->searchService->getIndexManager()->reindexAll();
 
         // Act: Measure search execution time
         $startTime = microtime(true);
-        $results = $searchService->search('user');
+        $results = $this->searchService->search('user');
         $executionTime = microtime(true) - $startTime;
 
         // Assert: Verify performance constraints

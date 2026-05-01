@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Fuzzy\Traits;
 
 use Illuminate\Support\Collection;
+use Fuzzy\Services\FuzzySearchService;
 
 /**
  * Provides fuzzy search capabilities to Eloquent models
@@ -12,6 +13,12 @@ use Illuminate\Support\Collection;
  * This trait automatically indexes models for search operations and provides
  * methods for searching within the model's scope. It handles lifecycle
  * events (create, update, delete) to maintain search index consistency.
+ *
+ * The trait requires the model to implement MustFuzzySearch interface,
+ * which forces explicit definition of searchable fields, formatting,
+ * indexing logic, and conditional indexing.
+ *
+ * @package Fuzzy\Traits
  */
 trait FuzzySearchable
 {
@@ -20,75 +27,57 @@ trait FuzzySearchable
      *
      * Registers model event listeners to automatically manage search index
      * during create, update, and delete operations.
+     *
+     * @return void
      */
     protected static function bootFuzzySearchable(): void
     {
         static::created(static function ($model): void {
-            if ($model->shouldBeIndexed() && method_exists($model, 'indexForSearch')) {
-                $model->indexForSearch();
+            if ($model->shouldBeIndexed()) {
+                app(FuzzySearchService::class)->getIndexManager()->indexModel($model);
             }
         });
 
         static::updated(static function ($model): void {
-            if ($model->shouldBeIndexed() && method_exists($model, 'updateIndexForSearch')) {
-                $model->updateIndexForSearch();
+            if ($model->shouldBeIndexed()) {
+                app(FuzzySearchService::class)->getIndexManager()->updateModelIndex($model);
             }
         });
 
         static::deleted(static function ($model): void {
-            if (method_exists($model, 'removeFromIndex')) {
-                $model->removeFromIndex();
-            }
+            app(FuzzySearchService::class)->getIndexManager()->removeModel($model);
         });
     }
 
     /**
-     * Determine if this model instance should be indexed
+     * Get the weight for a specific searchable field
      *
-     * Override this method in individual models to implement custom indexing logic.
+     * Returns the weight multiplier for a given field. Higher weights make
+     * matches in that field more important in scoring.
      *
-     * @return bool True if the model should be indexed, false otherwise
+     * Override this method in your model to customize field weights.
+     *
+     * @param string $field The field name
+     * @return float Weight multiplier (default: 1.0)
      */
-    public function shouldBeIndexed(): bool
+    public function getFieldWeight(string $field): float
     {
-        return true;
-    }
-
-    /**
-     * Get the searchable fields for the model
-     *
-     * @return array<int, string> Array of field names to be indexed for search
-     */
-    public function getSearchableFields(): array
-    {
-        if (property_exists($this, 'searchableFields')) {
-            /** @var array<int, string> */
-            return $this->searchableFields;
+        if (property_exists($this, 'fieldWeights') && isset($this->fieldWeights[$field])) {
+            return (float) $this->fieldWeights[$field];
         }
 
-        return ['name', 'email', 'description'];
+        return 1.0;
     }
 
     /**
-     * Get the format class for custom search data transformation
+     * Get the unique identifier for this model instance
      *
-     * @return class-string|null Fully qualified class name implementing custom formatting,
-     *                           or null to use default formatting
-     */
-    public function getFuzzyFormat(): ?string
-    {
-        if (property_exists($this, 'fuzzyFormat')) {
-            /** @var class-string|null */
-            return $this->fuzzyFormat;
-        }
-
-        return null;
-    }
-
-    /**
-     * Get the identifier used for indexing
+     * Used to associate index entries with the correct model instance during
+     * search result retrieval. Returns the model's primary key by default.
      *
-     * @return string|int Unique identifier for the model in the search index
+     * Override this method if your model uses a custom key name.
+     *
+     * @return string|int Unique identifier for this model instance
      */
     public function getIndexableId(): string|int
     {
@@ -96,33 +85,29 @@ trait FuzzySearchable
     }
 
     /**
-     * Index this model for search
+     * Get protected fields that should preserve stop words.
      *
-     * Adds the model to the search index for future search operations.
+     * By default, returns an empty array (no fields protected).
+     * Override this method in your model to specify which fields should
+     * preserve stop words during indexing.
+     *
+     * Example:
+     * ```php
+     * public function getProtectedFields(): array
+     * {
+     *     return ['name', 'email', 'firstname', 'lastname'];
+     * }
+     * ```
+     *
+     * @return array<int, string> List of field names that should preserve stop words
      */
-    public function indexForSearch(): void
+    public function getProtectedFields(): array
     {
-        app('laravel-fuzzy.search')->indexModel(model: $this);
-    }
+        if (property_exists($this, 'protectedFields') && is_array($this->protectedFields)) {
+            return $this->protectedFields;
+        }
 
-    /**
-     * Update the search index for this model
-     *
-     * Updates the model's entry in the search index with current data.
-     */
-    public function updateIndexForSearch(): void
-    {
-        app('laravel-fuzzy.search')->updateModelIndex(model: $this);
-    }
-
-    /**
-     * Remove this model from the search index
-     *
-     * Removes the model from the search index permanently.
-     */
-    public function removeFromIndex(): void
-    {
-        app('laravel-fuzzy.search')->removeModelFromIndex(model: $this);
+        return [];
     }
 
     /**
@@ -136,7 +121,7 @@ trait FuzzySearchable
      */
     public static function fuzzySearch(string $query, array $options = []): Collection
     {
-        return app('laravel-fuzzy.search')->searchInModel(
+        return app(FuzzySearchService::class)->searchInModel(
             modelClass: static::class,
             query: $query,
             options: $options
