@@ -15,7 +15,6 @@ return [
      * @package Fuzzy
      */
 
-
     /**
      * --------------------------------------------------------------------------
      * Cache Configuration
@@ -681,12 +680,49 @@ return [
 
     /**
      * --------------------------------------------------------------------------
-     * Advanced Scoring Configuration
+     * Scoring Configuration
      * --------------------------------------------------------------------------
      *
-     * Controls bonus and penalty multipliers for advanced relevance scoring.
+     * Controls scoring behavior including coverage bonuses and field weights.
      */
     'scoring' => [
+        /**
+         * Coverage Bonus Configuration
+         * ------------------------------------------------
+         * Defines thresholds and bonuses for query word coverage.
+         * When a search matches a high percentage of query words, additional
+         * bonus points are added to the final score.
+         */
+        'coverage_bonus' => [
+            /**
+             * Minimum coverage ratio to apply full bonus (0.0 to 1.0).
+             * Example: 0.75 means 75% of query words must match to get full bonus.
+             * Impact: Higher thresholds make full bonus harder to achieve.
+             */
+            'full_threshold' => 0.75,
+
+            /**
+             * Minimum coverage ratio to apply high bonus (0.0 to 1.0).
+             * Example: 0.50 means 50% of query words must match to get high bonus.
+             * Impact: Lower thresholds make bonuses more accessible.
+             */
+            'high_threshold' => 0.50,
+
+            /**
+             * Bonus score added when coverage meets or exceeds full threshold.
+             * Example: 0.30 adds 30% of base score as bonus.
+             * Impact: Higher values reward full coverage more generously.
+             */
+            'full_bonus' => 0.30,
+
+            /**
+             * Bonus score added when coverage meets or exceeds high threshold.
+             * Example: 0.15 adds 15% of base score as bonus.
+             * Impact: Higher values reward partial coverage more generously.
+             */
+            'high_bonus' => 0.15,
+        ],
+
         /**
          * Field weights for scoring (1.0 = normal importance).
          * Impact: Higher weights make matches in that field more important for ranking.
@@ -722,6 +758,7 @@ return [
         /**
          * Bonus values for high-quality matches.
          * Impact: Higher bonuses increase scores for desirable match characteristics.
+         * @deprecated Use 'coverage_bonus' section instead for coverage-related bonuses
          */
         'bonuses' => [
             'early_position' => 0.2,

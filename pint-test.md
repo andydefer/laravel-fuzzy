@@ -1,12 +1,12 @@
 # Pint Formatting Test Report
-*Generated: ven. 01 mai 2026 16:21:33 WAT*
+*Generated: ven. 01 mai 2026 17:05:23 WAT*
 
 
-  ⨯⨯⨯⨯⨯⨯.⨯⨯⨯⨯⨯.⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯...⨯⨯⨯⨯⨯⨯⨯⨯⨯.⨯⨯⨯.⨯⨯⨯⨯⨯..⨯⨯
+  ⨯⨯⨯⨯⨯⨯.⨯⨯⨯⨯⨯.⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯...⨯⨯⨯⨯⨯⨯⨯⨯⨯.⨯⨯⨯.⨯⨯⨯⨯⨯..⨯⨯
 
   ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── Laravel  
-    FAIL   ............................................................................................................................................... 141 files, 132 style issues  
-  ⨯ config/fuzzy.php                                                                                                              phpdoc_no_package, phpdoc_trim, no_extra_blank_lines  
+    FAIL   ............................................................................................................................................... 142 files, 133 style issues  
+  ⨯ config/fuzzy.php                                                                                                                 phpdoc_no_package, phpdoc_separation, phpdoc_trim  
   ⨯ database/migrations/2024_01_01_000000_create_fuzzy_index_table.php                                      class_definition, no_superfluous_phpdoc_tags, braces_position, phpdoc_trim  
   ⨯ rector.php                                                                                                                                                            concat_space  
   ⨯ src/Commands/ClearCacheCommand.php        phpdoc_no_package, no_superfluous_phpdoc_tags, phpdoc_trim, not_operator_with_successor_space, blank_line_before_statement, phpdoc_align  
@@ -16,6 +16,7 @@
   ⨯ src/Config/AdvancedScoringConfig.php                                                                                         braces_position, single_line_empty_body, phpdoc_align  
   ⨯ src/Config/BaseSimilarityConfig.php                                                                        phpdoc_no_package, braces_position, phpdoc_trim, single_line_empty_body  
   ⨯ src/Config/CacheConfig.php                                                                                                   concat_space, braces_position, single_line_empty_body  
+  ⨯ src/Config/CoverageBonusConfig.php               no_superfluous_phpdoc_tags, no_trailing_whitespace_in_comment, braces_position, phpdoc_trim, single_line_empty_body, phpdoc_align  
   ⨯ src/Config/LevenshteinAlgorithmConfig.php                                                                              class_attributes_separation, phpdoc_no_package, phpdoc_trim  
   ⨯ src/Config/LongestCommonSubstringConfig.php                                                                            class_attributes_separation, phpdoc_no_package, phpdoc_trim  
   ⨯ src/Config/PrefixAlgorithmConfig.php                                                                                   class_attributes_separation, phpdoc_no_package, phpdoc_trim  
@@ -67,7 +68,7 @@
   ⨯ src/Services/PipelineManagerService.php                function_declaration, no_trailing_whitespace_in_comment, phpdoc_separation, not_operator_with_successor_space, phpdoc_align  
   ⨯ src/Services/PipelineStageManager.php            function_declaration, braces_position, phpdoc_separation, not_operator_with_successor_space, single_line_empty_body, phpdoc_align  
   ⨯ src/Services/ResultFilterService.php                                                                                                                          function_declaration  
-  ⨯ src/Services/Scoring/ScoringEngine.php class_attributes_separation, function_declaration, not_operator_with_successor_space, blank_line_before_statement, ordered_imports, phpdoc…  
+  ⨯ src/Services/Scoring/ScoringEngine.php function_declaration, no_multiline_whitespace_around_double_arrow, no_superfluous_phpdoc_tags, no_trailing_whitespace_in_comment, phpdoc_t…  
   ⨯ src/Services/Scoring/ScoringStrategies/ExactMatchStrategy.php                             no_trailing_whitespace_in_comment, braces_position, single_line_empty_body, phpdoc_align  
   ⨯ src/Services/Scoring/ScoringStrategies/FuzzyMatchStrategy.php no_trailing_whitespace_in_comment, braces_position, not_operator_with_successor_space, single_line_empty_body, phpd…  
   ⨯ src/Services/Scoring/ScoringStrategies/MultiWordStrategy.php                                                     phpdoc_no_package, no_trailing_whitespace_in_comment, phpdoc_trim  
@@ -94,10 +95,10 @@
   ⨯ src/helpers.php                                                                              blank_line_after_opening_tag, not_operator_with_successor_space, no_extra_blank_lines  
   ⨯ tests/Feature/ArtisanCommandsTest.php                                                                                 increment_style, single_quote, concat_space, ordered_imports  
   ⨯ tests/Feature/CommandsTest.php                              function_declaration, increment_style, single_quote, concat_space, php_unit_method_casing, trailing_comma_in_multiline  
-  ⨯ tests/Feature/ConfigurationTest.php                                                  concat_space, no_trailing_whitespace_in_comment, blank_line_before_statement, ordered_imports  
+  ⨯ tests/Feature/ConfigurationTest.php                                                                                  concat_space, no_trailing_whitespace_in_comment, phpdoc_align  
   ⨯ tests/Feature/FacadeTest.php                                                                                            class_attributes_separation, concat_space, ordered_imports  
   ⨯ tests/Feature/IntegrationTest.php                                            increment_style, no_superfluous_phpdoc_tags, concat_space, phpdoc_trim, ordered_imports, phpdoc_align  
-  ⨯ tests/Feature/MonitoringTest.php                                                                                                    increment_style, concat_space, ordered_imports  
+  ⨯ tests/Feature/MonitoringTest.php                                                   increment_style, concat_space, no_trailing_whitespace_in_comment, ordered_imports, phpdoc_align  
   ⨯ tests/Feature/ShouldBeIndexedTest.php                                                                                                                                 concat_space  
   ⨯ tests/Fixtures/CustomStage.php                                                 no_trailing_whitespace_in_comment, not_operator_with_successor_space, ordered_imports, phpdoc_align  
   ⨯ tests/Fixtures/CustomStage2.php                                                                                                 not_operator_with_successor_space, ordered_imports  
@@ -111,7 +112,7 @@
   ⨯ tests/Unit/Commands/IndexSearchCommandTest.php                                                            new_with_parentheses, single_quote, concat_space, php_unit_method_casing  
   ⨯ tests/Unit/Commands/StatsIndexCommandTest.php                                                                                                   new_with_parentheses, concat_space  
   ⨯ tests/Unit/FuzzySearchServiceProviderTest.php                                                                                      concat_space, not_operator_with_successor_space  
-  ⨯ tests/Unit/FuzzySearchServiceTest.php                                            class_attributes_separation, lambda_not_used_import, trailing_comma_in_multiline, ordered_imports  
+  ⨯ tests/Unit/FuzzySearchServiceTest.php         class_attributes_separation, lambda_not_used_import, no_trailing_whitespace_in_comment, trailing_comma_in_multiline, ordered_imports  
   ⨯ tests/Unit/Models/FuzzyIndexTest.php                                                 new_with_parentheses, no_superfluous_phpdoc_tags, concat_space, ordered_imports, phpdoc_align  
   ⨯ tests/Unit/Repositories/IndexRepositoryTest.php                                                                              new_with_parentheses, concat_space, no_unused_imports  
   ⨯ tests/Unit/Services/AdvancedScoringCalculatorTest.php                                                           class_attributes_separation, new_with_parentheses, ordered_imports  

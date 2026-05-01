@@ -13,6 +13,9 @@ use Illuminate\Support\Facades\Artisan;
 
 /**
  * Tests for monitoring and statistics functionality.
+ * 
+ * Verifies that index statistics are correctly calculated,
+ * cache invalidation works properly, and performance meets expectations.
  */
 final class MonitoringTest extends TestCase
 {
@@ -21,6 +24,8 @@ final class MonitoringTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // Arrange: Load migrations and clean test data
         $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
         $this->cleanupTestData();
 
@@ -59,10 +64,8 @@ final class MonitoringTest extends TestCase
             'price' => 100,
         ]);
 
-        // Act: Reindex all data via IndexManager
+        // Act: Reindex all data via IndexManager and retrieve statistics
         $this->searchService->getIndexManager()->reindexAll();
-
-        // Retrieve statistics via IndexManager
         $stats = $this->searchService->getIndexManager()->getStats();
 
         // Assert: Verify statistics structure and values
@@ -78,7 +81,6 @@ final class MonitoringTest extends TestCase
 
     /**
      * Test stats command output.
-     * La commande utilise déjà le bon service via le conteneur.
      */
     public function test_stats_command_output(): void
     {
@@ -189,14 +191,16 @@ final class MonitoringTest extends TestCase
         // Assert: Verify performance constraints
         $this->assertGreaterThan(0, $results->count());
         $this->assertLessThan(
-            1.0,
-            $executionTime,
-            sprintf('Search execution time was %ss - should be under 1 second', $executionTime)
+            maximum: 1.0,
+            actual: $executionTime,
+            message: sprintf('Search execution time was %ss - should be under 1 second', $executionTime)
         );
     }
 
     /**
      * Create bulk test users for performance testing.
+     *
+     * @param int $count Number of users to create
      */
     private function createBulkTestUsers(int $count): void
     {
