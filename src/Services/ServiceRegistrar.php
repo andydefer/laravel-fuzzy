@@ -43,6 +43,10 @@ use Illuminate\Support\ServiceProvider;
 
 /**
  * Centralized service registrar for the Fuzzy Search package.
+ *
+ * This class is responsible for registering all services, bindings, and configurations
+ * required by the Fuzzy Search package. It handles dependency injection, singleton
+ * registrations, command registration, and asset publishing.
  */
 class ServiceRegistrar
 {
@@ -50,12 +54,23 @@ class ServiceRegistrar
 
     private PipelineStageManager $stageManager;
 
+    /**
+     * Create a new ServiceRegistrar instance.
+     *
+     * @param Application $app The Laravel application container
+     * @param ServiceProvider $provider The service provider instance for publishing
+     */
     public function __construct(private Application $app, ServiceProvider $provider)
     {
         $this->provider = $provider;
         $this->stageManager = new PipelineStageManager($app);
     }
 
+    /**
+     * Register all services and configurations.
+     *
+     * This is the main entry point that orchestrates all registration methods.
+     */
     public function registerAll(): void
     {
         $this->registerHelpers();
@@ -68,6 +83,11 @@ class ServiceRegistrar
         $this->registerPublishing();
     }
 
+    /**
+     * Register and load helper functions.
+     *
+     * @throws \RuntimeException If helpers.php file is not found
+     */
     private function registerHelpers(): void
     {
         $helpersPath = __DIR__ . '/../helpers.php';
@@ -77,10 +97,18 @@ class ServiceRegistrar
         require_once $helpersPath;
     }
 
+    /**
+     * Register configuration files and config singletons.
+     *
+     * Merges package config with application config and registers
+     * configuration classes as singletons for dependency injection.
+     */
     private function registerConfig(): void
     {
+        // Merge the package configuration file
         $this->mergeConfigFrom(__DIR__ . '/../../config/fuzzy.php', 'fuzzy');
 
+        // Register configuration classes as singletons
         $this->app->singleton(SimilarityCalculatorConfig::class, fn() => SimilarityCalculatorConfig::createDefault());
         $this->app->singleton(AdvancedScoringConfig::class, fn() => AdvancedScoringConfig::fromConfig());
 
@@ -93,6 +121,12 @@ class ServiceRegistrar
         $this->app->singleton(WordSimilarityComparatorConfig::class, fn() => WordSimilarityComparatorConfig::fromConfig());
     }
 
+    /**
+     * Register interface-to-implementation bindings.
+     *
+     * Maps all package contracts to their concrete implementations
+     * for dependency injection resolution.
+     */
     private function registerContracts(): void
     {
         $bindings = [
@@ -106,7 +140,6 @@ class ServiceRegistrar
             SearchContextInterface::class => SearchContext::class,
             ScoringEngineInterface::class => ScoringEngine::class,
             SearchServiceInterface::class => FuzzySearchService::class,
-            // Bind ContextualNormalizerInterface to StringNormalizer
             ContextualNormalizerInterface::class => StringNormalizer::class,
         ];
 
@@ -115,12 +148,23 @@ class ServiceRegistrar
         }
     }
 
+    /**
+     * Register core services as singletons.
+     *
+     * This method registers all the essential services including:
+     * - Normalizers
+     * - Calculators
+     * - Managers
+     * - Processors
+     * - The main search service
+     */
     private function registerCoreServices(): void
     {
-        // Utilities - bind ContextualNormalizerInterface to StringNormalizer as singleton
+        // Register normalizers as singletons
         $this->app->singleton(ContextualNormalizerInterface::class, fn() => new StringNormalizer());
         $this->app->singleton(StringNormalizer::class, fn() => new StringNormalizer());
 
+        // Register service managers
         $this->app->singleton(ResultFilterService::class, fn() => new ResultFilterService());
         $this->app->singleton(CacheManagerService::class, fn() => new CacheManagerService());
         $this->app->singleton(ModelDiscoveryService::class, fn() => new ModelDiscoveryService());
@@ -128,7 +172,7 @@ class ServiceRegistrar
         // PipelineStageManager as singleton
         $this->app->singleton(PipelineStageManager::class, fn($app) => new PipelineStageManager($app));
 
-        // Index Builder - now uses ContextualNormalizerInterface
+        // Index Builder - uses ContextualNormalizerInterface
         $this->app->singleton(IndexBuilder::class, fn($app) => new IndexBuilder(
             $app->make(ContextualNormalizerInterface::class)
         ));
@@ -140,11 +184,11 @@ class ServiceRegistrar
             modelDiscovery: $app->make(ModelDiscoveryInterface::class)
         ));
 
-        // Calculators with their algorithms registered
+        // Similarity Calculator with algorithm registration
         $this->app->singleton(SimilarityCalculator::class, function ($app) {
             $calculator = new SimilarityCalculator($app->make(SimilarityCalculatorConfig::class));
 
-            // Register algorithms with their specific configs from container
+            // Register all similarity algorithms with their specific configurations
             $calculator->addAlgorithm(new LongestCommonSubstringAlgorithm($app->make(LongestCommonSubstringConfig::class)));
             $calculator->addAlgorithm(new LevenshteinSimilarityAlgorithm($app->make(LevenshteinAlgorithmConfig::class)));
             $calculator->addAlgorithm(new PrefixSimilarityAlgorithm($app->make(PrefixAlgorithmConfig::class)));
@@ -152,11 +196,12 @@ class ServiceRegistrar
             return $calculator;
         });
 
+        // Advanced Scoring Calculator
         $this->app->singleton(AdvancedScoringCalculator::class, fn($app) => new AdvancedScoringCalculator(
             $app->make(AdvancedScoringConfig::class)
         ));
 
-        // Pipeline Manager with stages
+        // Pipeline Manager with configured stages
         $this->app->singleton(PipelineManagerService::class, function ($app) {
             $stageClasses = $this->stageManager->getMergedStages();
             $stages = $this->stageManager->createStageInstances($stageClasses);
@@ -167,7 +212,7 @@ class ServiceRegistrar
             );
         });
 
-        // Search Processor
+        // Search Processor - Core search orchestration
         $this->app->singleton(SearchProcessorService::class, fn($app) => new SearchProcessorService(
             pipeline: $app->make(Pipeline::class),
             normalizer: $app->make(StringNormalizer::class),
@@ -178,7 +223,7 @@ class ServiceRegistrar
             resultFilter: $app->make(ResultFilterInterface::class)
         ));
 
-        // Main Search Service - lié à l'interface
+        // Main Search Service - bound to interface for easy resolution
         $this->app->singleton(SearchServiceInterface::class, fn($app) => new FuzzySearchService(
             cacheManager: $app->make(CacheManagerInterface::class),
             modelDiscovery: $app->make(ModelDiscoveryInterface::class),
@@ -186,11 +231,14 @@ class ServiceRegistrar
             searchProcessor: $app->make(SearchProcessorInterface::class)
         ));
 
-        // Alias pour compatibilité
+        // Register aliases for backward compatibility and convenience
         $this->app->alias(SearchServiceInterface::class, 'laravel-fuzzy.search');
         $this->app->alias(SearchServiceInterface::class, FuzzySearchService::class);
     }
 
+    /**
+     * Register algorithm comparator services.
+     */
     private function registerAlgorithms(): void
     {
         $this->app->singleton(WordSimilarityComparator::class, fn($app) => new WordSimilarityComparator(
@@ -199,6 +247,9 @@ class ServiceRegistrar
         ));
     }
 
+    /**
+     * Register scoring strategies and scoring engine.
+     */
     private function registerScoring(): void
     {
         $this->app->singleton(ScoringEngineInterface::class, function ($app) {
@@ -213,6 +264,12 @@ class ServiceRegistrar
         });
     }
 
+    /**
+     * Register Artisan commands for console environments.
+     *
+     * Commands are only registered when running in console mode
+     * to avoid loading them in web requests.
+     */
     private function registerCommands(): void
     {
         if (!$this->app->runningInConsole()) {
@@ -227,14 +284,73 @@ class ServiceRegistrar
         ]);
     }
 
+    /**
+     * Register assets for publishing (config and migrations).
+     *
+     * This method allows users to publish the package configuration
+     * and migration files to their application.
+     */
     private function registerPublishing(): void
     {
+        // Publish configuration file using the helper trait
         $this->publishes([
             __DIR__ . '/../../config/fuzzy.php' => config_path('fuzzy.php'),
         ], 'fuzzy-config');
 
-        $this->publishes([
-            __DIR__ . '/../../database/migrations' => database_path('migrations'),
-        ], 'fuzzy-migrations');
+        // Publish migrations only if they don't already exist
+        $this->publishMigrationsIfNotExists();
+    }
+
+    /**
+     * Publish migration files only if they don't already exist.
+     *
+     * This method prevents overwriting existing migration files that may have been
+     * customized by the user. Each migration file is checked individually before
+     * being added to the publishing list.
+     *
+     * Benefits:
+     * - Preserves user customizations to migrations
+     * - Prevents accidental data loss from schema changes
+     * - Allows safe package updates without migration conflicts
+     *
+     * Usage:
+     * php artisan vendor:publish --tag=fuzzy-migrations
+     *
+     * @return void
+     */
+    private function publishMigrationsIfNotExists(): void
+    {
+        $sourceMigrationsPath = __DIR__ . '/../../database/migrations';
+        $targetMigrationsPath = database_path('migrations');
+
+        // If source migrations directory doesn't exist, nothing to publish
+        if (!is_dir($sourceMigrationsPath)) {
+            return;
+        }
+
+        // Create target directory if it doesn't exist
+        if (!is_dir($targetMigrationsPath)) {
+            mkdir($targetMigrationsPath, 0755, true);
+        }
+
+        // Get all migration files from source
+        $migrationFiles = glob($sourceMigrationsPath . '/*.php');
+        $filesToPublish = [];
+
+        foreach ($migrationFiles as $sourceFile) {
+            $fileName = basename($sourceFile);
+            $targetFile = $targetMigrationsPath . '/' . $fileName;
+
+            // Only include files that don't already exist in target
+            if (!file_exists($targetFile)) {
+                $filesToPublish[$sourceFile] = $targetFile;
+            }
+        }
+
+        // Publish only the migrations that don't exist
+        // Using the publishes() method from ServiceProviderHelper trait
+        if (!empty($filesToPublish)) {
+            $this->publishes($filesToPublish, 'fuzzy-migrations');
+        }
     }
 }

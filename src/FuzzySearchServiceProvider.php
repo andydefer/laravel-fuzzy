@@ -9,19 +9,53 @@ use Illuminate\Support\ServiceProvider;
 
 /**
  * Service provider for the Fuzzy Search package.
+ * 
+ * Registers all package services, contracts, and implementations with the Laravel
+ * service container. Also handles database migrations publishing.
+ * 
+ * This provider follows the Laravel package development conventions and ensures
+ * proper dependency injection throughout the package.
  */
-class FuzzySearchServiceProvider extends ServiceProvider
+final class FuzzySearchServiceProvider extends ServiceProvider
 {
+    /**
+     * Register any package services.
+     * 
+     * This method is called by Laravel during the service registration phase.
+     * It delegates the actual service registration to a dedicated ServiceRegistrar
+     * class to maintain the Single Responsibility Principle.
+     */
     public function register(): void
     {
-        (new ServiceRegistrar($this->app, $this))->registerAll();
+        $serviceRegistrar = new ServiceRegistrar(
+            app: $this->app,
+            provider: $this
+        );
+
+        $serviceRegistrar->registerAll();
     }
 
+    /**
+     * Bootstrap any package services.
+     * 
+     * This method is called after all service providers have been registered.
+     * It loads the package's database migrations.
+     */
     public function boot(): void
     {
-        $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
+        $this->loadMigrationsFrom(
+            paths: __DIR__ . '/../database/migrations'
+        );
     }
 
+    /**
+     * Get the services provided by this provider.
+     * 
+     * This method allows Laravel to optimize service loading by knowing
+     * which services are provided by this package.
+     * 
+     * @return array<int, class-string|string> List of service identifiers
+     */
     public function provides(): array
     {
         return [

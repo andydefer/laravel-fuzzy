@@ -1,5 +1,5 @@
 # Pint Formatting Test Report
-*Generated: ven. 01 mai 2026 17:05:23 WAT*
+*Generated: ven. 01 mai 2026 17:49:38 WAT*
 
 
   ⨯⨯⨯⨯⨯⨯.⨯⨯⨯⨯⨯.⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯⨯...⨯⨯⨯⨯⨯⨯⨯⨯⨯.⨯⨯⨯.⨯⨯⨯⨯⨯..⨯⨯
@@ -48,7 +48,7 @@
   ⨯ src/Exceptions/FuzzySearchException.php                                                                                               phpdoc_no_package, phpdoc_trim, phpdoc_align  
   ⨯ src/Exceptions/ModelNotSearchableException.php                                                                                        phpdoc_no_package, phpdoc_trim, phpdoc_align  
   ⨯ src/FuzzySearch.php                                                                                                          phpdoc_separation, no_unused_imports, ordered_imports  
-  ⨯ src/FuzzySearchServiceProvider.php                                                                                                                                    concat_space  
+  ⨯ src/FuzzySearchServiceProvider.php                                                                                                 concat_space, no_trailing_whitespace_in_comment  
   ⨯ src/Models/FuzzyIndex.php                                                                                            phpdoc_no_package, phpdoc_trim, ordered_imports, phpdoc_align  
   ⨯ src/Repositories/IndexRepository.php new_with_parentheses, phpdoc_no_package, concat_space, phpdoc_trim, not_operator_with_successor_space, blank_line_before_statement, phpdoc_a…  
   ⨯ src/SearchContext.php  phpdoc_no_package, no_superfluous_phpdoc_tags, concat_space, phpdoc_trim, not_operator_with_successor_space, blank_line_before_statement, ordered_imports,…  
@@ -75,7 +75,7 @@
   ⨯ src/Services/Scoring/ScoringStrategies/WordMatchStrategy.php                                                                 braces_position, single_line_empty_body, phpdoc_align  
   ⨯ src/Services/Scoring/ScoringStrategyInterface.php                                                                                  no_trailing_whitespace_in_comment, phpdoc_align  
   ⨯ src/Services/SearchProcessorService.php                  function_declaration, braces_position, single_line_empty_body, blank_line_before_statement, ordered_imports, phpdoc_align  
-  ⨯ src/Services/ServiceRegistrar.php                                     new_with_parentheses, function_declaration, concat_space, not_operator_with_successor_space, ordered_imports  
+  ⨯ src/Services/ServiceRegistrar.php new_with_parentheses, function_declaration, no_superfluous_phpdoc_tags, concat_space, phpdoc_trim, not_operator_with_successor_space, ordered_i…  
   ⨯ src/Services/SimilarityCalculator.php                  class_attributes_separation, increment_style, no_unused_imports, blank_line_before_statement, ordered_imports, phpdoc_align  
   ⨯ src/Services/StringNormalizer.php class_attributes_separation, function_declaration, phpdoc_no_package, no_superfluous_phpdoc_tags, concat_space, phpdoc_trim, not_operator_with_…  
   ⨯ src/Stages/MatchDiscoveryStage.php                                                                                              not_operator_with_successor_space, ordered_imports  
@@ -125,7 +125,7 @@
   ⨯ tests/Unit/Services/ResultFilterServiceTest.php                                                                                                               new_with_parentheses  
   ⨯ tests/Unit/Services/ScoringEngineTest.php                                                                       class_attributes_separation, new_with_parentheses, ordered_imports  
   ⨯ tests/Unit/Services/SearchProcessorServiceTest.php                                                class_attributes_separation, lambda_not_used_import, trailing_comma_in_multiline  
-  ⨯ tests/Unit/Services/ServiceRegistrarTest.php                                class_attributes_separation, new_with_parentheses, function_declaration, concat_space, ordered_imports  
+  ⨯ tests/Unit/Services/ServiceRegistrarTest.php class_attributes_separation, new_with_parentheses, function_declaration, concat_space, no_trailing_whitespace_in_comment, not_operat…  
   ⨯ tests/Unit/Services/SimilarityCalculatorTest.php                                                                                             new_with_parentheses, ordered_imports  
   ⨯ tests/Unit/Services/StringNormalizerTest.php                                                                                                                  new_with_parentheses  
   ⨯ tests/Unit/Services/WordSimilarityComparatorTest.php                                                 class_attributes_separation, new_with_parentheses, single_quote, concat_space  

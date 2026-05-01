@@ -1,5 +1,5 @@
 # Rector Refactoring Report
-*Generated: ven. 01 mai 2026 17:05:27 WAT*
+*Generated: ven. 01 mai 2026 17:49:43 WAT*
 
 
 85 files with changes
@@ -2721,7 +2721,1219 @@ Applied rules:
  * NewlineBetweenClassLikeStmtsRector
 
 
-49) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/Algorithms/WordSimilarity/LetterDistanceCalculatorTest.php:21
+49) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Stages/RelevanceScoringStageTest.php:5
+
+    ---------- begin diff ----------
+@@ @@
+ namespace Fuzzy\Tests\Unit\Stages;
+
+ use Fuzzy\Contracts\IndexRepositoryInterface;
+-use Fuzzy\Contracts\SearchContextInterface;
+ use Fuzzy\Config\RelevanceScoringConfig;
+ use Fuzzy\Data\SearchOptionsData;
+ use Fuzzy\Data\SearchResultData;
+@@ @@
+ use Fuzzy\ValueObjects\SearchQuery;
+ use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
+ use ReflectionMethod;
+-use ReflectionProperty;
+
+ #[AllowMockObjectsWithoutExpectations]
+ final class RelevanceScoringStageTest extends TestCase
+ {
+     private RelevanceScoringStage $stage;
+-    private WordSimilarityComparator $comparator;
+-    private StringNormalizer $normalizer;
+     private RelevanceScoringConfig $config;
+
+     /**
+@@ @@
+     {
+         parent::setUp();
+
+-        $this->normalizer = new StringNormalizer();
+-        $this->comparator = new WordSimilarityComparator(
+-            normalizer: $this->normalizer
++        $normalizer = new StringNormalizer();
++        $comparator = new WordSimilarityComparator(
++            normalizer: $normalizer
+         );
+         $this->config = RelevanceScoringConfig::createDefault();
+
+-        $this->stage = new RelevanceScoringStage($this->comparator, $this->config);
++        $this->stage = new RelevanceScoringStage($comparator, $this->config);
+     }
+
+     /**
+@@ @@
+     {
+         // Arrange: Many results without explicit maxResults
+         $results = [];
+-        for ($i = 0; $i < 30; $i++) {
++        for ($i = 0; $i < 30; ++$i) {
+             $results[] = $this->createSearchResult('Test ' . $i, 'Test ' . $i);
+         }
+
+         $context = $this->createSearchContext('test', $results);
+-        $context->options = new SearchOptionsData(); // Uses default maxResults
++        $context->options = new SearchOptionsData();
++         // Uses default maxResults
+         $next = $this->createNextCallback($context);
+
+         // Act: Process without explicit limit
+@@ @@
+         $this->assertCount(1, $processedResults);
+
+         $resultItem = $processedResults[0];
+-        $this->assertEquals(85.5, $resultItem->score);
++        $this->assertEqualsWithDelta(85.5, $resultItem->score, PHP_FLOAT_EPSILON);
+         $this->assertEquals('User', $resultItem->modelType);
+         $this->assertEquals('name', $resultItem->matchedField);
+         $this->assertEquals('John Doe', $resultItem->matchedValue);
+@@ @@
+                 $expected,
+                 $result,
+                 0.01,
+-                "Failed for input: $input. Got: $result, Expected: $expected"
++                sprintf('Failed for input: %s. Got: %s, Expected: %s', $input, $result, $expected)
+             );
+         }
+     }
+@@ @@
+
+         // Verify descending order by combined score
+         $sorted = $combinedResults->values()->all();
+-        for ($i = 0; $i < count($sorted) - 1; $i++) {
++        for ($i = 0; $i < count($sorted) - 1; ++$i) {
+             $this->assertGreaterThanOrEqual($sorted[$i + 1]->combinedScore, $sorted[$i]->combinedScore);
+         }
+     }
+@@ @@
+
+     /**
+      * Create a search context for testing.
++     * @param SearchResultData[] $results
+      */
+     private function createSearchContext(
+         string $queryString,
+@@ @@
+
+     /**
+      * Invoke a private method on an object.
++     * @param array<mixed[], mixed> $args
+      */
+     private function invokePrivateMethod(object $object, string $methodName, array $args = []): mixed
+     {
+@@ @@
+         $reflection->setAccessible(true);
+
+         return $reflection->invokeArgs($object, $args);
+-    }
+-
+-    /**
+-     * Set a private property value on an object.
+-     */
+-    private function setPrivateProperty(object $object, string $propertyName, mixed $value): void
+-    {
+-        $reflection = new ReflectionProperty($object, $propertyName);
+-        $reflection->setAccessible(true);
+-        $reflection->setValue($object, $value);
+     }
+ }
+    ----------- end diff -----------
+
+Applied rules:
+ * NewlineBeforeNewAssignSetRector
+ * EncapsedStringsToSprintfRector
+ * PostIncDecToPreIncDecRector
+ * RemoveUnusedPrivateMethodRector
+ * NarrowUnusedSetUpDefinedPropertyRector
+ * AssertEqualsOrAssertSameFloatParameterToSpecificMethodsTypeRector
+ * ClassMethodArrayDocblockParamFromLocalCallsRector
+
+
+50) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Stages/ScoringStageTest.php:17
+
+    ---------- begin diff ----------
+@@ @@
+ use Fuzzy\ValueObjects\SearchQuery;
+ use InvalidArgumentException;
+ use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
+-use ReflectionClass;
+ use ReflectionMethod;
+ use ReflectionProperty;
+ use stdClass;
+    ----------- end diff -----------
+
+Applied rules:
+
+
+51) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Stages/SortAndLimitStageTest.php:5
+
+    ---------- begin diff ----------
+@@ @@
+ namespace Fuzzy\Tests\Unit\Stages;
+
+ use Fuzzy\Contracts\IndexRepositoryInterface;
+-use Fuzzy\Contracts\SearchContextInterface;
+ use Fuzzy\Services\Scoring\ScoringEngine;
+ use Fuzzy\Tests\TestCase;
+ use Fuzzy\Stages\SortAndLimitStage;
+@@ @@
+
+     /**
+      * Create a search context for testing.
++     * @param array<mixed[], mixed> $results
+      */
+     private function createSearchContext(
+         string $queryString,
+    ----------- end diff -----------
+
+Applied rules:
+ * ClassMethodArrayDocblockParamFromLocalCallsRector
+
+
+52) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/database/migrations/2024_01_01_000000_create_non_indexable_users_table.php:17
+
+    ---------- begin diff ----------
+@@ @@
+      */
+     public function up(): void
+     {
+-        Schema::create('non_indexable_users', function (Blueprint $table) {
++        Schema::create('non_indexable_users', function (Blueprint $table): void {
+             $table->id();
+             $table->string('name');
+             $table->string('email')->unique();
+    ----------- end diff -----------
+
+Applied rules:
+ * AddClosureVoidReturnTypeWhereNoReturnRector
+
+
+53) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/database/migrations/2024_01_01_000000_create_non_searchable_models_table.php:17
+
+    ---------- begin diff ----------
+@@ @@
+      */
+     public function up(): void
+     {
+-        Schema::create('non_searchable_models', function (Blueprint $table) {
++        Schema::create('non_searchable_models', function (Blueprint $table): void {
+             $table->id();
+             $table->string('name');
+             $table->string('email')->unique();
+    ----------- end diff -----------
+
+Applied rules:
+ * AddClosureVoidReturnTypeWhereNoReturnRector
+
+
+54) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/ResultFilterService.php:4
+
+    ---------- begin diff ----------
+@@ @@
+
+ namespace Fuzzy\Services;
+
++use Fuzzy\Data\SearchResultData;
+ use Fuzzy\Contracts\ResultFilterInterface;
+ use Illuminate\Support\Collection;
+
+@@ @@
+     public function filterAndSort(Collection $results, float $minScore): Collection
+     {
+         return $results
+-            ->filter(fn($result): bool => $result !== null && $result->score >= $minScore)
++            ->filter(fn($result): bool => $result instanceof SearchResultData && $result->score >= $minScore)
+             ->sortByDesc('score')
+             ->values();
+     }
+    ----------- end diff -----------
+
+Applied rules:
+ * FlipTypeControlToUseExclusiveTypeRector
+
+
+55) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/Scoring/ScoringEngine.php:113
+
+    ---------- begin diff ----------
+@@ @@
+
+     /**
+      * Check if the score has reached the maximum possible value.
+-     *
+-     * @param float $score
+-     * @return bool
+      */
+     private function isPerfectScore(float $score): bool
+     {
+@@ @@
+
+     /**
+      * Check if no scoring strategy matched the index entry.
+-     *
+-     * @param float $score
+-     * @return bool
+      */
+     private function hasNoMatch(float $score): bool
+     {
+@@ @@
+      * Check if multi-word scoring can be performed.
+      *
+      * @param array<int, array<string, mixed>> $indexEntries
+-     * @param SearchContextInterface $context
+-     * @return bool
+      */
+     private function cannotCalculateMultiWordScore(array $indexEntries, SearchContextInterface $context): bool
+     {
+@@ @@
+      * Find the best similarity score for each query word against all index entries.
+      *
+      * @param array<int, array<string, mixed>> $indexEntries
+-     * @param SearchContextInterface $context
+      * @param array<int, string> $queryWords
+      * @return array<int, float>
+      */
+@@ @@
+      * Find the best similarity score for a single query word against all index entries.
+      *
+      * @param array<int, array<string, mixed>> $indexEntries
+-     * @param SearchContextInterface $context
+-     * @param string $queryWord
+-     * @return float
+      */
+     private function findBestMatchingScoreForWord(array $indexEntries, SearchContextInterface $context, string $queryWord): float
+     {
+@@ @@
+
+     /**
+      * Check if a similarity score meets or exceeds the configured threshold.
+-     *
+-     * @param float $similarity
+-     * @param SearchContextInterface $context
+-     * @return bool
+      */
+     private function isScoreAboveThreshold(float $similarity, SearchContextInterface $context): bool
+     {
+@@ @@
+
+     /**
+      * Check if a word was successfully matched (score > minimum).
+-     *
+-     * @param float $score
+-     * @return bool
+      */
+     private function isWordMatched(float $score): bool
+     {
+@@ @@
+      * Check if no query words were matched against any index entry.
+      *
+      * @param array<int, float> $matchedScores
+-     * @return bool
+      */
+     private function noWordsMatched(array $matchedScores): bool
+     {
+@@ @@
+      * Calculate the average score of all matched query words.
+      *
+      * @param array<int, float> $matchedScores
+-     * @return float
+      */
+     private function calculateAverageScore(array $matchedScores): float
+     {
+@@ @@
+      *
+      * @param array<int, float> $matchedScores
+      * @param array<int, string> $queryWords
+-     * @return float
+      */
+     private function calculateCoverageRatio(array $matchedScores, array $queryWords): float
+     {
+@@ @@
+      * Get coverage bonus based on the coverage ratio using configured thresholds.
+      *
+      * @param float $coverageRatio Value between 0 and 1
+-     * @return float
+      */
+     private function getCoverageBonus(float $coverageRatio): float
+     {
+@@ @@
+
+     /**
+      * Compute the final weighted score using average, coverage, and bonus.
+-     *
+-     * @param float $averageScore
+-     * @param float $coverageRatio
+-     * @param float $coverageBonus
+-     * @return float
+      */
+     private function computeWeightedScore(float $averageScore, float $coverageRatio, float $coverageBonus): float
+     {
+@@ @@
+     /**
+      * Calculate fallback score when no strategy matches the index entry.
+      *
+-     * @param SearchContextInterface $context
+      * @param array<string, mixed> $indexEntry
+-     * @return float
+      */
+     private function calculateFallbackScore(SearchContextInterface $context, array $indexEntry): float
+     {
+@@ @@
+     /**
+      * Apply field-specific weighting to the calculated score.
+      *
+-     * @param float $score
+      * @param array<string, mixed> $match
+-     * @return float
+      */
+     private function applyFieldWeighting(float $score, array $match): float
+     {
+@@ @@
+
+     /**
+      * Normalize score to ensure it stays within allowed bounds.
+-     *
+-     * @param float $score
+-     * @return float
+      */
+     private function normalizeScore(float $score): float
+     {
+    ----------- end diff -----------
+
+Applied rules:
+ * RemoveUselessParamTagRector
+ * RemoveUselessReturnTagRector
+
+
+56) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/SearchProcessorService.php:4
+
+    ---------- begin diff ----------
+@@ @@
+
+ namespace Fuzzy\Services;
+
++use Fuzzy\Stages\NormalizeQueryStage;
++use Fuzzy\Stages\MatchDiscoveryStage;
++use Fuzzy\Stages\ScoringStage;
++use Fuzzy\Stages\RelevanceScoringStage;
++use Fuzzy\Stages\SortAndLimitStage;
+ use Fuzzy\Contracts\IndexRepositoryInterface;
+ use Fuzzy\Contracts\ModelDiscoveryInterface;
+ use Fuzzy\Contracts\ResultFilterInterface;
+@@ @@
+
+     /**
+      * {@inheritDoc}
++     * @param array<string, mixed> $options
+      */
+     public function searchInModel(string $modelClass, string $query, array $options = []): Collection
+     {
+@@ @@
+     private function getPipelineStages(): array
+     {
+         return config('fuzzy.pipeline.stages', [
+-            \Fuzzy\Stages\NormalizeQueryStage::class,
+-            \Fuzzy\Stages\MatchDiscoveryStage::class,
+-            \Fuzzy\Stages\ScoringStage::class,
+-            \Fuzzy\Stages\RelevanceScoringStage::class,
+-            \Fuzzy\Stages\SortAndLimitStage::class,
++            NormalizeQueryStage::class,
++            MatchDiscoveryStage::class,
++            ScoringStage::class,
++            RelevanceScoringStage::class,
++            SortAndLimitStage::class,
+         ]);
+     }
+ }
+    ----------- end diff -----------
+
+Applied rules:
+ * ClassMethodArrayDocblockParamFromLocalCallsRector
+
+
+57) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/ServiceRegistrar.php:4
+
+    ---------- begin diff ----------
+@@ @@
+
+ namespace Fuzzy\Services;
+
++use RuntimeException;
+ use Fuzzy\Commands\ClearCacheCommand;
+ use Fuzzy\Commands\ClearIndexCommand;
+ use Fuzzy\Commands\IndexSearchCommand;
+@@ @@
+     /**
+      * Register and load helper functions.
+      *
+-     * @throws \RuntimeException If helpers.php file is not found
++     * @throws RuntimeException If helpers.php file is not found
+      */
+     private function registerHelpers(): void
+     {
+         $helpersPath = __DIR__ . '/../helpers.php';
+         if (!file_exists($helpersPath)) {
+-            throw new \RuntimeException("helpers.php not found at: {$helpersPath}");
++            throw new RuntimeException('helpers.php not found at: ' . $helpersPath);
+         }
++
+         require_once $helpersPath;
+     }
+
+@@ @@
+         $this->mergeConfigFrom(__DIR__ . '/../../config/fuzzy.php', 'fuzzy');
+
+         // Register configuration classes as singletons
+-        $this->app->singleton(SimilarityCalculatorConfig::class, fn() => SimilarityCalculatorConfig::createDefault());
+-        $this->app->singleton(AdvancedScoringConfig::class, fn() => AdvancedScoringConfig::fromConfig());
++        $this->app->singleton(SimilarityCalculatorConfig::class, fn(): SimilarityCalculatorConfig => SimilarityCalculatorConfig::createDefault());
++        $this->app->singleton(AdvancedScoringConfig::class, fn(): AdvancedScoringConfig => AdvancedScoringConfig::fromConfig());
+
+         // Register algorithm-specific configs with fromConfig() method
+-        $this->app->singleton(LongestCommonSubstringConfig::class, fn() => LongestCommonSubstringConfig::fromConfig());
+-        $this->app->singleton(LevenshteinAlgorithmConfig::class, fn() => LevenshteinAlgorithmConfig::fromConfig());
+-        $this->app->singleton(PrefixAlgorithmConfig::class, fn() => PrefixAlgorithmConfig::fromConfig());
++        $this->app->singleton(LongestCommonSubstringConfig::class, fn(): LongestCommonSubstringConfig => LongestCommonSubstringConfig::fromConfig());
++        $this->app->singleton(LevenshteinAlgorithmConfig::class, fn(): LevenshteinAlgorithmConfig => LevenshteinAlgorithmConfig::fromConfig());
++        $this->app->singleton(PrefixAlgorithmConfig::class, fn(): PrefixAlgorithmConfig => PrefixAlgorithmConfig::fromConfig());
+
+         // Register WordSimilarityComparator config
+-        $this->app->singleton(WordSimilarityComparatorConfig::class, fn() => WordSimilarityComparatorConfig::fromConfig());
++        $this->app->singleton(WordSimilarityComparatorConfig::class, fn(): WordSimilarityComparatorConfig => WordSimilarityComparatorConfig::fromConfig());
+     }
+
+     /**
+@@ @@
+     private function registerCoreServices(): void
+     {
+         // Register normalizers as singletons
+-        $this->app->singleton(ContextualNormalizerInterface::class, fn() => new StringNormalizer());
+-        $this->app->singleton(StringNormalizer::class, fn() => new StringNormalizer());
++        $this->app->singleton(ContextualNormalizerInterface::class, fn(): StringNormalizer => new StringNormalizer());
++        $this->app->singleton(StringNormalizer::class, fn(): StringNormalizer => new StringNormalizer());
+
+         // Register service managers
+-        $this->app->singleton(ResultFilterService::class, fn() => new ResultFilterService());
+-        $this->app->singleton(CacheManagerService::class, fn() => new CacheManagerService());
+-        $this->app->singleton(ModelDiscoveryService::class, fn() => new ModelDiscoveryService());
++        $this->app->singleton(ResultFilterService::class, fn(): ResultFilterService => new ResultFilterService());
++        $this->app->singleton(CacheManagerService::class, fn(): CacheManagerService => new CacheManagerService());
++        $this->app->singleton(ModelDiscoveryService::class, fn(): ModelDiscoveryService => new ModelDiscoveryService());
+
+         // PipelineStageManager as singleton
+-        $this->app->singleton(PipelineStageManager::class, fn($app) => new PipelineStageManager($app));
++        $this->app->singleton(PipelineStageManager::class, fn($app): PipelineStageManager => new PipelineStageManager($app));
+
+         // Index Builder - uses ContextualNormalizerInterface
+-        $this->app->singleton(IndexBuilder::class, fn($app) => new IndexBuilder(
++        $this->app->singleton(IndexBuilder::class, fn($app): IndexBuilder => new IndexBuilder(
+             $app->make(ContextualNormalizerInterface::class)
+         ));
+
+         // Index Manager
+-        $this->app->singleton(IndexManagerService::class, fn($app) => new IndexManagerService(
++        $this->app->singleton(IndexManagerService::class, fn($app): IndexManagerService => new IndexManagerService(
+             indexBuilder: $app->make(IndexBuilder::class),
+             indexRepository: $app->make(IndexRepositoryInterface::class),
+             modelDiscovery: $app->make(ModelDiscoveryInterface::class)
+@@ @@
+         ));
+
+         // Similarity Calculator with algorithm registration
+-        $this->app->singleton(SimilarityCalculator::class, function ($app) {
++        $this->app->singleton(SimilarityCalculator::class, function ($app): SimilarityCalculator {
+             $calculator = new SimilarityCalculator($app->make(SimilarityCalculatorConfig::class));
+
+             // Register all similarity algorithms with their specific configurations
+@@ @@
+         });
+
+         // Advanced Scoring Calculator
+-        $this->app->singleton(AdvancedScoringCalculator::class, fn($app) => new AdvancedScoringCalculator(
++        $this->app->singleton(AdvancedScoringCalculator::class, fn($app): AdvancedScoringCalculator => new AdvancedScoringCalculator(
+             $app->make(AdvancedScoringConfig::class)
+         ));
+
+         // Pipeline Manager with configured stages
+-        $this->app->singleton(PipelineManagerService::class, function ($app) {
++        $this->app->singleton(PipelineManagerService::class, function ($app): PipelineManagerService {
+             $stageClasses = $this->stageManager->getMergedStages();
+             $stages = $this->stageManager->createStageInstances($stageClasses);
+
+@@ @@
+         });
+
+         // Search Processor - Core search orchestration
+-        $this->app->singleton(SearchProcessorService::class, fn($app) => new SearchProcessorService(
++        $this->app->singleton(SearchProcessorService::class, fn($app): SearchProcessorService => new SearchProcessorService(
+             pipeline: $app->make(Pipeline::class),
+             normalizer: $app->make(StringNormalizer::class),
+             similarityCalculator: $app->make(SimilarityCalculator::class),
+@@ @@
+         ));
+
+         // Main Search Service - bound to interface for easy resolution
+-        $this->app->singleton(SearchServiceInterface::class, fn($app) => new FuzzySearchService(
++        $this->app->singleton(SearchServiceInterface::class, fn($app): FuzzySearchService => new FuzzySearchService(
+             cacheManager: $app->make(CacheManagerInterface::class),
+             modelDiscovery: $app->make(ModelDiscoveryInterface::class),
+             indexManager: $app->make(IndexManagerInterface::class),
+@@ @@
+      */
+     private function registerAlgorithms(): void
+     {
+-        $this->app->singleton(WordSimilarityComparator::class, fn($app) => new WordSimilarityComparator(
++        $this->app->singleton(WordSimilarityComparator::class, fn($app): WordSimilarityComparator => new WordSimilarityComparator(
+             normalizer: $app->make(StringNormalizer::class),
+             config: $app->make(WordSimilarityComparatorConfig::class)
+         ));
+@@ @@
+      */
+     private function registerScoring(): void
+     {
+-        $this->app->singleton(ScoringEngineInterface::class, function ($app) {
++        $this->app->singleton(ScoringEngineInterface::class, function ($app): ScoringEngine {
+             $calculator = $app->make(AdvancedScoringCalculator::class);
+
+             return new ScoringEngine(
+@@ @@
+      *
+      * Usage:
+      * php artisan vendor:publish --tag=fuzzy-migrations
+-     *
+-     * @return void
+      */
+     private function publishMigrationsIfNotExists(): void
+     {
+@@ @@
+
+         // Publish only the migrations that don't exist
+         // Using the publishes() method from ServiceProviderHelper trait
+-        if (!empty($filesToPublish)) {
++        if ($filesToPublish !== []) {
+             $this->publishes($filesToPublish, 'fuzzy-migrations');
+         }
+     }
+    ----------- end diff -----------
+
+Applied rules:
+ * SimplifyEmptyCheckOnEmptyArrayRector
+ * EncapsedStringsToSprintfRector
+ * NewlineAfterStatementRector
+ * RemoveUselessReturnTagRector
+ * AddArrowFunctionReturnTypeRector
+ * ClosureReturnTypeRector
+
+
+58) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/SimilarityCalculator.php:4
+
+    ---------- begin diff ----------
+@@ @@
+
+ namespace Fuzzy\Services;
+
+-use Fuzzy\Services\Algorithms\LongestCommonSubstringAlgorithm;
+-use Fuzzy\Services\Algorithms\LevenshteinSimilarityAlgorithm;
+-use Fuzzy\Services\Algorithms\PrefixSimilarityAlgorithm;
+ use Fuzzy\Contracts\SimilarityAlgorithmInterface;
+ use Fuzzy\Config\SimilarityCalculatorConfig;
+
+@@ @@
+ {
+     /** @var array<int, SimilarityAlgorithmInterface> */
+     private array $algorithms = [];
++
+     private SimilarityCalculatorConfig $config;
+
+     public function __construct(?SimilarityCalculatorConfig $config = null)
+@@ @@
+
+     private function calculateCompositeWordSimilarity(string $firstWord, string $secondWord): float
+     {
+-        if (empty($this->algorithms)) {
++        if ($this->algorithms === []) {
+             return FUZZY_SCORE_NONE;
+         }
+
+@@ @@
+         $firstWords = $this->splitIntoWords($normalizedFirstString);
+         $secondWords = $this->splitIntoWords($normalizedSecondString);
+
+-        if (empty($firstWords) || empty($secondWords)) {
++        if ($firstWords === [] || $secondWords === []) {
+             return FUZZY_SCORE_NONE;
+         }
+    ----------- end diff -----------
+
+Applied rules:
+ * SimplifyEmptyCheckOnEmptyArrayRector
+ * NewlineBetweenClassLikeStmtsRector
+
+
+59) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/StringNormalizer.php:19
+
+    ---------- begin diff ----------
+@@ @@
+ class StringNormalizer implements ContextualNormalizerInterface
+ {
+     private const STOP_WORD_REMOVAL_THRESHOLD = 3;
++
+     private const MIN_KEYWORD_LENGTH = 3;
++
+     private const DEFAULT_MAX_KEYWORDS = 10;
++
+     private const REGEX_REMOVE_SPECIAL_CHARS = '/[^a-z0-9\s_-]/';
++
+     private const REGEX_COLLAPSE_SPACES = '/\s+/';
++
+     private const REGEX_WORD_SPLITTER = '/\s+/';
++
+     private const WORD_SEPARATORS = ['_', '-'];
++
+     private const EMPTY_STRING = '';
++
+     private const ZERO_STRING = '0';
+
+     /**
+@@ @@
+
+     /**
+      * Current field being processed (for contextual normalization).
+-     *
+-     * @var string|null
+      */
+     private ?string $currentField = null;
+
+@@ @@
+
+     /**
+      * Load stop words from internal language files based on application locale.
+-     *
+-     * @return void
+      */
+     private function loadStopWords(): void
+     {
+@@ @@
+         if (function_exists('app') && method_exists(app(), 'getLocale')) {
+             return app()->getLocale();
+         }
++
+         return $_ENV['APP_LOCALE'] ?? 'en';
+     }
+
+@@ @@
+         if ($this->shouldRemoveStopWords()) {
+             $filteredWords = array_filter(
+                 $words,
+-                fn($word): bool => !in_array($word, $this->stopWords, true)
++                fn(string $word): bool => !in_array($word, $this->stopWords, true)
+             );
+         } else {
+             // Keep all words for protected fields (names, emails, etc.)
+    ----------- end diff -----------
+
+Applied rules:
+ * NewlineBetweenClassLikeStmtsRector
+ * NewlineAfterStatementRector
+ * RemoveUselessReturnTagRector
+ * RemoveUselessVarTagRector
+ * AddArrayFunctionClosureParamTypeRector
+
+
+60) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Stages/MatchDiscoveryStage/IndexOptimizer.php:13
+
+    ---------- begin diff ----------
+@@ @@
+ class IndexOptimizer
+ {
+     private array $cachedOptimizedIndexes = [];
++
+     private array $cacheTimestamps = [];
++
+     private MatchDiscoveryConfig $config;
+
+     public function __construct(?MatchDiscoveryConfig $config = null)
+@@ @@
+
+     /**
+      * Build optimized index structures.
++     * @return array<string, mixed[]>
+      */
+     private function buildOptimizedIndexes(array $wordIndex): array
+     {
+@@ @@
+             if (!isset($byLength[$wordLength])) {
+                 $byLength[$wordLength] = [];
+             }
++
+             $byLength[$wordLength][$wordString] = $matches;
+
+             $firstChar = $wordString[0];
+@@ @@
+             if (!isset($byFirstChar[$firstChar])) {
+                 $byFirstChar[$firstChar] = [];
+             }
++
+             $byFirstChar[$firstChar][$wordString] = $matches;
+
+             if ($wordLength >= $this->config->getMinTrigramLength()) {
+@@ @@
+
+     /**
+      * Add word to trigram index.
++     * @param never[][] $trigramIndex
+      */
+     private function addToTrigramIndex(string $word, array $matches, array &$trigramIndex): void
+     {
+@@ @@
+             if (!isset($trigramIndex[$trigram])) {
+                 $trigramIndex[$trigram] = [];
+             }
++
+             $trigramIndex[$trigram][$word] = $matches;
+         }
+     }
+    ----------- end diff -----------
+
+Applied rules:
+ * NewlineBetweenClassLikeStmtsRector
+ * NewlineAfterStatementRector
+ * AddParamArrayDocblockFromAssignsParamToParamReferenceRector
+ * DocblockReturnArrayFromDirectArrayInstanceRector
+
+
+61) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Stages/MatchDiscoveryStage/MatchFinder.php:13
+
+    ---------- begin diff ----------
+@@ @@
+ class MatchFinder
+ {
+     private MatchDiscoveryConfig $config;
++
+     private IndexOptimizer $optimizer;
+
+     public function __construct(?MatchDiscoveryConfig $config = null)
+@@ @@
+
+     /**
+      * Simple fuzzy match discovery for small indexes.
++     * @param array<string, mixed> $wordIndex
+      */
+     private function discoverFuzzyMatchesSimple(SearchContextInterface $context, array $wordIndex): void
+     {
+@@ @@
+
+     /**
+      * Find words containing the query word.
++     * @param array<int, mixed> $byLength
+      */
+     private function findContainedMatches(
+         string $queryWord,
+@@ @@
+         }
+
+         return $queryWord[0] === $indexedWord[0];
+-    }
+-
+-    /**
+-     * Add all matches to context.
+-     */
+-    private function addAllMatches(SearchContextInterface $context, array $matches): void
+-    {
+-        foreach ($matches as $match) {
+-            $context->addPotentialMatch($match);
+-        }
+     }
+ }
+    ----------- end diff -----------
+
+Applied rules:
+ * NewlineBetweenClassLikeStmtsRector
+ * RemoveUnusedPrivateMethodRector
+ * AddParamArrayDocblockFromDimFetchAccessRector
+
+
+62) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Stages/RelevanceScoringStage.php:83
+
+    ---------- begin diff ----------
+@@ @@
+     private function calculateRelevanceScores(SearchContextInterface $context): Collection
+     {
+         return collect($context->results)
+-            ->map(function (object $result) use ($context) {
++            ->map(function (object $result) use ($context): object {
+                 $relevance = $this->calculateRelevanceForResult($result, $context);
+                 $result->relevance = $relevance;
+                 return $result;
+@@ @@
+             ->take($maxResults)
+             ->values()
+             ->all();
+-    }
+-
+-    /**
+-     * Combine relevance with original score for final ranking.
+-     *
+-     * @param Collection<int, object> $results Results with relevance scores
+-     * @return Collection<int, object> Results with combined scores
+-     */
+-    private function combineScores(Collection $results): Collection
+-    {
+-        return $results
+-            ->map(function (object $result) {
+-                $normalizedRelevance = $this->normalizeRelevance($result->relevance);
+-                $combinedScore = ($result->score * $this->config->getOriginalScoreWeight()) +
+-                    ($normalizedRelevance * $this->config->getRelevanceScoreWeight());
+-
+-                $result->combinedScore = $combinedScore;
+-                $result->originalScore = $result->score;
+-                $result->relevanceScore = $normalizedRelevance;
+-
+-                return $result;
+-            })
+-            ->sortByDesc('combinedScore');
+-    }
+-
+-    /**
+-     * Normalize relevance score to 0-100 scale.
+-     *
+-     * @param float $relevance Relevance score from comparator
+-     * @return float Normalized score (100 = perfect, 0 = poor)
+-     */
+-    private function normalizeRelevance(float $relevance): float
+-    {
+-        if ($relevance <= FUZZY_DISTANCE_IDENTICAL) {
+-            return $this->config->getMaxNormalizedRelevance();
+-        }
+-
+-        $normalized = max(
+-            $this->config->getMinNormalizedRelevance(),
+-            $this->config->getMaxNormalizedRelevance() - ($relevance * $this->config->getNormalizationFactor())
+-        );
+-        return min($this->config->getMaxNormalizedRelevance(), $normalized);
+     }
+ }
+    ----------- end diff -----------
+
+Applied rules:
+ * RemoveUnusedPrivateMethodRector
+ * ClosureReturnTypeRector
+
+
+63) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Stages/ScoringStage.php:4
+
+    ---------- begin diff ----------
+@@ @@
+
+ namespace Fuzzy\Stages;
+
++use InvalidArgumentException;
+ use Fuzzy\Contracts\SearchContextInterface;
+ use Fuzzy\Contracts\StageInterface;
+ use Fuzzy\Enums\StageType;
+@@ @@
+      *
+      * @param array<int, array> $matches Array of matches with field and value information
+      * @return array{indexable_type: string, field: string, original_value: string} Match details
+-     * @throws \InvalidArgumentException If matches array is empty
++     * @throws InvalidArgumentException If matches array is empty
+      */
+     private function extractBestMatchDetails(array $matches): array
+     {
+         if ($matches === []) {
+-            throw new \InvalidArgumentException('Matches array cannot be empty');
++            throw new InvalidArgumentException('Matches array cannot be empty');
+         }
+
+         return $matches[0];
+    ----------- end diff -----------
+
+Applied rules:
+
+
+64) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Traits/CommandHelpers.php:20
+
+    ---------- begin diff ----------
+@@ @@
+ {
+     /**
+      * Get the fuzzy search service from the container.
+-     *
+-     * @return FuzzySearchService
+      */
+     protected function getSearchService(): FuzzySearchService
+     {
+@@ @@
+      * Display a success message with a checkmark prefix.
+      *
+      * @param string $message The success message to display
+-     * @return void
+      */
+     protected function showSuccess(string $message): void
+     {
+-        $this->info("✓ {$message}");
++        $this->info('✓ ' . $message);
+     }
+
+     /**
+@@ @@
+      * Display a warning message.
+      *
+      * @param string $message The warning message to display
+-     * @return void
+      */
+     protected function showWarning(string $message): void
+     {
+@@ @@
+      * Display an error message.
+      *
+      * @param string $message The error message to display
+-     * @return void
+      */
+     protected function showError(string $message): void
+     {
+@@ @@
+      * Display an info message.
+      *
+      * @param string $message The info message to display
+-     * @return void
+      */
+     protected function showInfo(string $message): void
+     {
+@@ @@
+      * Display a section header with equals signs.
+      *
+      * @param string $title The section title
+-     * @return void
+      */
+     protected function showHeader(string $title): void
+     {
+-        $this->info("=== {$title} ===");
++        $this->info(sprintf('=== %s ===', $title));
+     }
+
+     /**
+      * Display a blank line.
+-     *
+-     * @return void
+      */
+     protected function showNewLine(): void
+     {
+    ----------- end diff -----------
+
+Applied rules:
+ * EncapsedStringsToSprintfRector
+ * RemoveUselessReturnTagRector
+
+
+65) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Traits/FuzzySearchable.php:4
+
+    ---------- begin diff ----------
+@@ @@
+
+ namespace Fuzzy\Traits;
+
++use Fuzzy\Contracts\MustFuzzySearch;
+ use Illuminate\Support\Collection;
+ use Fuzzy\Services\FuzzySearchService;
+
+@@ @@
+      *
+      * Registers model event listeners to automatically manage search index
+      * during create, update, and delete operations.
+-     *
+-     * @return void
+      */
+     protected static function bootFuzzySearchable(): void
+     {
+@@ @@
+             }
+         });
+
+-        static::deleted(static function ($model): void {
++        static::deleted(static function (MustFuzzySearch $model): void {
+             app(FuzzySearchService::class)->getIndexManager()->removeModel($model);
+         });
+     }
+    ----------- end diff -----------
+
+Applied rules:
+ * RemoveUselessReturnTagRector
+ * ParamTypeByMethodCallTypeRector
+
+
+66) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Traits/ServiceProviderHelper.php:4
+
+    ---------- begin diff ----------
+@@ @@
+
+ namespace Fuzzy\Traits;
+
++use ReflectionClass;
+ use Illuminate\Support\ServiceProvider;
+
+ /**
+@@ @@
+      */
+     protected function mergeConfigFrom(string $path, string $key): void
+     {
+-        $reflection = new \ReflectionClass($this->provider);
++        $reflection = new ReflectionClass($this->provider);
+         $method = $reflection->getMethod('mergeConfigFrom');
+         $method->setAccessible(true);
+         $method->invoke($this->provider, $path, $key);
+@@ @@
+      */
+     protected function publishes(array $paths, string $group = null): void
+     {
+-        $reflection = new \ReflectionClass($this->provider);
++        $reflection = new ReflectionClass($this->provider);
+         $method = $reflection->getMethod('publishes');
+         $method->setAccessible(true);
+
+@@ @@
+      */
+     protected function commands(array $commands): void
+     {
+-        $reflection = new \ReflectionClass($this->provider);
++        $reflection = new ReflectionClass($this->provider);
+         $method = $reflection->getMethod('commands');
+         $method->setAccessible(true);
+         $method->invoke($this->provider, $commands);
+    ----------- end diff -----------
+
+Applied rules:
+
+
+67) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Feature/CommandsTest.php:453
+
+    ---------- begin diff ----------
+@@ @@
+
+     /**
+      * Create a user without triggering model events.
++     * @param array<string, string> $attributes
+      */
+     private function createUserWithoutEvents(array $attributes): User
+     {
+@@ @@
+
+     /**
+      * Create a product without triggering model events.
++     * @param array<string, string>|array<string, int> $attributes
+      */
+     private function createProductWithoutEvents(array $attributes): Product
+     {
+@@ @@
+      */
+     private function createIndexableUsers(int $count): void
+     {
+-        for ($i = 1; $i <= $count; $i++) {
++        for ($i = 1; $i <= $count; ++$i) {
+             User::create([
+-                'name' => "User {$i}",
+-                'email' => "user{$i}@example.com",
++                'name' => 'User ' . $i,
++                'email' => sprintf('user%d@example.com', $i),
+                 'type' => 'user',
+             ]);
+         }
+@@ @@
+      */
+     private function createNonIndexableUsers(int $count): void
+     {
+-        for ($i = 1; $i <= $count; $i++) {
++        for ($i = 1; $i <= $count; ++$i) {
+             User::create([
+-                'name' => "Admin User {$i}",
+-                'email' => "admin{$i}@example.com",
++                'name' => 'Admin User ' . $i,
++                'email' => sprintf('admin%d@example.com', $i),
+                 'type' => 'admin',
+             ]);
+         }
+    ----------- end diff -----------
+
+Applied rules:
+ * EncapsedStringsToSprintfRector
+ * PostIncDecToPreIncDecRector
+ * ClassMethodArrayDocblockParamFromLocalCallsRector
+
+
+68) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Feature/ConfigurationTest.php:4
+
+    ---------- begin diff ----------
+@@ @@
+
+ namespace Fuzzy\Tests\Feature;
+
++use ReflectionClass;
+ use Fuzzy\Contracts\ModelDiscoveryInterface;
+ use Fuzzy\Contracts\SearchServiceInterface;
+ use Fuzzy\Services\IndexBuilder;
+@@ @@
+      */
+     private function getFieldWeightFromIndexBuilder(IndexBuilder $indexBuilder, string $field): float
+     {
+-        $reflection = new \ReflectionClass($indexBuilder);
++        $reflection = new ReflectionClass($indexBuilder);
+         $calculateWeightMethod = $reflection->getMethod('calculateFieldWeight');
+         $calculateWeightMethod->setAccessible(true);
+
+@@ @@
+     public function test_coverage_bonus_defaults_when_configuration_missing(): void
+     {
+         // Arrange: Remove coverage bonus configuration entirely
+-        Config::set('fuzzy.scoring.coverage_bonus', null);
++        Config::set('fuzzy.scoring.coverage_bonus');
+
+         // Clear config cache to ensure fresh load
+         Config::offsetUnset('fuzzy.scoring.coverage_bonus');
+    ----------- end diff -----------
+
+Applied rules:
+ * RemoveNullArgOnNullDefaultParamRector
+
+
+69) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Feature/FacadeTest.php:24
+
+    ---------- begin diff ----------
+@@ @@
+ final class FacadeTest extends TestCase
+ {
+     private SearchServiceInterface $searchService;
++
+     private StringNormalizer $normalizer;
+
+     /**
+@@ @@
+         $normalized = $this->normalizer->normalize($inputString);
+
+         // Assert: Verify normalization removes accents and special chars
+-        $this->assertEquals($expectedOutput, $normalized);
++        $this->assertSame($expectedOutput, $normalized);
+     }
+
+     /**
+@@ @@
+         $words = $this->normalizer->splitIntoWords($inputString);
+
+         // Assert: Verify correct word splitting
+-        $this->assertEquals($expectedWords, $words);
++        $this->assertSame($expectedWords, $words);
+     }
+
+     /**
+    ----------- end diff -----------
+
+Applied rules:
+ * NewlineBetweenClassLikeStmtsRector
+ * AssertEqualsToSameRector
+
+
+70) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/Algorithms/WordSimilarity/LetterDistanceCalculatorTest.php:21
 
     ---------- begin diff ----------
 @@ @@
@@ -2773,7 +3985,7 @@ Applied rules:
  * AssertEqualsToSameRector
 
 
-50) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/Algorithms/WordSimilarity/WordSimilarityCalculatorTest.php:21
+71) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/Algorithms/WordSimilarity/WordSimilarityCalculatorTest.php:21
 
     ---------- begin diff ----------
 @@ @@
@@ -2847,7 +4059,7 @@ Applied rules:
  * AssertEqualsToSameRector
 
 
-51) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/CacheManagerServiceTest.php:52
+72) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/CacheManagerServiceTest.php:52
 
     ---------- begin diff ----------
 @@ @@
@@ -3030,7 +4242,7 @@ Applied rules:
  * ClosureReturnTypeRector
 
 
-52) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/IndexBuilderTest.php:4
+73) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/IndexBuilderTest.php:4
 
     ---------- begin diff ----------
 @@ @@
@@ -3070,7 +4282,7 @@ Applied rules:
  * CoversAnnotationWithValueToAttributeRector
 
 
-53) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/IndexManagerServiceTest.php:4
+74) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/IndexManagerServiceTest.php:4
 
     ---------- begin diff ----------
 @@ @@
@@ -3119,7 +4331,7 @@ Applied rules:
  * AssertEqualsToSameRector
 
 
-54) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/ModelDiscoveryServiceTest.php:4
+75) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/ModelDiscoveryServiceTest.php:4
 
     ---------- begin diff ----------
 @@ @@
@@ -3135,7 +4347,7 @@ Applied rules:
 Applied rules:
 
 
-55) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/PipelineManagerServiceTest.php:4
+76) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/PipelineManagerServiceTest.php:4
 
     ---------- begin diff ----------
 @@ @@
@@ -3413,7 +4625,7 @@ Applied rules:
  * DocblockVarArrayFromPropertyDefaultsRector
 
 
-56) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/PipelineStageManagerTest.php:4
+77) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/PipelineStageManagerTest.php:4
 
     ---------- begin diff ----------
 @@ @@
@@ -3439,7 +4651,7 @@ Applied rules:
  * AssertEqualsToSameRector
 
 
-57) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/ResultFilterServiceTest.php:40
+78) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/ResultFilterServiceTest.php:40
 
     ---------- begin diff ----------
 @@ @@
@@ -3483,7 +4695,7 @@ Applied rules:
  * AssertEqualsToSameRector
 
 
-58) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/ScoringEngineTest.php:21
+79) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/ScoringEngineTest.php:21
 
     ---------- begin diff ----------
 @@ @@
@@ -3517,7 +4729,7 @@ Applied rules:
  * DocblockReturnArrayFromDirectArrayInstanceRector
 
 
-59) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/SearchProcessorServiceTest.php:19
+80) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/SearchProcessorServiceTest.php:19
 
     ---------- begin diff ----------
 @@ @@
@@ -3578,7 +4790,7 @@ Applied rules:
  * ClosureReturnTypeRector
 
 
-60) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/ServiceRegistrarTest.php:4
+81) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/ServiceRegistrarTest.php:4
 
     ---------- begin diff ----------
 @@ @@
@@ -3600,18 +4812,18 @@ Applied rules:
 
      protected function setUp(): void
 @@ @@
-         $this->provider = new FuzzySearchServiceProvider($this->app);
-         $this->registrar = new ServiceRegistrar($this->app, $this->provider);
-         // Force console context for command tests
+             provider: $this->provider
+         );
+
 -        $this->app->detectEnvironment(fn() => 'testing');
 +        $this->app->detectEnvironment(fn(): string => 'testing');
      }
 
-     /**
+     protected function tearDown(): void
 @@ @@
          $calculator = $this->app->make(SimilarityCalculator::class);
 
-         // Use reflection to access private property
+         // Assert: Verify algorithms are registered using reflection
 -        $reflection = new \ReflectionClass($calculator);
 +        $reflection = new ReflectionClass($calculator);
          $algorithmsProperty = $reflection->getProperty('algorithms');
@@ -3619,11 +4831,11 @@ Applied rules:
 +
          $algorithms = $algorithmsProperty->getValue($calculator);
 
-         // Should have 3 algorithms registered by default
+         $this->assertCount(3, $algorithms);
 @@ @@
          $calculator = $this->app->make(SimilarityCalculator::class);
 
-         // Use reflection to access private property
+         // Assert: Verify LCS algorithm config is correctly injected
 -        $reflection = new \ReflectionClass($calculator);
 +        $reflection = new ReflectionClass($calculator);
          $algorithmsProperty = $reflection->getProperty('algorithms');
@@ -3631,7 +4843,6 @@ Applied rules:
 +
          $algorithms = $algorithmsProperty->getValue($calculator);
 
-         // Verify each algorithm has its specific config
 -        $lcsReflection = new \ReflectionClass($algorithms[0]);
 +        $lcsReflection = new ReflectionClass($algorithms[0]);
          $lcsConfigProperty = $lcsReflection->getProperty('config');
@@ -3640,6 +4851,7 @@ Applied rules:
          $lcsConfig = $lcsConfigProperty->getValue($algorithms[0]);
          $this->assertInstanceOf(LongestCommonSubstringConfig::class, $lcsConfig);
 
+         // Assert: Verify Levenshtein algorithm config is correctly injected
 -        $levReflection = new \ReflectionClass($algorithms[1]);
 +        $levReflection = new ReflectionClass($algorithms[1]);
          $levConfigProperty = $levReflection->getProperty('config');
@@ -3648,6 +4860,7 @@ Applied rules:
          $levConfig = $levConfigProperty->getValue($algorithms[1]);
          $this->assertInstanceOf(LevenshteinAlgorithmConfig::class, $levConfig);
 
+         // Assert: Verify Prefix algorithm config is correctly injected
 -        $prefixReflection = new \ReflectionClass($algorithms[2]);
 +        $prefixReflection = new ReflectionClass($algorithms[2]);
          $prefixConfigProperty = $prefixReflection->getProperty('config');
@@ -3657,27 +4870,27 @@ Applied rules:
          $this->assertInstanceOf(PrefixAlgorithmConfig::class, $prefixConfig);
      }
 @@ @@
-      */
      public function test_register_all_handles_custom_pipeline_stages(): void
      {
+         // Arrange: Set custom pipeline stages configuration
 -        config(['fuzzy.pipeline' => [\Fuzzy\Tests\Fixtures\CustomStage::class]]);
 +        config(['fuzzy.pipeline' => [CustomStage::class]]);
 
+         // Act: Register all services
          $this->registrar->registerAll();
-
 @@ @@
-         }
 
          try {
+             // Act & Assert: Expect exception when helpers file is missing
 -            $this->expectException(\RuntimeException::class);
 +            $this->expectException(RuntimeException::class);
              $this->expectExceptionMessage('helpers.php not found at');
 
-             $registrar = new ServiceRegistrar($this->app, $this->provider);
+             $registrar = new ServiceRegistrar(
 @@ @@
          $indexBuilder = $this->app->make(IndexBuilder::class);
 
-         // Use reflection to verify the normalizer property type
+         // Assert: Verify normalizer dependency is properly injected
 -        $reflection = new \ReflectionClass($indexBuilder);
 +        $reflection = new ReflectionClass($indexBuilder);
          $property = $reflection->getProperty('normalizer');
@@ -3686,15 +4899,24 @@ Applied rules:
          $normalizer = $property->getValue($indexBuilder);
 
          $this->assertInstanceOf(ContextualNormalizerInterface::class, $normalizer);
+@@ @@
+     public function test_multiple_register_calls_are_safe(): void
+     {
+         // Act: Call registerAll multiple times
+-        for ($i = 0; $i < 3; $i++) {
++        for ($i = 0; $i < 3; ++$i) {
+             $this->registrar->registerAll();
+         }
     ----------- end diff -----------
 
 Applied rules:
  * NewlineBetweenClassLikeStmtsRector
  * NewlineBeforeNewAssignSetRector
+ * PostIncDecToPreIncDecRector
  * AddArrowFunctionReturnTypeRector
 
 
-61) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/StringNormalizerTest.php:158
+82) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/StringNormalizerTest.php:158
 
     ---------- begin diff ----------
 @@ @@
@@ -3762,7 +4984,7 @@ Applied rules:
  * AssertEqualsToSameRector
 
 
-62) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/WordSimilarityComparatorTest.php:14
+83) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/WordSimilarityComparatorTest.php:14
 
     ---------- begin diff ----------
 @@ @@
@@ -3917,7 +5139,7 @@ Applied rules:
  * NarrowUnusedSetUpDefinedPropertyRector
 
 
-63) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Stages/MatchDiscoveryStage/MatchFinderTest.php:4
+84) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Stages/MatchDiscoveryStage/MatchFinderTest.php:4
 
     ---------- begin diff ----------
 @@ @@
@@ -3994,983 +5216,7 @@ Applied rules:
  * ClassMethodArrayDocblockParamFromLocalCallsRector
 
 
-64) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/ResultFilterService.php:4
-
-    ---------- begin diff ----------
-@@ @@
-
- namespace Fuzzy\Services;
-
-+use Fuzzy\Data\SearchResultData;
- use Fuzzy\Contracts\ResultFilterInterface;
- use Illuminate\Support\Collection;
-
-@@ @@
-     public function filterAndSort(Collection $results, float $minScore): Collection
-     {
-         return $results
--            ->filter(fn($result): bool => $result !== null && $result->score >= $minScore)
-+            ->filter(fn($result): bool => $result instanceof SearchResultData && $result->score >= $minScore)
-             ->sortByDesc('score')
-             ->values();
-     }
-    ----------- end diff -----------
-
-Applied rules:
- * FlipTypeControlToUseExclusiveTypeRector
-
-
-65) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/Scoring/ScoringEngine.php:113
-
-    ---------- begin diff ----------
-@@ @@
-
-     /**
-      * Check if the score has reached the maximum possible value.
--     *
--     * @param float $score
--     * @return bool
-      */
-     private function isPerfectScore(float $score): bool
-     {
-@@ @@
-
-     /**
-      * Check if no scoring strategy matched the index entry.
--     *
--     * @param float $score
--     * @return bool
-      */
-     private function hasNoMatch(float $score): bool
-     {
-@@ @@
-      * Check if multi-word scoring can be performed.
-      *
-      * @param array<int, array<string, mixed>> $indexEntries
--     * @param SearchContextInterface $context
--     * @return bool
-      */
-     private function cannotCalculateMultiWordScore(array $indexEntries, SearchContextInterface $context): bool
-     {
-@@ @@
-      * Find the best similarity score for each query word against all index entries.
-      *
-      * @param array<int, array<string, mixed>> $indexEntries
--     * @param SearchContextInterface $context
-      * @param array<int, string> $queryWords
-      * @return array<int, float>
-      */
-@@ @@
-      * Find the best similarity score for a single query word against all index entries.
-      *
-      * @param array<int, array<string, mixed>> $indexEntries
--     * @param SearchContextInterface $context
--     * @param string $queryWord
--     * @return float
-      */
-     private function findBestMatchingScoreForWord(array $indexEntries, SearchContextInterface $context, string $queryWord): float
-     {
-@@ @@
-
-     /**
-      * Check if a similarity score meets or exceeds the configured threshold.
--     *
--     * @param float $similarity
--     * @param SearchContextInterface $context
--     * @return bool
-      */
-     private function isScoreAboveThreshold(float $similarity, SearchContextInterface $context): bool
-     {
-@@ @@
-
-     /**
-      * Check if a word was successfully matched (score > minimum).
--     *
--     * @param float $score
--     * @return bool
-      */
-     private function isWordMatched(float $score): bool
-     {
-@@ @@
-      * Check if no query words were matched against any index entry.
-      *
-      * @param array<int, float> $matchedScores
--     * @return bool
-      */
-     private function noWordsMatched(array $matchedScores): bool
-     {
-@@ @@
-      * Calculate the average score of all matched query words.
-      *
-      * @param array<int, float> $matchedScores
--     * @return float
-      */
-     private function calculateAverageScore(array $matchedScores): float
-     {
-@@ @@
-      *
-      * @param array<int, float> $matchedScores
-      * @param array<int, string> $queryWords
--     * @return float
-      */
-     private function calculateCoverageRatio(array $matchedScores, array $queryWords): float
-     {
-@@ @@
-      * Get coverage bonus based on the coverage ratio using configured thresholds.
-      *
-      * @param float $coverageRatio Value between 0 and 1
--     * @return float
-      */
-     private function getCoverageBonus(float $coverageRatio): float
-     {
-@@ @@
-
-     /**
-      * Compute the final weighted score using average, coverage, and bonus.
--     *
--     * @param float $averageScore
--     * @param float $coverageRatio
--     * @param float $coverageBonus
--     * @return float
-      */
-     private function computeWeightedScore(float $averageScore, float $coverageRatio, float $coverageBonus): float
-     {
-@@ @@
-     /**
-      * Calculate fallback score when no strategy matches the index entry.
-      *
--     * @param SearchContextInterface $context
-      * @param array<string, mixed> $indexEntry
--     * @return float
-      */
-     private function calculateFallbackScore(SearchContextInterface $context, array $indexEntry): float
-     {
-@@ @@
-     /**
-      * Apply field-specific weighting to the calculated score.
-      *
--     * @param float $score
-      * @param array<string, mixed> $match
--     * @return float
-      */
-     private function applyFieldWeighting(float $score, array $match): float
-     {
-@@ @@
-
-     /**
-      * Normalize score to ensure it stays within allowed bounds.
--     *
--     * @param float $score
--     * @return float
-      */
-     private function normalizeScore(float $score): float
-     {
-    ----------- end diff -----------
-
-Applied rules:
- * RemoveUselessParamTagRector
- * RemoveUselessReturnTagRector
-
-
-66) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/SearchProcessorService.php:4
-
-    ---------- begin diff ----------
-@@ @@
-
- namespace Fuzzy\Services;
-
-+use Fuzzy\Stages\NormalizeQueryStage;
-+use Fuzzy\Stages\MatchDiscoveryStage;
-+use Fuzzy\Stages\ScoringStage;
-+use Fuzzy\Stages\RelevanceScoringStage;
-+use Fuzzy\Stages\SortAndLimitStage;
- use Fuzzy\Contracts\IndexRepositoryInterface;
- use Fuzzy\Contracts\ModelDiscoveryInterface;
- use Fuzzy\Contracts\ResultFilterInterface;
-@@ @@
-
-     /**
-      * {@inheritDoc}
-+     * @param array<string, mixed> $options
-      */
-     public function searchInModel(string $modelClass, string $query, array $options = []): Collection
-     {
-@@ @@
-     private function getPipelineStages(): array
-     {
-         return config('fuzzy.pipeline.stages', [
--            \Fuzzy\Stages\NormalizeQueryStage::class,
--            \Fuzzy\Stages\MatchDiscoveryStage::class,
--            \Fuzzy\Stages\ScoringStage::class,
--            \Fuzzy\Stages\RelevanceScoringStage::class,
--            \Fuzzy\Stages\SortAndLimitStage::class,
-+            NormalizeQueryStage::class,
-+            MatchDiscoveryStage::class,
-+            ScoringStage::class,
-+            RelevanceScoringStage::class,
-+            SortAndLimitStage::class,
-         ]);
-     }
- }
-    ----------- end diff -----------
-
-Applied rules:
- * ClassMethodArrayDocblockParamFromLocalCallsRector
-
-
-67) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/ServiceRegistrar.php:4
-
-    ---------- begin diff ----------
-@@ @@
-
- namespace Fuzzy\Services;
-
-+use RuntimeException;
- use Fuzzy\Commands\ClearCacheCommand;
- use Fuzzy\Commands\ClearIndexCommand;
- use Fuzzy\Commands\IndexSearchCommand;
-@@ @@
-     {
-         $helpersPath = __DIR__ . '/../helpers.php';
-         if (!file_exists($helpersPath)) {
--            throw new \RuntimeException("helpers.php not found at: {$helpersPath}");
-+            throw new RuntimeException('helpers.php not found at: ' . $helpersPath);
-         }
-+
-         require_once $helpersPath;
-     }
-
-@@ @@
-     {
-         $this->mergeConfigFrom(__DIR__ . '/../../config/fuzzy.php', 'fuzzy');
-
--        $this->app->singleton(SimilarityCalculatorConfig::class, fn() => SimilarityCalculatorConfig::createDefault());
--        $this->app->singleton(AdvancedScoringConfig::class, fn() => AdvancedScoringConfig::fromConfig());
-+        $this->app->singleton(SimilarityCalculatorConfig::class, fn(): SimilarityCalculatorConfig => SimilarityCalculatorConfig::createDefault());
-+        $this->app->singleton(AdvancedScoringConfig::class, fn(): AdvancedScoringConfig => AdvancedScoringConfig::fromConfig());
-
-         // Register algorithm-specific configs with fromConfig() method
--        $this->app->singleton(LongestCommonSubstringConfig::class, fn() => LongestCommonSubstringConfig::fromConfig());
--        $this->app->singleton(LevenshteinAlgorithmConfig::class, fn() => LevenshteinAlgorithmConfig::fromConfig());
--        $this->app->singleton(PrefixAlgorithmConfig::class, fn() => PrefixAlgorithmConfig::fromConfig());
-+        $this->app->singleton(LongestCommonSubstringConfig::class, fn(): LongestCommonSubstringConfig => LongestCommonSubstringConfig::fromConfig());
-+        $this->app->singleton(LevenshteinAlgorithmConfig::class, fn(): LevenshteinAlgorithmConfig => LevenshteinAlgorithmConfig::fromConfig());
-+        $this->app->singleton(PrefixAlgorithmConfig::class, fn(): PrefixAlgorithmConfig => PrefixAlgorithmConfig::fromConfig());
-
-         // Register WordSimilarityComparator config
--        $this->app->singleton(WordSimilarityComparatorConfig::class, fn() => WordSimilarityComparatorConfig::fromConfig());
-+        $this->app->singleton(WordSimilarityComparatorConfig::class, fn(): WordSimilarityComparatorConfig => WordSimilarityComparatorConfig::fromConfig());
-     }
-
-     private function registerContracts(): void
-@@ @@
-     private function registerCoreServices(): void
-     {
-         // Utilities - bind ContextualNormalizerInterface to StringNormalizer as singleton
--        $this->app->singleton(ContextualNormalizerInterface::class, fn() => new StringNormalizer());
--        $this->app->singleton(StringNormalizer::class, fn() => new StringNormalizer());
-+        $this->app->singleton(ContextualNormalizerInterface::class, fn(): StringNormalizer => new StringNormalizer());
-+        $this->app->singleton(StringNormalizer::class, fn(): StringNormalizer => new StringNormalizer());
-
--        $this->app->singleton(ResultFilterService::class, fn() => new ResultFilterService());
--        $this->app->singleton(CacheManagerService::class, fn() => new CacheManagerService());
--        $this->app->singleton(ModelDiscoveryService::class, fn() => new ModelDiscoveryService());
-+        $this->app->singleton(ResultFilterService::class, fn(): ResultFilterService => new ResultFilterService());
-+        $this->app->singleton(CacheManagerService::class, fn(): CacheManagerService => new CacheManagerService());
-+        $this->app->singleton(ModelDiscoveryService::class, fn(): ModelDiscoveryService => new ModelDiscoveryService());
-
-         // PipelineStageManager as singleton
--        $this->app->singleton(PipelineStageManager::class, fn($app) => new PipelineStageManager($app));
-+        $this->app->singleton(PipelineStageManager::class, fn($app): PipelineStageManager => new PipelineStageManager($app));
-
-         // Index Builder - now uses ContextualNormalizerInterface
--        $this->app->singleton(IndexBuilder::class, fn($app) => new IndexBuilder(
-+        $this->app->singleton(IndexBuilder::class, fn($app): IndexBuilder => new IndexBuilder(
-             $app->make(ContextualNormalizerInterface::class)
-         ));
-
-         // Index Manager
--        $this->app->singleton(IndexManagerService::class, fn($app) => new IndexManagerService(
-+        $this->app->singleton(IndexManagerService::class, fn($app): IndexManagerService => new IndexManagerService(
-             indexBuilder: $app->make(IndexBuilder::class),
-             indexRepository: $app->make(IndexRepositoryInterface::class),
-             modelDiscovery: $app->make(ModelDiscoveryInterface::class)
-@@ @@
-         ));
-
-         // Calculators with their algorithms registered
--        $this->app->singleton(SimilarityCalculator::class, function ($app) {
-+        $this->app->singleton(SimilarityCalculator::class, function ($app): SimilarityCalculator {
-             $calculator = new SimilarityCalculator($app->make(SimilarityCalculatorConfig::class));
-
-             // Register algorithms with their specific configs from container
-@@ @@
-             return $calculator;
-         });
-
--        $this->app->singleton(AdvancedScoringCalculator::class, fn($app) => new AdvancedScoringCalculator(
-+        $this->app->singleton(AdvancedScoringCalculator::class, fn($app): AdvancedScoringCalculator => new AdvancedScoringCalculator(
-             $app->make(AdvancedScoringConfig::class)
-         ));
-
-         // Pipeline Manager with stages
--        $this->app->singleton(PipelineManagerService::class, function ($app) {
-+        $this->app->singleton(PipelineManagerService::class, function ($app): PipelineManagerService {
-             $stageClasses = $this->stageManager->getMergedStages();
-             $stages = $this->stageManager->createStageInstances($stageClasses);
-
-@@ @@
-         });
-
-         // Search Processor
--        $this->app->singleton(SearchProcessorService::class, fn($app) => new SearchProcessorService(
-+        $this->app->singleton(SearchProcessorService::class, fn($app): SearchProcessorService => new SearchProcessorService(
-             pipeline: $app->make(Pipeline::class),
-             normalizer: $app->make(StringNormalizer::class),
-             similarityCalculator: $app->make(SimilarityCalculator::class),
-@@ @@
-         ));
-
-         // Main Search Service - lié à l'interface
--        $this->app->singleton(SearchServiceInterface::class, fn($app) => new FuzzySearchService(
-+        $this->app->singleton(SearchServiceInterface::class, fn($app): FuzzySearchService => new FuzzySearchService(
-             cacheManager: $app->make(CacheManagerInterface::class),
-             modelDiscovery: $app->make(ModelDiscoveryInterface::class),
-             indexManager: $app->make(IndexManagerInterface::class),
-@@ @@
-
-     private function registerAlgorithms(): void
-     {
--        $this->app->singleton(WordSimilarityComparator::class, fn($app) => new WordSimilarityComparator(
-+        $this->app->singleton(WordSimilarityComparator::class, fn($app): WordSimilarityComparator => new WordSimilarityComparator(
-             normalizer: $app->make(StringNormalizer::class),
-             config: $app->make(WordSimilarityComparatorConfig::class)
-         ));
-@@ @@
-
-     private function registerScoring(): void
-     {
--        $this->app->singleton(ScoringEngineInterface::class, function ($app) {
-+        $this->app->singleton(ScoringEngineInterface::class, function ($app): ScoringEngine {
-             $calculator = $app->make(AdvancedScoringCalculator::class);
-
-             return new ScoringEngine(
-    ----------- end diff -----------
-
-Applied rules:
- * EncapsedStringsToSprintfRector
- * NewlineAfterStatementRector
- * AddArrowFunctionReturnTypeRector
- * ClosureReturnTypeRector
-
-
-68) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/SimilarityCalculator.php:4
-
-    ---------- begin diff ----------
-@@ @@
-
- namespace Fuzzy\Services;
-
--use Fuzzy\Services\Algorithms\LongestCommonSubstringAlgorithm;
--use Fuzzy\Services\Algorithms\LevenshteinSimilarityAlgorithm;
--use Fuzzy\Services\Algorithms\PrefixSimilarityAlgorithm;
- use Fuzzy\Contracts\SimilarityAlgorithmInterface;
- use Fuzzy\Config\SimilarityCalculatorConfig;
-
-@@ @@
- {
-     /** @var array<int, SimilarityAlgorithmInterface> */
-     private array $algorithms = [];
-+
-     private SimilarityCalculatorConfig $config;
-
-     public function __construct(?SimilarityCalculatorConfig $config = null)
-@@ @@
-
-     private function calculateCompositeWordSimilarity(string $firstWord, string $secondWord): float
-     {
--        if (empty($this->algorithms)) {
-+        if ($this->algorithms === []) {
-             return FUZZY_SCORE_NONE;
-         }
-
-@@ @@
-         $firstWords = $this->splitIntoWords($normalizedFirstString);
-         $secondWords = $this->splitIntoWords($normalizedSecondString);
-
--        if (empty($firstWords) || empty($secondWords)) {
-+        if ($firstWords === [] || $secondWords === []) {
-             return FUZZY_SCORE_NONE;
-         }
-    ----------- end diff -----------
-
-Applied rules:
- * SimplifyEmptyCheckOnEmptyArrayRector
- * NewlineBetweenClassLikeStmtsRector
-
-
-69) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/StringNormalizer.php:19
-
-    ---------- begin diff ----------
-@@ @@
- class StringNormalizer implements ContextualNormalizerInterface
- {
-     private const STOP_WORD_REMOVAL_THRESHOLD = 3;
-+
-     private const MIN_KEYWORD_LENGTH = 3;
-+
-     private const DEFAULT_MAX_KEYWORDS = 10;
-+
-     private const REGEX_REMOVE_SPECIAL_CHARS = '/[^a-z0-9\s_-]/';
-+
-     private const REGEX_COLLAPSE_SPACES = '/\s+/';
-+
-     private const REGEX_WORD_SPLITTER = '/\s+/';
-+
-     private const WORD_SEPARATORS = ['_', '-'];
-+
-     private const EMPTY_STRING = '';
-+
-     private const ZERO_STRING = '0';
-
-     /**
-@@ @@
-
-     /**
-      * Current field being processed (for contextual normalization).
--     *
--     * @var string|null
-      */
-     private ?string $currentField = null;
-
-@@ @@
-
-     /**
-      * Load stop words from internal language files based on application locale.
--     *
--     * @return void
-      */
-     private function loadStopWords(): void
-     {
-@@ @@
-         if (function_exists('app') && method_exists(app(), 'getLocale')) {
-             return app()->getLocale();
-         }
-+
-         return $_ENV['APP_LOCALE'] ?? 'en';
-     }
-
-@@ @@
-         if ($this->shouldRemoveStopWords()) {
-             $filteredWords = array_filter(
-                 $words,
--                fn($word): bool => !in_array($word, $this->stopWords, true)
-+                fn(string $word): bool => !in_array($word, $this->stopWords, true)
-             );
-         } else {
-             // Keep all words for protected fields (names, emails, etc.)
-    ----------- end diff -----------
-
-Applied rules:
- * NewlineBetweenClassLikeStmtsRector
- * NewlineAfterStatementRector
- * RemoveUselessReturnTagRector
- * RemoveUselessVarTagRector
- * AddArrayFunctionClosureParamTypeRector
-
-
-70) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Stages/MatchDiscoveryStage/IndexOptimizer.php:13
-
-    ---------- begin diff ----------
-@@ @@
- class IndexOptimizer
- {
-     private array $cachedOptimizedIndexes = [];
-+
-     private array $cacheTimestamps = [];
-+
-     private MatchDiscoveryConfig $config;
-
-     public function __construct(?MatchDiscoveryConfig $config = null)
-@@ @@
-
-     /**
-      * Build optimized index structures.
-+     * @return array<string, mixed[]>
-      */
-     private function buildOptimizedIndexes(array $wordIndex): array
-     {
-@@ @@
-             if (!isset($byLength[$wordLength])) {
-                 $byLength[$wordLength] = [];
-             }
-+
-             $byLength[$wordLength][$wordString] = $matches;
-
-             $firstChar = $wordString[0];
-@@ @@
-             if (!isset($byFirstChar[$firstChar])) {
-                 $byFirstChar[$firstChar] = [];
-             }
-+
-             $byFirstChar[$firstChar][$wordString] = $matches;
-
-             if ($wordLength >= $this->config->getMinTrigramLength()) {
-@@ @@
-
-     /**
-      * Add word to trigram index.
-+     * @param never[][] $trigramIndex
-      */
-     private function addToTrigramIndex(string $word, array $matches, array &$trigramIndex): void
-     {
-@@ @@
-             if (!isset($trigramIndex[$trigram])) {
-                 $trigramIndex[$trigram] = [];
-             }
-+
-             $trigramIndex[$trigram][$word] = $matches;
-         }
-     }
-    ----------- end diff -----------
-
-Applied rules:
- * NewlineBetweenClassLikeStmtsRector
- * NewlineAfterStatementRector
- * AddParamArrayDocblockFromAssignsParamToParamReferenceRector
- * DocblockReturnArrayFromDirectArrayInstanceRector
-
-
-71) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Stages/MatchDiscoveryStage/MatchFinder.php:13
-
-    ---------- begin diff ----------
-@@ @@
- class MatchFinder
- {
-     private MatchDiscoveryConfig $config;
-+
-     private IndexOptimizer $optimizer;
-
-     public function __construct(?MatchDiscoveryConfig $config = null)
-@@ @@
-
-     /**
-      * Simple fuzzy match discovery for small indexes.
-+     * @param array<string, mixed> $wordIndex
-      */
-     private function discoverFuzzyMatchesSimple(SearchContextInterface $context, array $wordIndex): void
-     {
-@@ @@
-
-     /**
-      * Find words containing the query word.
-+     * @param array<int, mixed> $byLength
-      */
-     private function findContainedMatches(
-         string $queryWord,
-@@ @@
-         }
-
-         return $queryWord[0] === $indexedWord[0];
--    }
--
--    /**
--     * Add all matches to context.
--     */
--    private function addAllMatches(SearchContextInterface $context, array $matches): void
--    {
--        foreach ($matches as $match) {
--            $context->addPotentialMatch($match);
--        }
-     }
- }
-    ----------- end diff -----------
-
-Applied rules:
- * NewlineBetweenClassLikeStmtsRector
- * RemoveUnusedPrivateMethodRector
- * AddParamArrayDocblockFromDimFetchAccessRector
-
-
-72) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Stages/RelevanceScoringStage.php:83
-
-    ---------- begin diff ----------
-@@ @@
-     private function calculateRelevanceScores(SearchContextInterface $context): Collection
-     {
-         return collect($context->results)
--            ->map(function (object $result) use ($context) {
-+            ->map(function (object $result) use ($context): object {
-                 $relevance = $this->calculateRelevanceForResult($result, $context);
-                 $result->relevance = $relevance;
-                 return $result;
-@@ @@
-             ->take($maxResults)
-             ->values()
-             ->all();
--    }
--
--    /**
--     * Combine relevance with original score for final ranking.
--     *
--     * @param Collection<int, object> $results Results with relevance scores
--     * @return Collection<int, object> Results with combined scores
--     */
--    private function combineScores(Collection $results): Collection
--    {
--        return $results
--            ->map(function (object $result) {
--                $normalizedRelevance = $this->normalizeRelevance($result->relevance);
--                $combinedScore = ($result->score * $this->config->getOriginalScoreWeight()) +
--                    ($normalizedRelevance * $this->config->getRelevanceScoreWeight());
--
--                $result->combinedScore = $combinedScore;
--                $result->originalScore = $result->score;
--                $result->relevanceScore = $normalizedRelevance;
--
--                return $result;
--            })
--            ->sortByDesc('combinedScore');
--    }
--
--    /**
--     * Normalize relevance score to 0-100 scale.
--     *
--     * @param float $relevance Relevance score from comparator
--     * @return float Normalized score (100 = perfect, 0 = poor)
--     */
--    private function normalizeRelevance(float $relevance): float
--    {
--        if ($relevance <= FUZZY_DISTANCE_IDENTICAL) {
--            return $this->config->getMaxNormalizedRelevance();
--        }
--
--        $normalized = max(
--            $this->config->getMinNormalizedRelevance(),
--            $this->config->getMaxNormalizedRelevance() - ($relevance * $this->config->getNormalizationFactor())
--        );
--        return min($this->config->getMaxNormalizedRelevance(), $normalized);
-     }
- }
-    ----------- end diff -----------
-
-Applied rules:
- * RemoveUnusedPrivateMethodRector
- * ClosureReturnTypeRector
-
-
-73) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Stages/ScoringStage.php:4
-
-    ---------- begin diff ----------
-@@ @@
-
- namespace Fuzzy\Stages;
-
-+use InvalidArgumentException;
- use Fuzzy\Contracts\SearchContextInterface;
- use Fuzzy\Contracts\StageInterface;
- use Fuzzy\Enums\StageType;
-@@ @@
-      *
-      * @param array<int, array> $matches Array of matches with field and value information
-      * @return array{indexable_type: string, field: string, original_value: string} Match details
--     * @throws \InvalidArgumentException If matches array is empty
-+     * @throws InvalidArgumentException If matches array is empty
-      */
-     private function extractBestMatchDetails(array $matches): array
-     {
-         if ($matches === []) {
--            throw new \InvalidArgumentException('Matches array cannot be empty');
-+            throw new InvalidArgumentException('Matches array cannot be empty');
-         }
-
-         return $matches[0];
-    ----------- end diff -----------
-
-Applied rules:
-
-
-74) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Traits/CommandHelpers.php:20
-
-    ---------- begin diff ----------
-@@ @@
- {
-     /**
-      * Get the fuzzy search service from the container.
--     *
--     * @return FuzzySearchService
-      */
-     protected function getSearchService(): FuzzySearchService
-     {
-@@ @@
-      * Display a success message with a checkmark prefix.
-      *
-      * @param string $message The success message to display
--     * @return void
-      */
-     protected function showSuccess(string $message): void
-     {
--        $this->info("✓ {$message}");
-+        $this->info('✓ ' . $message);
-     }
-
-     /**
-@@ @@
-      * Display a warning message.
-      *
-      * @param string $message The warning message to display
--     * @return void
-      */
-     protected function showWarning(string $message): void
-     {
-@@ @@
-      * Display an error message.
-      *
-      * @param string $message The error message to display
--     * @return void
-      */
-     protected function showError(string $message): void
-     {
-@@ @@
-      * Display an info message.
-      *
-      * @param string $message The info message to display
--     * @return void
-      */
-     protected function showInfo(string $message): void
-     {
-@@ @@
-      * Display a section header with equals signs.
-      *
-      * @param string $title The section title
--     * @return void
-      */
-     protected function showHeader(string $title): void
-     {
--        $this->info("=== {$title} ===");
-+        $this->info(sprintf('=== %s ===', $title));
-     }
-
-     /**
-      * Display a blank line.
--     *
--     * @return void
-      */
-     protected function showNewLine(): void
-     {
-    ----------- end diff -----------
-
-Applied rules:
- * EncapsedStringsToSprintfRector
- * RemoveUselessReturnTagRector
-
-
-75) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Traits/FuzzySearchable.php:4
-
-    ---------- begin diff ----------
-@@ @@
-
- namespace Fuzzy\Traits;
-
-+use Fuzzy\Contracts\MustFuzzySearch;
- use Illuminate\Support\Collection;
- use Fuzzy\Services\FuzzySearchService;
-
-@@ @@
-      *
-      * Registers model event listeners to automatically manage search index
-      * during create, update, and delete operations.
--     *
--     * @return void
-      */
-     protected static function bootFuzzySearchable(): void
-     {
-@@ @@
-             }
-         });
-
--        static::deleted(static function ($model): void {
-+        static::deleted(static function (MustFuzzySearch $model): void {
-             app(FuzzySearchService::class)->getIndexManager()->removeModel($model);
-         });
-     }
-    ----------- end diff -----------
-
-Applied rules:
- * RemoveUselessReturnTagRector
- * ParamTypeByMethodCallTypeRector
-
-
-76) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Traits/ServiceProviderHelper.php:4
-
-    ---------- begin diff ----------
-@@ @@
-
- namespace Fuzzy\Traits;
-
-+use ReflectionClass;
- use Illuminate\Support\ServiceProvider;
-
- /**
-@@ @@
-      */
-     protected function mergeConfigFrom(string $path, string $key): void
-     {
--        $reflection = new \ReflectionClass($this->provider);
-+        $reflection = new ReflectionClass($this->provider);
-         $method = $reflection->getMethod('mergeConfigFrom');
-         $method->setAccessible(true);
-         $method->invoke($this->provider, $path, $key);
-@@ @@
-      */
-     protected function publishes(array $paths, string $group = null): void
-     {
--        $reflection = new \ReflectionClass($this->provider);
-+        $reflection = new ReflectionClass($this->provider);
-         $method = $reflection->getMethod('publishes');
-         $method->setAccessible(true);
-
-@@ @@
-      */
-     protected function commands(array $commands): void
-     {
--        $reflection = new \ReflectionClass($this->provider);
-+        $reflection = new ReflectionClass($this->provider);
-         $method = $reflection->getMethod('commands');
-         $method->setAccessible(true);
-         $method->invoke($this->provider, $commands);
-    ----------- end diff -----------
-
-Applied rules:
-
-
-77) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Feature/CommandsTest.php:453
-
-    ---------- begin diff ----------
-@@ @@
-
-     /**
-      * Create a user without triggering model events.
-+     * @param array<string, string> $attributes
-      */
-     private function createUserWithoutEvents(array $attributes): User
-     {
-@@ @@
-
-     /**
-      * Create a product without triggering model events.
-+     * @param array<string, string>|array<string, int> $attributes
-      */
-     private function createProductWithoutEvents(array $attributes): Product
-     {
-@@ @@
-      */
-     private function createIndexableUsers(int $count): void
-     {
--        for ($i = 1; $i <= $count; $i++) {
-+        for ($i = 1; $i <= $count; ++$i) {
-             User::create([
--                'name' => "User {$i}",
--                'email' => "user{$i}@example.com",
-+                'name' => 'User ' . $i,
-+                'email' => sprintf('user%d@example.com', $i),
-                 'type' => 'user',
-             ]);
-         }
-@@ @@
-      */
-     private function createNonIndexableUsers(int $count): void
-     {
--        for ($i = 1; $i <= $count; $i++) {
-+        for ($i = 1; $i <= $count; ++$i) {
-             User::create([
--                'name' => "Admin User {$i}",
--                'email' => "admin{$i}@example.com",
-+                'name' => 'Admin User ' . $i,
-+                'email' => sprintf('admin%d@example.com', $i),
-                 'type' => 'admin',
-             ]);
-         }
-    ----------- end diff -----------
-
-Applied rules:
- * EncapsedStringsToSprintfRector
- * PostIncDecToPreIncDecRector
- * ClassMethodArrayDocblockParamFromLocalCallsRector
-
-
-78) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Feature/ConfigurationTest.php:4
-
-    ---------- begin diff ----------
-@@ @@
-
- namespace Fuzzy\Tests\Feature;
-
-+use ReflectionClass;
- use Fuzzy\Contracts\ModelDiscoveryInterface;
- use Fuzzy\Contracts\SearchServiceInterface;
- use Fuzzy\Services\IndexBuilder;
-@@ @@
-      */
-     private function getFieldWeightFromIndexBuilder(IndexBuilder $indexBuilder, string $field): float
-     {
--        $reflection = new \ReflectionClass($indexBuilder);
-+        $reflection = new ReflectionClass($indexBuilder);
-         $calculateWeightMethod = $reflection->getMethod('calculateFieldWeight');
-         $calculateWeightMethod->setAccessible(true);
-
-@@ @@
-     public function test_coverage_bonus_defaults_when_configuration_missing(): void
-     {
-         // Arrange: Remove coverage bonus configuration entirely
--        Config::set('fuzzy.scoring.coverage_bonus', null);
-+        Config::set('fuzzy.scoring.coverage_bonus');
-
-         // Clear config cache to ensure fresh load
-         Config::offsetUnset('fuzzy.scoring.coverage_bonus');
-    ----------- end diff -----------
-
-Applied rules:
- * RemoveNullArgOnNullDefaultParamRector
-
-
-79) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Feature/FacadeTest.php:24
-
-    ---------- begin diff ----------
-@@ @@
- final class FacadeTest extends TestCase
- {
-     private SearchServiceInterface $searchService;
-+
-     private StringNormalizer $normalizer;
-
-     /**
-@@ @@
-         $normalized = $this->normalizer->normalize($inputString);
-
-         // Assert: Verify normalization removes accents and special chars
--        $this->assertEquals($expectedOutput, $normalized);
-+        $this->assertSame($expectedOutput, $normalized);
-     }
-
-     /**
-@@ @@
-         $words = $this->normalizer->splitIntoWords($inputString);
-
-         // Assert: Verify correct word splitting
--        $this->assertEquals($expectedWords, $words);
-+        $this->assertSame($expectedWords, $words);
-     }
-
-     /**
-    ----------- end diff -----------
-
-Applied rules:
- * NewlineBetweenClassLikeStmtsRector
- * AssertEqualsToSameRector
-
-
-80) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Stages/MatchDiscoveryStageTest.php:4
+85) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Stages/MatchDiscoveryStageTest.php:4
 
     ---------- begin diff ----------
 @@ @@
@@ -5108,214 +5354,6 @@ Applied rules:
  * ClassMethodArrayDocblockParamFromLocalCallsRector
  * AddArrowFunctionReturnTypeRector
  * ClosureReturnTypeRector
-
-
-81) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Stages/RelevanceScoringStageTest.php:5
-
-    ---------- begin diff ----------
-@@ @@
- namespace Fuzzy\Tests\Unit\Stages;
-
- use Fuzzy\Contracts\IndexRepositoryInterface;
--use Fuzzy\Contracts\SearchContextInterface;
- use Fuzzy\Config\RelevanceScoringConfig;
- use Fuzzy\Data\SearchOptionsData;
- use Fuzzy\Data\SearchResultData;
-@@ @@
- use Fuzzy\ValueObjects\SearchQuery;
- use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
- use ReflectionMethod;
--use ReflectionProperty;
-
- #[AllowMockObjectsWithoutExpectations]
- final class RelevanceScoringStageTest extends TestCase
- {
-     private RelevanceScoringStage $stage;
--    private WordSimilarityComparator $comparator;
--    private StringNormalizer $normalizer;
-     private RelevanceScoringConfig $config;
-
-     /**
-@@ @@
-     {
-         parent::setUp();
-
--        $this->normalizer = new StringNormalizer();
--        $this->comparator = new WordSimilarityComparator(
--            normalizer: $this->normalizer
-+        $normalizer = new StringNormalizer();
-+        $comparator = new WordSimilarityComparator(
-+            normalizer: $normalizer
-         );
-         $this->config = RelevanceScoringConfig::createDefault();
-
--        $this->stage = new RelevanceScoringStage($this->comparator, $this->config);
-+        $this->stage = new RelevanceScoringStage($comparator, $this->config);
-     }
-
-     /**
-@@ @@
-     {
-         // Arrange: Many results without explicit maxResults
-         $results = [];
--        for ($i = 0; $i < 30; $i++) {
-+        for ($i = 0; $i < 30; ++$i) {
-             $results[] = $this->createSearchResult('Test ' . $i, 'Test ' . $i);
-         }
-
-         $context = $this->createSearchContext('test', $results);
--        $context->options = new SearchOptionsData(); // Uses default maxResults
-+        $context->options = new SearchOptionsData();
-+         // Uses default maxResults
-         $next = $this->createNextCallback($context);
-
-         // Act: Process without explicit limit
-@@ @@
-         $this->assertCount(1, $processedResults);
-
-         $resultItem = $processedResults[0];
--        $this->assertEquals(85.5, $resultItem->score);
-+        $this->assertEqualsWithDelta(85.5, $resultItem->score, PHP_FLOAT_EPSILON);
-         $this->assertEquals('User', $resultItem->modelType);
-         $this->assertEquals('name', $resultItem->matchedField);
-         $this->assertEquals('John Doe', $resultItem->matchedValue);
-@@ @@
-                 $expected,
-                 $result,
-                 0.01,
--                "Failed for input: $input. Got: $result, Expected: $expected"
-+                sprintf('Failed for input: %s. Got: %s, Expected: %s', $input, $result, $expected)
-             );
-         }
-     }
-@@ @@
-
-         // Verify descending order by combined score
-         $sorted = $combinedResults->values()->all();
--        for ($i = 0; $i < count($sorted) - 1; $i++) {
-+        for ($i = 0; $i < count($sorted) - 1; ++$i) {
-             $this->assertGreaterThanOrEqual($sorted[$i + 1]->combinedScore, $sorted[$i]->combinedScore);
-         }
-     }
-@@ @@
-
-     /**
-      * Create a search context for testing.
-+     * @param SearchResultData[] $results
-      */
-     private function createSearchContext(
-         string $queryString,
-@@ @@
-
-     /**
-      * Invoke a private method on an object.
-+     * @param array<mixed[], mixed> $args
-      */
-     private function invokePrivateMethod(object $object, string $methodName, array $args = []): mixed
-     {
-@@ @@
-         $reflection->setAccessible(true);
-
-         return $reflection->invokeArgs($object, $args);
--    }
--
--    /**
--     * Set a private property value on an object.
--     */
--    private function setPrivateProperty(object $object, string $propertyName, mixed $value): void
--    {
--        $reflection = new ReflectionProperty($object, $propertyName);
--        $reflection->setAccessible(true);
--        $reflection->setValue($object, $value);
-     }
- }
-    ----------- end diff -----------
-
-Applied rules:
- * NewlineBeforeNewAssignSetRector
- * EncapsedStringsToSprintfRector
- * PostIncDecToPreIncDecRector
- * RemoveUnusedPrivateMethodRector
- * NarrowUnusedSetUpDefinedPropertyRector
- * AssertEqualsOrAssertSameFloatParameterToSpecificMethodsTypeRector
- * ClassMethodArrayDocblockParamFromLocalCallsRector
-
-
-82) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Stages/ScoringStageTest.php:17
-
-    ---------- begin diff ----------
-@@ @@
- use Fuzzy\ValueObjects\SearchQuery;
- use InvalidArgumentException;
- use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
--use ReflectionClass;
- use ReflectionMethod;
- use ReflectionProperty;
- use stdClass;
-    ----------- end diff -----------
-
-Applied rules:
-
-
-83) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Stages/SortAndLimitStageTest.php:5
-
-    ---------- begin diff ----------
-@@ @@
- namespace Fuzzy\Tests\Unit\Stages;
-
- use Fuzzy\Contracts\IndexRepositoryInterface;
--use Fuzzy\Contracts\SearchContextInterface;
- use Fuzzy\Services\Scoring\ScoringEngine;
- use Fuzzy\Tests\TestCase;
- use Fuzzy\Stages\SortAndLimitStage;
-@@ @@
-
-     /**
-      * Create a search context for testing.
-+     * @param array<mixed[], mixed> $results
-      */
-     private function createSearchContext(
-         string $queryString,
-    ----------- end diff -----------
-
-Applied rules:
- * ClassMethodArrayDocblockParamFromLocalCallsRector
-
-
-84) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/database/migrations/2024_01_01_000000_create_non_indexable_users_table.php:17
-
-    ---------- begin diff ----------
-@@ @@
-      */
-     public function up(): void
-     {
--        Schema::create('non_indexable_users', function (Blueprint $table) {
-+        Schema::create('non_indexable_users', function (Blueprint $table): void {
-             $table->id();
-             $table->string('name');
-             $table->string('email')->unique();
-    ----------- end diff -----------
-
-Applied rules:
- * AddClosureVoidReturnTypeWhereNoReturnRector
-
-
-85) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/database/migrations/2024_01_01_000000_create_non_searchable_models_table.php:17
-
-    ---------- begin diff ----------
-@@ @@
-      */
-     public function up(): void
-     {
--        Schema::create('non_searchable_models', function (Blueprint $table) {
-+        Schema::create('non_searchable_models', function (Blueprint $table): void {
-             $table->id();
-             $table->string('name');
-             $table->string('email')->unique();
-    ----------- end diff -----------
-
-Applied rules:
- * AddClosureVoidReturnTypeWhereNoReturnRector
 
 
  [OK] 85 files would have been changed (dry-run) by Rector                                                              
