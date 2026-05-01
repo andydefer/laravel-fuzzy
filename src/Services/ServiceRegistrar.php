@@ -39,6 +39,7 @@ use Fuzzy\SearchContext;
 use Fuzzy\Traits\ServiceProviderHelper;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Pipeline\Pipeline;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\ServiceProvider;
 
 /**
@@ -372,6 +373,46 @@ class ServiceRegistrar
     private function outputSkippedMigrationsMessage(array $skippedFiles): void
     {
         $count = count($skippedFiles);
+
+        try {
+            // Try to use Artisan facade for output (works during vendor:publish)
+            if (Artisan::getFacadeApplication() && method_exists(Artisan::getFacadeApplication(), 'make')) {
+                $output = Artisan::getFacadeApplication()->make('Illuminate\Contracts\Console\Kernel')->getOutput();
+                if ($output) {
+                    $this->writeOutputMessages($output, $skippedFiles, $count);
+                    return;
+                }
+            }
+        } catch (\Exception $e) {
+            // Fallback to simple output if Artisan doesn't respond
+        }
+
+        // Fallback: Simple console output using error_log or info
+        $message = sprintf(
+            '[Fuzzy] %d migration file(s) already exist and were preserved: %s',
+            $count,
+            implode(', ', $skippedFiles)
+        );
+
+        if (function_exists('info')) {
+            info($message);
+            info('[Fuzzy] Use --force to overwrite existing migrations.');
+        } else {
+            error_log($message);
+            error_log('[Fuzzy] Use --force to overwrite existing migrations.');
+        }
+    }
+
+    /**
+     * Write output messages using the console output interface.
+     *
+     * @param object $output Console output instance
+     * @param array<int, string> $skippedFiles List of skipped files
+     * @param int $count Number of skipped files
+     * @return void
+     */
+    private function writeOutputMessages(object $output, array $skippedFiles, int $count): void
+    {
         $message = sprintf(
             "  <fg=yellow;options=bold>📁 %d %s already exist%s:</>",
             $count,
@@ -379,18 +420,16 @@ class ServiceRegistrar
             $count === 1 ? 's' : ''
         );
 
-        $this->app->make('Illuminate\Contracts\Console\Kernel')->getOutput()->writeln($message);
+        $output->writeln($message);
 
         foreach ($skippedFiles as $file) {
-            $this->app->make('Illuminate\Contracts\Console\Kernel')->getOutput()->writeln(
-                sprintf("     <fg=gray>→ %s</fg=gray>", $file)
-            );
+            $output->writeln(sprintf("     <fg=gray>→ %s</fg=gray>", $file));
         }
 
-        $this->app->make('Illuminate\Contracts\Console\Kernel')->getOutput()->writeln(
+        $output->writeln(
             "     <fg=yellow;options=bold>💡 Skipped to preserve existing custom migrations. Use --force to overwrite.</>"
         );
-        $this->app->make('Illuminate\Contracts\Console\Kernel')->getOutput()->writeln('');
+        $output->writeln('');
     }
 
     /**
@@ -400,11 +439,31 @@ class ServiceRegistrar
      */
     private function outputAllMigrationsSkippedMessage(): void
     {
-        $output = $this->app->make('Illuminate\Contracts\Console\Kernel')->getOutput();
+        try {
+            // Try to use Artisan facade for output (works during vendor:publish)
+            if (Artisan::getFacadeApplication() && method_exists(Artisan::getFacadeApplication(), 'make')) {
+                $output = Artisan::getFacadeApplication()->make('Illuminate\Contracts\Console\Kernel')->getOutput();
+                if ($output) {
+                    $output->writeln('');
+                    $output->writeln('  <fg=yellow;options=bold>📁 All migration files already exist and were preserved.</>');
+                    $output->writeln('  <fg=yellow;options=bold>💡 Use --force to overwrite existing migrations.</>');
+                    $output->writeln('');
+                    return;
+                }
+            }
+        } catch (\Exception $e) {
+            // Fallback to simple output
+        }
 
-        $output->writeln('');
-        $output->writeln('  <fg=yellow;options=bold>📁 All migration files already exist and were preserved.</>');
-        $output->writeln('  <fg=yellow;options=bold>💡 Use --force to overwrite existing migrations.</>');
-        $output->writeln('');
+        // Fallback: Simple console output
+        $message = '[Fuzzy] All migration files already exist and were preserved.';
+
+        if (function_exists('info')) {
+            info($message);
+            info('[Fuzzy] Use --force to overwrite existing migrations.');
+        } else {
+            error_log($message);
+            error_log('[Fuzzy] Use --force to overwrite existing migrations.');
+        }
     }
 }
