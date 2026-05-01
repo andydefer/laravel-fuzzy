@@ -1,5 +1,5 @@
 # Rector Refactoring Report
-*Generated: ven. 01 mai 2026 17:49:43 WAT*
+*Generated: ven. 01 mai 2026 18:00:35 WAT*
 
 
 85 files with changes
@@ -1011,760 +1011,1468 @@ Applied rules:
  * RemoveUselessReturnTagRector
 
 
-17) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Contracts/SearchServiceInterface.php:4
+17) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/Algorithms/WordSimilarity/LetterDistanceCalculatorTest.php:21
 
     ---------- begin diff ----------
 @@ @@
-
- namespace Fuzzy\Contracts;
-
-+use Fuzzy\Data\SearchResultData;
- use Illuminate\Support\Collection;
-
- /**
-@@ @@
-      * Get the cache manager instance.
-      *
-      * Provides access to cache operations for advanced cache management.
--     *
--     * @return CacheManagerInterface
-      */
-     public function getCacheManager(): CacheManagerInterface;
-
-@@ @@
-      * Get the model discovery instance.
-      *
-      * Provides access to model discovery for advanced model operations.
--     *
--     * @return ModelDiscoveryInterface
-      */
-     public function getModelDiscovery(): ModelDiscoveryInterface;
-
-@@ @@
-      * Get the index manager instance.
-      *
-      * Provides access to index operations for advanced index management.
--     *
--     * @return IndexManagerInterface
-      */
-     public function getIndexManager(): IndexManagerInterface;
-
-@@ @@
-      * Get the search processor instance.
-      *
-      * Provides access to search processor for advanced search operations.
--     *
--     * @return SearchProcessorInterface
-      */
-     public function getSearchProcessor(): SearchProcessorInterface;
-
-@@ @@
-      *
-      * @param string $query The search query string
-      * @param array<string, mixed> $options Search options
--     * @return Collection<int, \Fuzzy\Data\SearchResultData> Collection of search results
-+     * @return Collection<int, SearchResultData> Collection of search results
-      */
-     public function search(string $query, array $options = []): Collection;
-
-@@ @@
-      * @param string $modelClass The fully qualified model class name
-      * @param string $query The search query string
-      * @param array<string, mixed> $options Search options
--     * @return Collection<int, \Fuzzy\Data\SearchResultData> Collection of search results
-+     * @return Collection<int, SearchResultData> Collection of search results
-      */
-     public function searchInModel(string $modelClass, string $query, array $options = []): Collection;
-
-@@ @@
-      * @param array<int, string> $modelClasses Array of fully qualified model class names
-      * @param string $query The search query string
-      * @param array<string, mixed> $options Search options
--     * @return Collection<int, \Fuzzy\Data\SearchResultData> Collection of search results
-+     * @return Collection<int, SearchResultData> Collection of search results
-      */
-     public function searchInModels(array $modelClasses, string $query, array $options = []): Collection;
- }
-    ----------- end diff -----------
-
-Applied rules:
- * RemoveUselessReturnTagRector
-
-
-18) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/FuzzySearch.php:6
-
-    ---------- begin diff ----------
-@@ @@
-
- use Illuminate\Support\Facades\Facade;
- use Illuminate\Support\Collection;
--use Fuzzy\Contracts\MustFuzzySearch;
-
- /**
-  * Facade for the fuzzy search service
-    ----------- end diff -----------
-
-Applied rules:
-
-
-19) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/FuzzySearchServiceProvider.php:4
-
-    ---------- begin diff ----------
-@@ @@
-
- namespace Fuzzy;
-
-+use Fuzzy\Contracts\CacheManagerInterface;
-+use Fuzzy\Contracts\ModelDiscoveryInterface;
-+use Fuzzy\Contracts\IndexManagerInterface;
-+use Fuzzy\Contracts\SearchProcessorInterface;
-+use Fuzzy\Contracts\ResultFilterInterface;
-+use Fuzzy\Contracts\PipelineManagerInterface;
-+use Fuzzy\Contracts\SearchContextInterface;
-+use Fuzzy\Contracts\ScoringEngineInterface;
-+use Fuzzy\Config\AdvancedScoringConfig;
-+use Fuzzy\Config\SimilarityCalculatorConfig;
-+use Fuzzy\Services\FuzzySearchService;
- use Fuzzy\Services\ServiceRegistrar;
- use Illuminate\Support\ServiceProvider;
-
-@@ @@
-     public function provides(): array
+     public function test_calculate_letter_distance_identical_strings(): void
      {
-         return [
--            \Fuzzy\Contracts\CacheManagerInterface::class,
--            \Fuzzy\Contracts\ModelDiscoveryInterface::class,
--            \Fuzzy\Contracts\IndexManagerInterface::class,
--            \Fuzzy\Contracts\SearchProcessorInterface::class,
--            \Fuzzy\Contracts\ResultFilterInterface::class,
--            \Fuzzy\Contracts\PipelineManagerInterface::class,
--            \Fuzzy\Contracts\SearchContextInterface::class,
--            \Fuzzy\Contracts\ScoringEngineInterface::class,
--            \Fuzzy\Config\AdvancedScoringConfig::class,
--            \Fuzzy\Config\SimilarityCalculatorConfig::class,
--            \Fuzzy\Services\FuzzySearchService::class,
-+            CacheManagerInterface::class,
-+            ModelDiscoveryInterface::class,
-+            IndexManagerInterface::class,
-+            SearchProcessorInterface::class,
-+            ResultFilterInterface::class,
-+            PipelineManagerInterface::class,
-+            SearchContextInterface::class,
-+            ScoringEngineInterface::class,
-+            AdvancedScoringConfig::class,
-+            SimilarityCalculatorConfig::class,
-+            FuzzySearchService::class,
-             'laravel-fuzzy.search',
-         ];
+         $distance = $this->calculator->calculateLetterDistance('hello', 'hello');
+-        $this->assertEquals(FUZZY_DISTANCE_IDENTICAL, $distance);
++        $this->assertSame(FUZZY_DISTANCE_IDENTICAL, $distance);
+     }
+
+     public function test_calculate_letter_distance_similar_strings(): void
+@@ @@
+         $distanceSame = $this->calculator->calculateLetterDistance('a', 'a');
+         $distanceDiff = $this->calculator->calculateLetterDistance('a', 'b');
+
+-        $this->assertEquals(FUZZY_DISTANCE_IDENTICAL, $distanceSame);
++        $this->assertSame(FUZZY_DISTANCE_IDENTICAL, $distanceSame);
+         $this->assertGreaterThan(0, $distanceDiff);
+     }
+
+@@ @@
+     public function test_calculate_letter_distance_with_single_character_matching(): void
+     {
+         $distance = $this->calculator->calculateLetterDistance('a', 'a');
+-        $this->assertEquals(FUZZY_DISTANCE_IDENTICAL, $distance);
++        $this->assertSame(FUZZY_DISTANCE_IDENTICAL, $distance);
+     }
+
+     public function test_calculate_letter_distance_with_empty_strings(): void
+     {
+         $distance = $this->calculator->calculateLetterDistance('', '');
+-        $this->assertEquals(FUZZY_DISTANCE_IDENTICAL, $distance);
++        $this->assertSame(FUZZY_DISTANCE_IDENTICAL, $distance);
+
+         $distance2 = $this->calculator->calculateLetterDistance('abc', '');
+         $this->assertGreaterThan(0, $distance2);
+@@ @@
+     public function test_calculate_letter_distance_with_numbers(): void
+     {
+         $distance = $this->calculator->calculateLetterDistance('123', '123');
+-        $this->assertEquals(FUZZY_DISTANCE_IDENTICAL, $distance);
++        $this->assertSame(FUZZY_DISTANCE_IDENTICAL, $distance);
+
+         $distance2 = $this->calculator->calculateLetterDistance('123', '124');
+         $this->assertGreaterThan(0, $distance2);
+    ----------- end diff -----------
+
+Applied rules:
+ * AssertEqualsToSameRector
+
+
+18) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/Algorithms/WordSimilarity/WordSimilarityCalculatorTest.php:21
+
+    ---------- begin diff ----------
+@@ @@
+     public function test_calculate_word_similarity_exact_match(): void
+     {
+         $score = $this->calculator->calculateWordSimilarity('hello', 'hello');
+-        $this->assertEquals(FUZZY_DISTANCE_IDENTICAL, $score);
++        $this->assertSame(FUZZY_DISTANCE_IDENTICAL, $score);
+     }
+
+     public function test_calculate_word_similarity_contained_word(): void
+@@ @@
+     public function test_calculate_word_real_similarity_identical_letters(): void
+     {
+         $similarity = $this->calculator->calculateWordRealSimilarity('abc', 'abc');
+-        $this->assertEquals(1.0, $similarity);
++        $this->assertEqualsWithDelta(1.0, $similarity, PHP_FLOAT_EPSILON);
+     }
+
+     public function test_calculate_word_real_similarity_partial_letters(): void
+     {
+         $similarity = $this->calculator->calculateWordRealSimilarity('abc', 'abd');
+-        $this->assertEquals(0.5, $similarity);
++        $this->assertEqualsWithDelta(0.5, $similarity, PHP_FLOAT_EPSILON);
+     }
+
+     public function test_calculate_word_real_similarity_no_common_letters(): void
+     {
+         $similarity = $this->calculator->calculateWordRealSimilarity('abc', 'xyz');
+-        $this->assertEquals(0.0, $similarity);
++        $this->assertEqualsWithDelta(0.0, $similarity, PHP_FLOAT_EPSILON);
+     }
+
+     public function test_calculate_word_similarity_with_phonetic_similarity(): void
+@@ @@
+     {
+         $similarity = $this->calculator->calculateWordRealSimilarity('AbC', 'aBc');
+         // Après normalisation, les deux deviennent 'abc' -> similarité parfaite
+-        $this->assertEquals(1.0, $similarity);
++        $this->assertEqualsWithDelta(1.0, $similarity, PHP_FLOAT_EPSILON);
+     }
+
+     public function test_calculate_word_real_similarity_with_repeated_letters(): void
+     {
+         $similarity = $this->calculator->calculateWordRealSimilarity('aaa', 'aab');
+-        $this->assertEquals(0.5, $similarity);
++        $this->assertEqualsWithDelta(0.5, $similarity, PHP_FLOAT_EPSILON);
+     }
+
+     public function test_calculate_word_similarity_with_empty_words(): void
+     {
+         $score = $this->calculator->calculateWordSimilarity('', '');
+-        $this->assertEquals(FUZZY_DISTANCE_IDENTICAL, $score);
++        $this->assertSame(FUZZY_DISTANCE_IDENTICAL, $score);
+
+         $score2 = $this->calculator->calculateWordSimilarity('hello', '');
+         $this->assertGreaterThan(FUZZY_DISTANCE_IDENTICAL, $score2);
+@@ @@
+     public function test_calculate_word_similarity_single_letter(): void
+     {
+         $score = $this->calculator->calculateWordSimilarity('a', 'a');
+-        $this->assertEquals(FUZZY_DISTANCE_IDENTICAL, $score);
++        $this->assertSame(FUZZY_DISTANCE_IDENTICAL, $score);
+
+         $score2 = $this->calculator->calculateWordSimilarity('a', 'b');
+         $this->assertGreaterThan(FUZZY_DISTANCE_IDENTICAL, $score2);
+    ----------- end diff -----------
+
+Applied rules:
+ * AssertEqualsOrAssertSameFloatParameterToSpecificMethodsTypeRector
+ * AssertEqualsToSameRector
+
+
+19) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/CacheManagerServiceTest.php:52
+
+    ---------- begin diff ----------
+@@ @@
+         $this->cacheManager = new CacheManagerService();
+
+         $executed = false;
+-        $result = $this->cacheManager->remember('test', function () use (&$executed) {
++        $result = $this->cacheManager->remember('test', function () use (&$executed): string {
+             $executed = true;
+             return 'callback_result';
+         }, []);
+@@ @@
+
+         $callbackExecutions = 0;
+
+-        $result1 = $this->cacheManager->remember('test', function () use (&$callbackExecutions) {
+-            $callbackExecutions++;
++        $result1 = $this->cacheManager->remember('test', function () use (&$callbackExecutions): string {
++            ++$callbackExecutions;
+             return 'cached_value';
+         }, ['param1']);
+
+-        $result2 = $this->cacheManager->remember('test', function () use (&$callbackExecutions) {
+-            $callbackExecutions++;
++        $result2 = $this->cacheManager->remember('test', function () use (&$callbackExecutions): string {
++            ++$callbackExecutions;
+             return 'cached_value';
+         }, ['param1']);
+
+-        $this->assertEquals(1, $callbackExecutions);
++        $this->assertSame(1, $callbackExecutions);
+         $this->assertEquals('cached_value', $result1);
+         $this->assertEquals('cached_value', $result2);
+     }
+@@ @@
+
+         $callbackExecutions = 0;
+
+-        $this->cacheManager->remember('test', function () use (&$callbackExecutions) {
+-            $callbackExecutions++;
++        $this->cacheManager->remember('test', function () use (&$callbackExecutions): string {
++            ++$callbackExecutions;
+             return 'value1';
+         }, ['param1']);
+
+-        $this->cacheManager->remember('test', function () use (&$callbackExecutions) {
+-            $callbackExecutions++;
++        $this->cacheManager->remember('test', function () use (&$callbackExecutions): string {
++            ++$callbackExecutions;
+             return 'value2';
+         }, ['param2']);
+
+-        $this->assertEquals(2, $callbackExecutions);
++        $this->assertSame(2, $callbackExecutions);
+     }
+
+     public function test_remember_stores_model_metadata_for_search_in_model(): void
+@@ @@
+
+         $userParams = [User::class, 'john', []];
+
+-        $this->cacheManager->remember('search_in_model', fn() => 'user_result', $userParams);
++        $this->cacheManager->remember('search_in_model', fn(): string => 'user_result', $userParams);
+
+         $storageKey = $this->getCacheKeysStorageKey();
+         $storedKeys = Cache::get($storageKey, []);
+@@ @@
+         config(['fuzzy.cache.enabled' => true]);
+         $this->cacheManager = new CacheManagerService();
+
+-        $this->cacheManager->remember('test', fn() => 'value', []);
++        $this->cacheManager->remember('test', fn(): string => 'value', []);
+         $this->cacheManager->invalidateAll();
+
+         $callbackExecuted = false;
+-        $result = $this->cacheManager->remember('test', function () use (&$callbackExecuted) {
++        $result = $this->cacheManager->remember('test', function () use (&$callbackExecuted): string {
+             $callbackExecuted = true;
+             return 'new_value';
+         }, []);
+@@ @@
+         config(['fuzzy.cache.enabled' => true]);
+         $this->cacheManager = new CacheManagerService();
+
+-        $this->cacheManager->remember('test', fn() => 'value', []);
++        $this->cacheManager->remember('test', fn(): string => 'value', []);
+
+         $storageKey = $this->getCacheKeysStorageKey();
+         $this->assertNotNull(Cache::get($storageKey));
+@@ @@
+         $productParams = [Product::class, 'laptop', []];
+
+         // Mettre en cache des résultats pour User et Product
+-        $this->cacheManager->remember('search_in_model', fn() => 'user_result', $userParams);
+-        $this->cacheManager->remember('search_in_model', fn() => 'product_result', $productParams);
++        $this->cacheManager->remember('search_in_model', fn(): string => 'user_result', $userParams);
++        $this->cacheManager->remember('search_in_model', fn(): string => 'product_result', $productParams);
+
+         // Récupérer le storage des clés
+         $storageKey = $this->getCacheKeysStorageKey();
+@@ @@
+             if ($model === User::class) {
+                 $userCached = $key;
+             }
++
+             if ($model === Product::class) {
+                 $productCached = $key;
+             }
+@@ @@
+             if ($model === User::class) {
+                 $userKeyStillExists = true;
+             }
++
+             if ($model === Product::class) {
+                 $productKeyStillExists = true;
+             }
+@@ @@
+         $userCallbackExecuted = false;
+         $productCallbackExecuted = false;
+
+-        $this->cacheManager->remember('search_in_model', function () use (&$userCallbackExecuted) {
++        $this->cacheManager->remember('search_in_model', function () use (&$userCallbackExecuted): string {
+             $userCallbackExecuted = true;
+             return 'new_user_result';
+         }, $userParams);
+
+-        $this->cacheManager->remember('search_in_model', function () use (&$productCallbackExecuted) {
++        $this->cacheManager->remember('search_in_model', function () use (&$productCallbackExecuted): string {
+             $productCallbackExecuted = false;
+             return 'product_result';
+         }, $productParams);
+@@ @@
+         $longString = str_repeat('a', 300);
+         $params = [$longString];
+
+-        $result = $this->cacheManager->remember('test', fn() => 'value', $params);
++        $result = $this->cacheManager->remember('test', fn(): string => 'value', $params);
+
+         // Devrait retourner la valeur, pas la clé
+         $this->assertEquals('value', $result);
+@@ @@
+         // search_in_models n'a pas de modèle unique
+         $modelsParams = [[User::class, Product::class], 'query', []];
+
+-        $this->cacheManager->remember('search_in_models', fn() => 'combined_result', $modelsParams);
++        $this->cacheManager->remember('search_in_models', fn(): string => 'combined_result', $modelsParams);
+
+         $storageKey = $this->getCacheKeysStorageKey();
+         $storedKeys = Cache::get($storageKey, []);
+@@ @@
+
+         $executionCount = 0;
+
+-        $result1 = $this->cacheManager->remember('test', function () use (&$executionCount) {
+-            $executionCount++;
++        $result1 = $this->cacheManager->remember('test', function () use (&$executionCount): string {
++            ++$executionCount;
+             return 'cached_value';
+         }, []);
+
+-        $result2 = $this->cacheManager->remember('test', function () use (&$executionCount) {
+-            $executionCount++;
++        $result2 = $this->cacheManager->remember('test', function () use (&$executionCount): string {
++            ++$executionCount;
+             return 'cached_value';
+         }, []);
+
+-        $this->assertEquals(1, $executionCount);
++        $this->assertSame(1, $executionCount);
+         $this->assertEquals('cached_value', $result1);
+         $this->assertEquals('cached_value', $result2);
      }
     ----------- end diff -----------
 
 Applied rules:
-
-
-20) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Repositories/IndexRepository.php:98
-
-    ---------- begin diff ----------
-@@ @@
-
-     /**
-      * {@inheritDoc}
-+     * @return array<string, Model>
-      */
-     public function getPreloadedModelsMap(): array
-     {
-@@ @@
-
-     /**
-      * {@inheritDoc}
-+     * @return array<string, mixed>
-      */
-     public function getStats(): array
-     {
-    ----------- end diff -----------
-
-Applied rules:
- * DocblockGetterReturnArrayFromPropertyDocblockVarRector
- * DocblockReturnArrayFromDirectArrayInstanceRector
-
-
-21) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/SearchContext.php:102
-
-    ---------- begin diff ----------
-@@ @@
-
-     /**
-      * Preload all required models for efficient access.
--     *
--     * @return void
-      */
-     private function preloadModels(): void
-     {
-@@ @@
-
-     /**
-      * {@inheritDoc}
-+     * @return array<string, array>
-      */
-     public function getAllPotentialMatches(): array
-     {
-    ----------- end diff -----------
-
-Applied rules:
- * RemoveUselessReturnTagRector
- * DocblockGetterReturnArrayFromPropertyDocblockVarRector
-
-
-22) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/Algorithms/LevenshteinSimilarityAlgorithm.php:138
-
-    ---------- begin diff ----------
-@@ @@
-         $closeMatchBonus = $this->config->getCloseMatchBonus();
-
-         if ($levenshteinDistance <= $closeMatchThreshold && $longestLength >= $minimumLengthForBonus) {
--            $currentSimilarity = min($currentSimilarity + $closeMatchBonus, FUZZY_SCORE_IDENTICAL);
-+            return min($currentSimilarity + $closeMatchBonus, FUZZY_SCORE_IDENTICAL);
-         }
-
-         return $currentSimilarity;
-    ----------- end diff -----------
-
-Applied rules:
- * CompleteMissingIfElseBracketRector
- * ReturnEarlyIfVariableRector
-
-
-23) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/Algorithms/WordSimilarity/LetterDistanceCalculator.php:71
-
-    ---------- begin diff ----------
-@@ @@
-
-     /**
-      * Find matching letters between two sets with position windows.
-+     * @param string[] $lettersA
-+     * @param string[] $lettersB
-      */
-     private function findLetterMatches(array $lettersA, array $lettersB): array
-     {
-@@ @@
-
-     /**
-      * Find the best matching letter in the target string.
-+     * @param array<int, mixed> $searchLetters
-      */
-     private function findBestLetterMatch(
-         string $targetLetter,
-@@ @@
-         $startSearch = max($startIndex, $currentPosition - $searchWindow);
-         $endSearch = min(count($searchLetters), $currentPosition + $searchWindow + $baseIncrement);
-
--        for ($searchPosition = $startSearch; $searchPosition < $endSearch; $searchPosition++) {
-+        for ($searchPosition = $startSearch; $searchPosition < $endSearch; ++$searchPosition) {
-             if (in_array($searchPosition, $usedPositions, true)) {
-                 continue;
-             }
-@@ @@
-
-     /**
-      * Calculate total distance from matched letter pairs.
-+     * @param string[] $lettersA
-+     * @param string[] $lettersB
-      */
-     private function calculateTotalMatchedDistance(array $matchedPairs, array $lettersA, array $lettersB): float
-     {
-@@ @@
-             );
-
-             if (!$pair['isExact']) {
--                $imperfectMatchCount++;
-+                ++$imperfectMatchCount;
-             }
-         }
-
-@@ @@
-         $unmatchedMultiplier = $this->config->getUnmatchedLetterMultiplier();
-         $totalDistance += ($unmatchedCountA + $unmatchedCountB) * $unmatchedPenaltyBase * $unmatchedMultiplier;
-
--        $totalDistance += $imperfectMatchCount * $this->config->getImperfectMatchPenalty();
--
--        return $totalDistance;
-+        return $totalDistance + $imperfectMatchCount * $this->config->getImperfectMatchPenalty();
-     }
-
-     /**
-@@ @@
-
-     /**
-      * Count common letters between two letter sets.
-+     * @param string[] $lettersA
-+     * @param string[] $lettersB
-      */
-     private function countCommonLetters(array $lettersA, array $lettersB): int
-     {
-@@ @@
-
-         foreach ($lettersA as $letterA) {
-             if (in_array($letterA, $lettersB, true)) {
--                $commonCount++;
-+                ++$commonCount;
-             }
-         }
-    ----------- end diff -----------
-
-Applied rules:
- * SimplifyUselessVariableRector
  * PostIncDecToPreIncDecRector
- * AddParamArrayDocblockFromDimFetchAccessRector
- * ClassMethodArrayDocblockParamFromLocalCallsRector
+ * NewlineAfterStatementRector
+ * AssertEqualsToSameRector
+ * AddArrowFunctionReturnTypeRector
+ * ClosureReturnTypeRector
 
 
-24) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/Algorithms/WordSimilarity/WordMatchScorer.php:12
-
-    ---------- begin diff ----------
-@@ @@
- class WordMatchScorer
- {
-     private WordSimilarityComparatorConfig $config;
-+
-     private WordSimilarityCalculator $wordSimilarityCalculator;
-
-     public function __construct(WordSimilarityComparatorConfig $config)
-@@ @@
-         $emptyTextPenalty = $this->calculateEmptyTextPenalty($queryWords);
-         $baseIncrement = $this->config->getBaseIncrement();
-
--        if (empty($textWords)) {
-+        if ($textWords === []) {
-             return $emptyTextPenalty * $sigma;
-         }
-
-         $bestScores = $this->findBestScoresForQuery($queryWords, $textWords);
-
--        if (empty($bestScores)) {
-+        if ($bestScores === []) {
-             return $emptyTextPenalty * $sigma;
-         }
-
-@@ @@
-
-         foreach ($scores as $score) {
-             if ($score > $threshold) {
--                $badMatchCount++;
-+                ++$badMatchCount;
-             }
-         }
-
-@@ @@
-         return $badMatchCount;
-     }
-
-+    /**
-+     * @param string[] $queryWords
-+     */
-     private function calculateEmptyTextPenalty(array $queryWords): float
-     {
-         $wordCount = count($queryWords);
-    ----------- end diff -----------
-
-Applied rules:
- * SimplifyEmptyCheckOnEmptyArrayRector
- * NewlineBetweenClassLikeStmtsRector
- * PostIncDecToPreIncDecRector
- * ClassMethodArrayDocblockParamFromLocalCallsRector
-
-
-25) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/Algorithms/WordSimilarity/WordSimilarityCalculator.php:12
-
-    ---------- begin diff ----------
-@@ @@
- class WordSimilarityCalculator
- {
-     private WordSimilarityComparatorConfig $config;
-+
-     private LetterDistanceCalculator $letterDistanceCalculator;
-
-     public function __construct(WordSimilarityComparatorConfig $config)
-@@ @@
-
-     /**
-      * Count common letters between two letter sets.
-+     * @param string[] $lettersA
-+     * @param string[] $lettersB
-      */
-     private function countCommonLetters(array $lettersA, array $lettersB): int
-     {
-@@ @@
-
-         foreach ($lettersA as $letterA) {
-             if (in_array($letterA, $lettersB, true)) {
--                $commonCount++;
-+                ++$commonCount;
-             }
-         }
-    ----------- end diff -----------
-
-Applied rules:
- * NewlineBetweenClassLikeStmtsRector
- * PostIncDecToPreIncDecRector
- * ClassMethodArrayDocblockParamFromLocalCallsRector
-
-
-26) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/Algorithms/WordSimilarityComparator.php:7
-
-    ---------- begin diff ----------
-@@ @@
- use Fuzzy\Contracts\StringNormalizerInterface;
- use Fuzzy\Config\WordSimilarityComparatorConfig;
- use Fuzzy\Services\Algorithms\WordSimilarity\WordMatchScorer;
--use Fuzzy\Services\Algorithms\WordSimilarity\LetterDistanceCalculator;
-
- /**
-  * Advanced lexical similarity comparator for strings.
-@@ @@
- class WordSimilarityComparator
- {
-     private StringNormalizerInterface $normalizer;
-+
-     private WordSimilarityComparatorConfig $config;
-+
-     private WordMatchScorer $wordMatchScorer;
--    private LetterDistanceCalculator $letterDistanceCalculator;
-
-     /**
-      * Constructor for WordSimilarityComparator.
-@@ @@
-         $this->normalizer = $normalizer;
-         $this->config = $config ?? WordSimilarityComparatorConfig::createDefault();
-         $this->wordMatchScorer = new WordMatchScorer($this->config);
--        $this->letterDistanceCalculator = new LetterDistanceCalculator($this->config);
-     }
-
-     /**
-@@ @@
-         }
-
-         // Empty query handling
--        if (empty($queryWords)) {
-+        if ($queryWords === []) {
-             return $this->config->getMaxScoreCap();
-         }
-
-         // Empty text handling - penalty based on query word count
--        if (empty($textWords)) {
-+        if ($textWords === []) {
-             $emptyTextPenalty = $this->calculateEmptyTextPenalty($queryWords);
-             return min($this->config->getMaxScoreCap(), $emptyTextPenalty);
-         }
-@@ @@
-
-         $filteredQueryWords = $this->filterShortWords($queryWords);
-
--        if (empty($filteredQueryWords)) {
-+        if ($filteredQueryWords === []) {
-             return $this->config->getMaxScoreCap();
-         }
-    ----------- end diff -----------
-
-Applied rules:
- * SimplifyEmptyCheckOnEmptyArrayRector
- * NewlineBetweenClassLikeStmtsRector
- * RemoveUnusedPrivatePropertyRector
-
-
-27) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/CacheManagerService.php:4
+20) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/IndexBuilderTest.php:4
 
     ---------- begin diff ----------
 @@ @@
 
- namespace Fuzzy\Services;
+ namespace Fuzzy\Tests\Unit\Services;
 
++use PHPUnit\Framework\Attributes\CoversClass;
 +use Carbon\Carbon;
- use Fuzzy\Contracts\CacheManagerInterface;
- use Fuzzy\Config\CacheConfig;
- use Illuminate\Support\Facades\Cache;
+ use Fuzzy\Models\FuzzyIndex;
+ use Fuzzy\Services\IndexBuilder;
+ use Fuzzy\Services\StringNormalizer;
 @@ @@
- class CacheManagerService implements CacheManagerInterface
+
+ /**
+  * Test suite for the IndexBuilder service.
+- *
+- * @covers \Fuzzy\Services\IndexBuilder
+  */
++#[CoversClass(\Fuzzy\Services\IndexBuilder::class)]
+ final class IndexBuilderTest extends TestCase
  {
-     private const MIN_CACHE_KEY_LENGTH_FOR_HASH = 250;
-+
-     private const STATS_CACHE_TYPE = 'stats';
-
-     private CacheConfig $config;
+     private IndexBuilder $builder;
 @@ @@
-
-     /**
-      * Extract model class from parameters array
-+     * @param array<int, mixed> $parameters
-      */
-     private function extractModelClassFromParameters(array $parameters): ?string
+     public function test_update_or_create_existing_entry(): void
      {
-@@ @@
-             return $parameters[0];
-         }
+         $modelType = User::class;
+-        $modelId = time();
++        $modelId = Carbon::now()
++            ->getTimestamp();
+         $field = 'unique_test_field_' . $modelId;
 
--        // Pour search_in_models: [modelClasses, query, options]
--        if (isset($parameters[0]) && is_array($parameters[0])) {
--            // Pour l'invalidation, on ne stocke pas tous les modèles
--            // On retourne null car l'invalidation se fera par modèle individuel
--            return null;
--        }
--
-         return null;
-     }
-
-@@ @@
-         // Structure des données stockées
-         $keyData = [
-             'key' => $key,
--            'created_at' => time(),
-+            'created_at' => Carbon::now()
-+                ->getTimestamp(),
-         ];
-
-         if ($modelClass !== null) {
-@@ @@
-                 $keyExists = true;
-                 break;
-             }
-+
-             if (is_string($existingKeyData) && $existingKeyData === $key) {
-                 $keyExists = true;
-                 break;
-@@ @@
-      * Remove stats key from stored keys tracking.
-      *
-      * @param string $statsKey The stats cache key to remove
--     * @return void
-      */
-     private function removeStatsKeyFromStorage(string $statsKey): void
-     {
-@@ @@
-                 $keyRemoved = true;
-                 continue;
-             }
-+
-             $keysToKeep[] = $keyData;
-         }
+         // Utiliser des mots qui ne sont PAS des stop words
     ----------- end diff -----------
 
 Applied rules:
  * TimeFuncCallToCarbonRector
- * NewlineBetweenClassLikeStmtsRector
- * NewlineAfterStatementRector
- * RemoveUselessReturnTagRector
- * RemoveDeadConditionAboveReturnRector
- * AddParamArrayDocblockFromDimFetchAccessRector
+ * CoversAnnotationWithValueToAttributeRector
 
 
-28) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/FuzzySearchService.php:4
+21) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/IndexManagerServiceTest.php:4
 
     ---------- begin diff ----------
 @@ @@
 
- namespace Fuzzy\Services;
+ namespace Fuzzy\Tests\Unit\Services;
 
-+use Fuzzy\Data\SearchResultData;
- use Fuzzy\Contracts\CacheManagerInterface;
- use Fuzzy\Contracts\IndexManagerInterface;
++use Exception;
+ use Fuzzy\Contracts\IndexRepositoryInterface;
  use Fuzzy\Contracts\ModelDiscoveryInterface;
+ use Fuzzy\Services\IndexBuilder;
 @@ @@
-     {
-         return $this->cacheManager->remember(
-             type: 'search',
--            callback: fn() => $this->executeSearch($query, $options),
-+            callback: fn(): Collection => $this->executeSearch($query, $options),
-             parameters: [$query, $options]
-         );
-     }
-@@ @@
-      *
-      * @param string $query The search query string
-      * @param array<string, mixed> $options Search options
--     * @return Collection<int, \Fuzzy\Data\SearchResultData> Collection of search results
-+     * @return Collection<int, SearchResultData> Collection of search results
-      */
-     private function executeSearch(string $query, array $options = []): Collection
-     {
-@@ @@
-     {
-         return $this->cacheManager->remember(
-             type: 'search_in_model',
--            callback: fn() => $this->searchProcessor->searchInModel($modelClass, $query, $options),
-+            callback: fn(): Collection => $this->searchProcessor->searchInModel($modelClass, $query, $options),
-             parameters: [$modelClass, $query, $options]
-         );
-     }
-@@ @@
-     {
-         return $this->cacheManager->remember(
-             type: 'search_in_models',
--            callback: fn() => $this->searchProcessor->searchInModels($modelClasses, $query, $options),
-+            callback: fn(): Collection => $this->searchProcessor->searchInModels($modelClasses, $query, $options),
-             parameters: [$modelClasses, $query, $options]
-         );
-     }
-    ----------- end diff -----------
-
-Applied rules:
- * AddArrowFunctionReturnTypeRector
-
-
-29) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/IndexBuilder.php:4
-
-    ---------- begin diff ----------
-@@ @@
-
- namespace Fuzzy\Services;
-
-+use ArrayAccess;
- use Fuzzy\Contracts\ContextualNormalizerInterface;
- use Fuzzy\Contracts\MustFuzzySearch;
- use Fuzzy\Models\FuzzyIndex;
-@@ @@
-      * from the model to preserve stop words where appropriate.
-      *
-      * @param MustFuzzySearch $model The searchable model instance to index
--     * @return void
-      */
-     public function indexModel(MustFuzzySearch $model): void
-     {
-@@ @@
-     {
-         // Try Eloquent's getAttribute method
-         if (method_exists($model, 'getAttribute')) {
--            /** @var \Illuminate\Database\Eloquent\Model $model */
-+            /** @var Model $model */
-             return $model->getAttribute($field);
-         }
-
-@@ @@
-         }
-
-         // Try array access if model implements ArrayAccess
--        if ($model instanceof \ArrayAccess && isset($model[$field])) {
-+        if ($model instanceof ArrayAccess && isset($model[$field])) {
-             return $model[$field];
-         }
-
-@@ @@
-      * @param mixed $modelId The model's primary key value
-      * @param string $field The field name being indexed
-      * @param string $value The field value to index
--     * @return void
-      */
-     public function indexField(string $modelType, mixed $modelId, string $field, string $value): void
-     {
-@@ @@
-
-         $words = $this->normalizer->splitIntoWords($normalizedValue);
-
--        if (empty($words)) {
-+        if ($words === []) {
-             return;
-         }
-
-@@ @@
-      * Efficiently indexes an array of models in a single operation.
-      *
-      * @param array<MustFuzzySearch|Model> $models Array of models to index
--     * @return void
-      */
-     public function batchIndex(array $models): void
-     {
-    ----------- end diff -----------
-
-Applied rules:
- * SimplifyEmptyCheckOnEmptyArrayRector
- * RemoveUselessReturnTagRector
-
-
-30) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/IndexManagerService.php:13
-
-    ---------- begin diff ----------
-@@ @@
- class IndexManagerService implements IndexManagerInterface
+ final class IndexManagerServiceTest extends TestCase
  {
-     private const REINDEX_CHUNK_SIZE = 100;
+     private IndexManagerService $indexManager;
 +
-     private const PCT_FACTOR = 100;
+     private $indexBuilder;
++
+     private $indexRepository;
++
+     private $modelDiscovery;
 
-     public function __construct(
+     protected function setUp(): void
 @@ @@
-         return $this->indexRepository->getStats();
+
+         $stats = $this->indexManager->getStats();
+
+-        $this->assertEquals($expectedStats, $stats);
++        $this->assertSame($expectedStats, $stats);
      }
 
-+    /**
-+     * @return array<string, mixed>
-+     */
-     public function getPreciseModelStats(string $modelClass): array
-     {
-         $this->modelDiscovery->validateModel($modelClass);
+     public function test_get_precise_model_stats_returns_detailed_stats(): void
 @@ @@
-         $totalRecords = 0;
-         $indexableRecords = 0;
+         // soit ignorer, soit utiliser DatabaseMigrations
+         try {
+             $this->indexManager->reindexModel($modelClass);
+-        } catch (\Exception $e) {
++        } catch (Exception $exception) {
+             // En environnement de test sans base, on ignore l'erreur
+             $this->addToAssertionCount(1);
+             return;
+    ----------- end diff -----------
 
--        $modelClass::chunk(self::REINDEX_CHUNK_SIZE, function ($models) use (&$totalRecords, &$indexableRecords) {
-+        $modelClass::chunk(self::REINDEX_CHUNK_SIZE, function ($models) use (&$totalRecords, &$indexableRecords): void {
-             $totalRecords += count($models);
+Applied rules:
+ * CatchExceptionNameMatchingTypeRector
+ * NewlineBetweenClassLikeStmtsRector
+ * AssertEqualsToSameRector
 
-             foreach ($models as $model) {
-                 if ($model->shouldBeIndexed()) {
--                    $indexableRecords++;
-+                    ++$indexableRecords;
-                 }
+
+22) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/ModelDiscoveryServiceTest.php:4
+
+    ---------- begin diff ----------
+@@ @@
+
+ namespace Fuzzy\Tests\Unit\Services;
+
+-use Fuzzy\Contracts\MustFuzzySearch;
+ use Fuzzy\Exceptions\ModelNotSearchableException;
+ use Fuzzy\Services\ModelDiscoveryService;
+ use Fuzzy\Tests\Fixtures\NonSearchableModel;
+    ----------- end diff -----------
+
+Applied rules:
+
+
+23) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/PipelineManagerServiceTest.php:4
+
+    ---------- begin diff ----------
+@@ @@
+
+ namespace Fuzzy\Tests\Unit\Services;
+
++use stdClass;
++use ReflectionClass;
+ use Fuzzy\Contracts\SearchContextInterface;
+ use Fuzzy\Contracts\StageInterface;
+ use Fuzzy\Services\PipelineManagerService;
+@@ @@
+ final class PipelineManagerServiceTest extends TestCase
+ {
+     private PipelineManagerService $pipelineManager;
++
+     private $pipeline;
+-    private $stages;
+
+     protected function setUp(): void
+     {
+@@ @@
+         $stage2 = Mockery::mock(StageInterface::class);
+         $stage2->shouldReceive('getPriority')->andReturn(60);
+
+-        $this->stages = [$stage1, $stage2];
++        $stages = [$stage1, $stage2];
+
+         $this->pipelineManager = new PipelineManagerService(
+             $this->pipeline,
+-            $this->stages
++            $stages
+         );
+     }
+
+@@ @@
+
+         $invalidStages = [
+             Mockery::mock(StageInterface::class)->shouldReceive('getPriority')->andReturn(50)->getMock(),
+-            new \stdClass(), // Invalid stage
++            new stdClass(), // Invalid stage
+         ];
+
+         new PipelineManagerService($this->pipeline, $invalidStages);
+@@ @@
+
+         $results = $this->pipelineManager->process($context);
+
+-        $this->assertEquals($expectedResults, $results);
++        $this->assertSame($expectedResults, $results);
+     }
+
+     public function test_process_returns_empty_array_when_pipeline_returns_empty(): void
+@@ @@
+             {
+                 return null;
              }
-         });
++
++            /**
++             * @return array{}
++             */
+             public function getAllModelIds(): array
+             {
+                 return [];
+             }
++
+             public function hasMultipleWords(): bool
+             {
+                 return false;
+             }
++
++            /**
++             * @return array{}
++             */
+             public function getQueryWords(): array
+             {
+                 return [];
+             }
++
+             public function getNormalizedQuery(): string
+             {
+                 return '';
+             }
++
++            /**
++             * @return array{}
++             */
+             public function getWordIndex(): array
+             {
+                 return [];
+             }
++
++            /**
++             * @return array{}
++             */
+             public function getItemMap(): array
+             {
+                 return [];
+             }
++
++            /**
++             * @return array{}
++             */
+             public function getModelIndex(): array
+             {
+                 return [];
+             }
++
++            /**
++             * @return array{}
++             */
+             public function getIndexEntriesForModel(string $modelType, string $modelId): array
+             {
+                 return [];
+             }
++
+             public function getModelClass(): string
+             {
+                 return '';
+             }
++
+             public function addPotentialMatch(array $match): void {}
++
++            /**
++             * @return array{}
++             */
+             public function getPotentialMatchesForModel(string $key): array
+             {
+                 return [];
+             }
++
++            /**
++             * @return array{}
++             */
+             public function getAllPotentialMatches(): array
+             {
+                 return [];
+             }
++
+             public function hasPotentialMatches(string $key): bool
+             {
+                 return false;
+@@ @@
+         $service->process($mockContext);
+
+         // Verify the execution order was set by our mock
+-        $this->assertEquals([1, 2], $executionOrder);
++        $this->assertSame([1, 2], $executionOrder);
+     }
+
+     public function test_process_passes_context_through_pipeline(): void
+@@ @@
+     {
+         // Use a simple anonymous class instead of Mockery for context
+         $mockContext = new class implements SearchContextInterface {
++            /**
++             * @var string[]
++             */
+             public array $results = ['final_result'];
+
+             public function getModelInstance(string $key): ?object
+@@ @@
+             {
+                 return null;
+             }
++
++            /**
++             * @return array{}
++             */
+             public function getAllModelIds(): array
+             {
+                 return [];
+             }
++
+             public function hasMultipleWords(): bool
+             {
+                 return false;
+             }
++
++            /**
++             * @return array{}
++             */
+             public function getQueryWords(): array
+             {
+                 return [];
+             }
++
+             public function getNormalizedQuery(): string
+             {
+                 return '';
+             }
++
++            /**
++             * @return array{}
++             */
+             public function getWordIndex(): array
+             {
+                 return [];
+             }
++
++            /**
++             * @return array{}
++             */
+             public function getItemMap(): array
+             {
+                 return [];
+             }
++
++            /**
++             * @return array{}
++             */
+             public function getModelIndex(): array
+             {
+                 return [];
+             }
++
++            /**
++             * @return array{}
++             */
+             public function getIndexEntriesForModel(string $modelType, string $modelId): array
+             {
+                 return [];
+             }
++
+             public function getModelClass(): string
+             {
+                 return '';
+             }
++
+             public function addPotentialMatch(array $match): void {}
++
++            /**
++             * @return array{}
++             */
+             public function getPotentialMatchesForModel(string $key): array
+             {
+                 return [];
+             }
++
++            /**
++             * @return array{}
++             */
+             public function getAllPotentialMatches(): array
+             {
+                 return [];
+             }
++
+             public function hasPotentialMatches(string $key): bool
+             {
+                 return false;
+@@ @@
+
+         $results = $this->pipelineManager->process($mockContext);
+
+-        $this->assertEquals(['final_result'], $results);
++        $this->assertSame(['final_result'], $results);
+     }
+
+     public function test_process_sorts_stages_by_priority_descending(): void
+@@ @@
+         $stages = [$mediumPriorityStage, $lowPriorityStage, $highPriorityStage];
+
+         // Create a temporary service to check sorting
+-        $reflection = new \ReflectionClass(PipelineManagerService::class);
++        $reflection = new ReflectionClass(PipelineManagerService::class);
+         $method = $reflection->getMethod('validateAndSortStages');
+         $method->setAccessible(true);
     ----------- end diff -----------
 
 Applied rules:
  * NewlineBetweenClassLikeStmtsRector
- * PostIncDecToPreIncDecRector
+ * NarrowUnusedSetUpDefinedPropertyRector
+ * AssertEqualsToSameRector
  * DocblockReturnArrayFromDirectArrayInstanceRector
- * AddClosureVoidReturnTypeWhereNoReturnRector
+ * DocblockVarArrayFromPropertyDefaultsRector
 
 
-31) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/ModelDiscoveryService.php:13
+24) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/PipelineStageManagerTest.php:4
 
     ---------- begin diff ----------
 @@ @@
- class ModelDiscoveryService implements ModelDiscoveryInterface
- {
-     private const EXTRACT_NAMESPACE_REGEX = '/namespace\s+(.+?);/s';
-+
-     private const EXTRACT_CLASS_REGEX = '/class\s+(\w+)(?:\s+extends|\s+implements|\s*\{)/';
+
+ namespace Fuzzy\Tests\Unit\Services;
+
+-use Fuzzy\Contracts\StageInterface;
+ use Fuzzy\Exceptions\DuplicateStageException;
+ use Fuzzy\Services\PipelineStageManager;
+ use Fuzzy\Stages\MatchDiscoveryStage;
+@@ @@
+             SortAndLimitStage::class,
+         ];
+
+-        $this->assertEquals($expected, $stages);
++        $this->assertSame($expected, $stages);
+     }
 
      /**
     ----------- end diff -----------
 
 Applied rules:
- * NewlineBetweenClassLikeStmtsRector
+ * AssertEqualsToSameRector
 
 
-32) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/PipelineStageManager.php:40
+25) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/ResultFilterServiceTest.php:40
 
     ---------- begin diff ----------
 @@ @@
-         $customStages = config('fuzzy.pipeline', []);
+         $filtered = $this->resultFilter->filterAndSort($results, 0.5);
 
-         // Validate each custom stage
--        foreach ($customStages as $index => $stage) {
-+        foreach ($customStages as $stage) {
-             $this->validateStage($stage);
-         }
+         $this->assertCount(2, $filtered);
+-        $this->assertEquals(0.8, $filtered[0]->score);
+-        $this->assertEquals(0.6, $filtered[1]->score);
++        $this->assertEqualsWithDelta(0.8, $filtered[0]->score, PHP_FLOAT_EPSILON);
++        $this->assertEqualsWithDelta(0.6, $filtered[1]->score, PHP_FLOAT_EPSILON);
+     }
+
+     public function test_filter_and_sort_sorts_by_score_descending(): void
+@@ @@
+
+         $filtered = $this->resultFilter->filterAndSort($results, 0.0);
+
+-        $this->assertEquals(0.9, $filtered[0]->score);
+-        $this->assertEquals(0.7, $filtered[1]->score);
+-        $this->assertEquals(0.6, $filtered[2]->score);
++        $this->assertEqualsWithDelta(0.9, $filtered[0]->score, PHP_FLOAT_EPSILON);
++        $this->assertEqualsWithDelta(0.7, $filtered[1]->score, PHP_FLOAT_EPSILON);
++        $this->assertEqualsWithDelta(0.6, $filtered[2]->score, PHP_FLOAT_EPSILON);
+     }
+
+     public function test_filter_and_sort_removes_null_results(): void
+@@ @@
+
+         $filtered = $this->resultFilter->filterAndSort($results, 0.0);
+
+-        $this->assertEquals(0, array_key_first($filtered->toArray()));
+-        $this->assertEquals(1, array_key_last($filtered->toArray()));
++        $this->assertSame(0, array_key_first($filtered->toArray()));
++        $this->assertSame(1, array_key_last($filtered->toArray()));
+     }
+ }
+    ----------- end diff -----------
+
+Applied rules:
+ * AssertEqualsOrAssertSameFloatParameterToSpecificMethodsTypeRector
+ * AssertEqualsToSameRector
+
+
+26) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/ScoringEngineTest.php:21
+
+    ---------- begin diff ----------
+@@ @@
+ final class ScoringEngineTest extends TestCase
+ {
+     private ScoringEngineInterface $scoringEngine;
++
+     private SearchContext $searchContext;
+
+     protected function setUp(): void
+@@ @@
+
+     /**
+      * Creates a test index entry.
++     * @return array<string, string|string[]|float>
+      */
+     private function createTestIndexEntry(string $field = 'name'): array
+     {
+@@ @@
+         // Assert: Should return perfect score
+         $this->assertEqualsWithDelta(1.0, $score, PHP_FLOAT_EPSILON);
+     }
++
+     /**
+      * Test fallback score uses similarity calculator.
+      */
+    ----------- end diff -----------
+
+Applied rules:
+ * NewlineBetweenClassLikeStmtsRector
+ * DocblockReturnArrayFromDirectArrayInstanceRector
+
+
+27) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/SearchProcessorServiceTest.php:19
+
+    ---------- begin diff ----------
+@@ @@
+ final class SearchProcessorServiceTest extends TestCase
+ {
+     private SearchProcessorService $searchProcessor;
++
+     private $pipeline;
++
+     private $normalizer;
+-    private $similarityCalculator;
+     private $indexRepository;
+-    private $scoringEngine;
+     private $modelDiscovery;
++
+     private $resultFilter;
+
+     protected function setUp(): void
+@@ @@
+
+         $this->pipeline = Mockery::mock(Pipeline::class);
+         $this->normalizer = Mockery::mock(StringNormalizer::class);
+-        $this->similarityCalculator = Mockery::mock(SimilarityCalculator::class);
++        $similarityCalculator = Mockery::mock(SimilarityCalculator::class);
+         $this->indexRepository = Mockery::mock(IndexRepositoryInterface::class);
+-        $this->scoringEngine = Mockery::mock(ScoringEngine::class);
++        $scoringEngine = Mockery::mock(ScoringEngine::class);
+         $this->modelDiscovery = Mockery::mock(ModelDiscoveryInterface::class);
+         $this->resultFilter = Mockery::mock(ResultFilterInterface::class);
 
 @@ @@
-             if (in_array($stage, $seen, true)) {
-                 throw DuplicateStageException::duplicate($stage, $index + 1);
-             }
+         $this->searchProcessor = new SearchProcessorService(
+             $this->pipeline,
+             $this->normalizer,
+-            $this->similarityCalculator,
++            $similarityCalculator,
+             $this->indexRepository,
+-            $this->scoringEngine,
++            $scoringEngine,
+             $this->modelDiscovery,
+             $this->resultFilter
+         );
+@@ @@
+
+         $this->resultFilter->shouldReceive('filterAndSort')
+             ->once()
+-            ->with(Mockery::on(function ($collection) use ($pipelineResults) {
++            ->with(Mockery::on(function ($collection): bool {
+                 return $collection instanceof Collection && $collection->count() === 2;
+             }), Mockery::any())
+             ->andReturn(collect($pipelineResults));
+    ----------- end diff -----------
+
+Applied rules:
+ * NewlineBetweenClassLikeStmtsRector
+ * RemoveUnusedClosureVariableUseRector
+ * NarrowUnusedSetUpDefinedPropertyRector
+ * ClosureReturnTypeRector
+
+
+28) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/ServiceRegistrarTest.php:4
+
+    ---------- begin diff ----------
+@@ @@
+
+ namespace Fuzzy\Tests\Unit\Services;
+
++use ReflectionClass;
++use Fuzzy\Tests\Fixtures\CustomStage;
++use RuntimeException;
+ use Fuzzy\Commands\ClearCacheCommand;
+ use Fuzzy\Commands\ClearIndexCommand;
+ use Fuzzy\Commands\IndexSearchCommand;
+@@ @@
+ use Fuzzy\Services\SimilarityCalculator;
+ use Fuzzy\Services\StringNormalizer;
+ use Fuzzy\Tests\TestCase;
+-use Illuminate\Support\Facades\File;
+ use Illuminate\Support\ServiceProvider;
+
+ /**
+@@ @@
+ final class ServiceRegistrarTest extends TestCase
+ {
+     private ServiceRegistrar $registrar;
 +
-             $seen[] = $stage;
+     private ServiceProvider $provider;
+
+     protected function setUp(): void
+@@ @@
+             provider: $this->provider
+         );
+
+-        $this->app->detectEnvironment(fn() => 'testing');
++        $this->app->detectEnvironment(fn(): string => 'testing');
+     }
+
+     protected function tearDown(): void
+@@ @@
+         $calculator = $this->app->make(SimilarityCalculator::class);
+
+         // Assert: Verify algorithms are registered using reflection
+-        $reflection = new \ReflectionClass($calculator);
++        $reflection = new ReflectionClass($calculator);
+         $algorithmsProperty = $reflection->getProperty('algorithms');
+         $algorithmsProperty->setAccessible(true);
++
+         $algorithms = $algorithmsProperty->getValue($calculator);
+
+         $this->assertCount(3, $algorithms);
+@@ @@
+         $calculator = $this->app->make(SimilarityCalculator::class);
+
+         // Assert: Verify LCS algorithm config is correctly injected
+-        $reflection = new \ReflectionClass($calculator);
++        $reflection = new ReflectionClass($calculator);
+         $algorithmsProperty = $reflection->getProperty('algorithms');
+         $algorithmsProperty->setAccessible(true);
++
+         $algorithms = $algorithmsProperty->getValue($calculator);
+
+-        $lcsReflection = new \ReflectionClass($algorithms[0]);
++        $lcsReflection = new ReflectionClass($algorithms[0]);
+         $lcsConfigProperty = $lcsReflection->getProperty('config');
+         $lcsConfigProperty->setAccessible(true);
++
+         $lcsConfig = $lcsConfigProperty->getValue($algorithms[0]);
+         $this->assertInstanceOf(LongestCommonSubstringConfig::class, $lcsConfig);
+
+         // Assert: Verify Levenshtein algorithm config is correctly injected
+-        $levReflection = new \ReflectionClass($algorithms[1]);
++        $levReflection = new ReflectionClass($algorithms[1]);
+         $levConfigProperty = $levReflection->getProperty('config');
+         $levConfigProperty->setAccessible(true);
++
+         $levConfig = $levConfigProperty->getValue($algorithms[1]);
+         $this->assertInstanceOf(LevenshteinAlgorithmConfig::class, $levConfig);
+
+         // Assert: Verify Prefix algorithm config is correctly injected
+-        $prefixReflection = new \ReflectionClass($algorithms[2]);
++        $prefixReflection = new ReflectionClass($algorithms[2]);
+         $prefixConfigProperty = $prefixReflection->getProperty('config');
+         $prefixConfigProperty->setAccessible(true);
++
+         $prefixConfig = $prefixConfigProperty->getValue($algorithms[2]);
+         $this->assertInstanceOf(PrefixAlgorithmConfig::class, $prefixConfig);
+     }
+@@ @@
+     public function test_register_all_handles_custom_pipeline_stages(): void
+     {
+         // Arrange: Set custom pipeline stages configuration
+-        config(['fuzzy.pipeline' => [\Fuzzy\Tests\Fixtures\CustomStage::class]]);
++        config(['fuzzy.pipeline' => [CustomStage::class]]);
+
+         // Act: Register all services
+         $this->registrar->registerAll();
+@@ @@
+
+         try {
+             // Act & Assert: Expect exception when helpers file is missing
+-            $this->expectException(\RuntimeException::class);
++            $this->expectException(RuntimeException::class);
+             $this->expectExceptionMessage('helpers.php not found at');
+
+             $registrar = new ServiceRegistrar(
+@@ @@
+         $indexBuilder = $this->app->make(IndexBuilder::class);
+
+         // Assert: Verify normalizer dependency is properly injected
+-        $reflection = new \ReflectionClass($indexBuilder);
++        $reflection = new ReflectionClass($indexBuilder);
+         $property = $reflection->getProperty('normalizer');
+         $property->setAccessible(true);
++
+         $normalizer = $property->getValue($indexBuilder);
+
+         $this->assertInstanceOf(ContextualNormalizerInterface::class, $normalizer);
+@@ @@
+             $currentContent = file_get_contents($dummyMigrationFile);
+             $currentMtime = filemtime($dummyMigrationFile);
+
+-            $this->assertEquals(
++            $this->assertSame(
+                 $originalContent,
+                 $currentContent,
+                 'Existing migration file content should not be overwritten by automatic publishing'
+@@ @@
+         $dummyMigrationFile = $migrationsPath . '/2025_01_01_000002_existing_migration_v2.php';
+         $originalContent = '<?php // Original custom migration content v2';
+         file_put_contents($dummyMigrationFile, $originalContent);
+-        $originalMtime = filemtime($dummyMigrationFile);
+
+         sleep(1);
+
+         try {
+             // Act: Call registerAll multiple times
+-            for ($i = 0; $i < 3; $i++) {
++            for ($i = 0; $i < 3; ++$i) {
+                 $this->registrar->registerAll();
+             }
+
+             // Assert: File content unchanged after multiple calls
+             $currentContent = file_get_contents($dummyMigrationFile);
+-            $this->assertEquals(
++            $this->assertSame(
+                 $originalContent,
+                 $currentContent,
+                 'Migration files should remain unchanged after multiple registerAll calls'
+@@ @@
+     public function test_multiple_register_calls_are_safe(): void
+     {
+         // Act: Call registerAll multiple times
+-        for ($i = 0; $i < 3; $i++) {
++        for ($i = 0; $i < 3; ++$i) {
+             $this->registrar->registerAll();
+         }
+    ----------- end diff -----------
+
+Applied rules:
+ * NewlineBetweenClassLikeStmtsRector
+ * NewlineBeforeNewAssignSetRector
+ * PostIncDecToPreIncDecRector
+ * RemoveUnusedVariableAssignRector
+ * AssertEqualsToSameRector
+ * AddArrowFunctionReturnTypeRector
+
+
+29) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/StringNormalizerTest.php:158
+
+    ---------- begin diff ----------
+@@ @@
+         $this->normalizer->setCurrentField('name');
+         $result = $this->normalizer->normalizeQuery($input);
+
+-        $this->assertEquals('jean de la fontaine', $result);
++        $this->assertSame('jean de la fontaine', $result);
+
+         $this->normalizer->setCurrentField(null);
+         $this->normalizer->setProtectedFields([]);
+@@ @@
+         $result = $this->normalizer->normalizeQuery($input);
+
+         // 'the', 'and', 'are', 'in' sont supprimés, reste 'cat dog house'
+-        $this->assertEquals('cat dog house', $result);
++        $this->assertSame('cat dog house', $result);
+
+         $this->normalizer->setCurrentField(null);
+         $this->normalizer->setProtectedFields([]);
+@@ @@
+
+         // Champ protégé : les stop words sont conservés
+         $resultProtected = $this->normalizer->normalizeForField($value, 'full_name');
+-        $this->assertEquals('john and jane doe', $resultProtected);
++        $this->assertSame('john and jane doe', $resultProtected);
+
+         // Champ non protégé : les stop words sont supprimés
+         $resultNonProtected = $this->normalizer->normalizeForField($value, 'description');
+-        $this->assertEquals('john jane doe', $resultNonProtected);
++        $this->assertSame('john jane doe', $resultNonProtected);
+
+         $this->normalizer->setProtectedFields([]);
+     }
+@@ @@
+         $email = 'john.doe+test@example.com';
+         $result = $this->normalizer->normalize($email);
+         // Les caractères spéciaux sont supprimés par normalize()
+-        $this->assertEquals('johndoetestexamplecom', $result);
++        $this->assertSame('johndoetestexamplecom', $result);
+     }
+
+     public function test_name_with_multiple_stop_words(): void
+@@ @@
+         $this->normalizer->setCurrentField('name');
+         $result = $this->normalizer->normalizeQuery($name);
+
+-        $this->assertEquals('charles de gaulle et jean de la fontaine', $result);
++        $this->assertSame('charles de gaulle et jean de la fontaine', $result);
+
+         $this->normalizer->setCurrentField(null);
+         $this->normalizer->setProtectedFields([]);
+@@ @@
+     {
+         $protectedFields = ['name', 'email', 'username'];
+         $this->normalizer->setProtectedFields($protectedFields);
+-        $this->assertEquals($protectedFields, $this->normalizer->getProtectedFields());
++        $this->assertSame($protectedFields, $this->normalizer->getProtectedFields());
+         $this->normalizer->setProtectedFields([]);
+     }
+ }
+    ----------- end diff -----------
+
+Applied rules:
+ * AssertEqualsToSameRector
+
+
+30) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/WordSimilarityComparatorTest.php:14
+
+    ---------- begin diff ----------
+@@ @@
+ final class WordSimilarityComparatorTest extends TestCase
+ {
+     private WordSimilarityComparator $comparator;
+-    private StringNormalizer $normalizer;
+
+     /**
+      * Set up test dependencies.
+@@ @@
+     protected function setUp(): void
+     {
+         parent::setUp();
+-        $this->normalizer = new StringNormalizer();
++        $normalizer = new StringNormalizer();
+         $this->comparator = new WordSimilarityComparator(
+-            normalizer: $this->normalizer
++            normalizer: $normalizer
+         );
+     }
+
+@@ @@
+                 $expectedScore,
+                 $score,
+                 0.01,
+-                "Failed for: '$inputA' vs '$inputB'. Got: $score, Expected: $expectedScore"
++                sprintf("Failed for: '%s' vs '%s'. Got: %s, Expected: %s", $inputA, $inputB, $score, $expectedScore)
+             );
+         }
+     }
+@@ @@
+             $this->assertLessThanOrEqual(
+                 $maxScore,
+                 $score,
+-                "Score too high for: '$inputA' vs '$inputB'. Got: $score, Max: $maxScore"
++                sprintf("Score too high for: '%s' vs '%s'. Got: %s, Max: %s", $inputA, $inputB, $score, $maxScore)
+             );
+             $this->assertGreaterThanOrEqual(
+                 0.1,
+                 $score,
+-                "Should have at least minimal penalty for non-exact match. Got: $score"
++                'Should have at least minimal penalty for non-exact match. Got: ' . $score
+             );
+         }
+     }
+@@ @@
+             $this->assertLessThanOrEqual(
+                 $maxScore,
+                 $score,
+-                "Score too high for: '$inputA' vs '$inputB'. Got: $score, Max: $maxScore"
++                sprintf("Score too high for: '%s' vs '%s'. Got: %s, Max: %s", $inputA, $inputB, $score, $maxScore)
+             );
+             $this->assertGreaterThanOrEqual(
+                 0.1,
+                 $score,
+-                "Should have at least minimal penalty for non-exact match. Got: $score"
++                'Should have at least minimal penalty for non-exact match. Got: ' . $score
+             );
+         }
+     }
+@@ @@
+             $this->assertLessThanOrEqual(
+                 $maxScore,
+                 $score,
+-                "Score too high for: '$inputA' vs '$inputB'. Got: $score, Max: $maxScore"
++                sprintf("Score too high for: '%s' vs '%s'. Got: %s, Max: %s", $inputA, $inputB, $score, $maxScore)
+             );
+             $this->assertGreaterThanOrEqual(
+                 0.1,
+                 $score,
+-                "Should have at least minimal penalty for non-exact match. Got: $score"
++                'Should have at least minimal penalty for non-exact match. Got: ' . $score
+             );
+         }
+     }
+@@ @@
+             $this->assertGreaterThanOrEqual(
+                 $expectedMinPenalty,
+                 $score,
+-                "Score too low for: '$inputA' vs '$inputB'. Got: $score, Min: $expectedMinPenalty"
++                sprintf("Score too low for: '%s' vs '%s'. Got: %s, Min: %s", $inputA, $inputB, $score, $expectedMinPenalty)
+             );
+         }
+     }
+@@ @@
+         $this->assertGreaterThan(
+             $scoreSigma1,
+             $scoreSigma2,
+-            "Sigma=2.0 ($scoreSigma2) should give higher score than Sigma=1.0 ($scoreSigma1)"
++            sprintf('Sigma=2.0 (%s) should give higher score than Sigma=1.0 (%s)', $scoreSigma2, $scoreSigma1)
+         );
+         $this->assertLessThan(
+             $scoreSigma1,
+             $scoreSigma05,
+-            "Sigma=0.5 ($scoreSigma05) should give lower score than Sigma=1.0 ($scoreSigma1)"
++            sprintf('Sigma=0.5 (%s) should give lower score than Sigma=1.0 (%s)', $scoreSigma05, $scoreSigma1)
+         );
+     }
+
+@@ @@
+             $this->assertLessThanOrEqual(
+                 $maxScore,
+                 $score,
+-                "Score too high for: '$inputA' vs '$inputB'. Got: $score, Max: $maxScore"
++                sprintf("Score too high for: '%s' vs '%s'. Got: %s, Max: %s", $inputA, $inputB, $score, $maxScore)
+             );
+         }
+     }
+@@ @@
+                 0.0,
+                 $score,
+                 0.01,
+-                "Exact match should return 0 for: '$inputA' vs '$inputB'. Got: $score"
++                sprintf("Exact match should return 0 for: '%s' vs '%s'. Got: %s", $inputA, $inputB, $score)
+             );
+         }
+     }
+@@ @@
+             $this->assertLessThanOrEqual(
+                 $maxScore,
+                 $score,
+-                "Score too high for: '$inputA' vs '$inputB'. Got: $score, Max: $maxScore"
++                sprintf("Score too high for: '%s' vs '%s'. Got: %s, Max: %s", $inputA, $inputB, $score, $maxScore)
+             );
+             $this->assertGreaterThan(0.0, $score);
+         }
+@@ @@
+         $difference1 = $scoreSigma1 - $scoreSigma05;
+         $difference2 = $scoreSigma2 - $scoreSigma1;
+
+-        $this->assertGreaterThan(0.02, $difference1, "Sigma should have noticeable effect (diff1: $difference1)");
+-        $this->assertGreaterThan(0.02, $difference2, "Sigma should have noticeable effect (diff2: $difference2)");
++        $this->assertGreaterThan(0.02, $difference1, sprintf('Sigma should have noticeable effect (diff1: %s)', $difference1));
++        $this->assertGreaterThan(0.02, $difference2, sprintf('Sigma should have noticeable effect (diff2: %s)', $difference2));
+     }
+
+     /**
+@@ @@
+                 0.0,
+                 $score,
+                 0.01,
+-                "Case should be ignored for: '$inputA' vs '$inputB'. Got: $score"
++                sprintf("Case should be ignored for: '%s' vs '%s'. Got: %s", $inputA, $inputB, $score)
+             );
          }
      }
     ----------- end diff -----------
 
 Applied rules:
+ * EncapsedStringsToSprintfRector
+ * NarrowUnusedSetUpDefinedPropertyRector
+
+
+31) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Stages/MatchDiscoveryStage/MatchFinderTest.php:4
+
+    ---------- begin diff ----------
+@@ @@
+
+ namespace Fuzzy\Tests\Unit\Stages\MatchDiscoveryStage;
+
++use ReflectionProperty;
+ use Fuzzy\Contracts\IndexRepositoryInterface;
+ use Fuzzy\Services\Scoring\ScoringEngine;
+ use Fuzzy\Stages\MatchDiscoveryStage\MatchFinder;
+@@ @@
+ final class MatchFinderTest extends TestCase
+ {
+     private MatchFinder $finder;
++
+     private StringNormalizer $normalizer;
++
+     private SimilarityCalculator&MockObject $similarityCalculator;
+
+     protected function setUp(): void
+@@ @@
+         $this->similarityCalculator = $this->createMock(SimilarityCalculator::class);
+     }
+
++    /**
++     * @param array<array<string, array<int, array<string, mixed>>>, mixed> $wordIndex
++     */
+     private function createContext(
+         string $query,
+         SearchOptionsData $options,
+@@ @@
+             indexDataArray: []
+         );
+
+-        $reflection = new \ReflectionProperty($context, 'indexData');
++        $reflection = new ReflectionProperty($context, 'indexData');
+         $reflection->setAccessible(true);
+         $reflection->setValue($context, $indexData);
+
+@@ @@
+         ];
+
+         $this->similarityCalculator->method('calculateWordSimilarity')
+-            ->willReturnCallback(function ($a, $b) {
++            ->willReturnCallback(function (string $a, string $b): float {
+                 if ($a === 'php' && $b === 'ph') {
+                     return 0.9;
+                 }
++
+                 return 0.5;
+             });
+
+@@ @@
+     {
+         // Build a large word index
+         $wordIndex = [];
+-        for ($i = 0; $i < 100; $i++) {
+-            $wordIndex["word{$i}"] = [['indexable_type' => 'User', 'indexable_id' => $i]];
++        for ($i = 0; $i < 100; ++$i) {
++            $wordIndex['word' . $i] = [['indexable_type' => 'User', 'indexable_id' => $i]];
+         }
++
+         $wordIndex['php'] = [['indexable_type' => 'User', 'indexable_id' => 100]];
+
+         $this->similarityCalculator->method('calculateWordSimilarity')
+    ----------- end diff -----------
+
+Applied rules:
+ * NewlineBetweenClassLikeStmtsRector
+ * EncapsedStringsToSprintfRector
+ * PostIncDecToPreIncDecRector
  * NewlineAfterStatementRector
- * RemoveUnusedForeachKeyRector
+ * TypeWillReturnCallableArrowFunctionRector
+ * ClassMethodArrayDocblockParamFromLocalCallsRector
+
+
+32) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Stages/MatchDiscoveryStageTest.php:4
+
+    ---------- begin diff ----------
+@@ @@
+
+ namespace Fuzzy\Tests\Unit\Stages;
+
++use Fuzzy\Enums\StageType;
+ use Fuzzy\Contracts\IndexRepositoryInterface;
+ use Fuzzy\Services\Scoring\ScoringEngine;
+ use ReflectionProperty;
+@@ @@
+ final class MatchDiscoveryStageTest extends TestCase
+ {
+     private MatchDiscoveryStage $stage;
++
+     private StringNormalizer $normalizer;
++
+     private SimilarityCalculator&MockObject $similarityCalculator;
++
+     private MatchFinder&MockObject $matchFinder;
+
+     protected function setUp(): void
+@@ @@
+         );
+     }
+
++    /**
++     * @param array<array<string, array<int, array<string, mixed>>>, mixed> $wordIndex
++     */
+     private function createContext(
+         string $query,
+         SearchOptionsData $options,
+@@ @@
+             ->method('discoverVeryCloseMatches')
+             ->with($context, 'test', $wordIndex);
+
+-        $this->stage->handle($context, fn() => 'next');
++        $this->stage->handle($context, fn(): string => 'next');
+     }
+
+     /**
+@@ @@
+             ->method('discoverMultiWordMatches')
+             ->with($context);
+
+-        $this->stage->handle($context, fn() => 'next');
++        $this->stage->handle($context, fn(): string => 'next');
+     }
+
+     public function test_handle_skips_fuzzy_when_disabled(): void
+@@ @@
+         $this->matchFinder->expects($this->once())
+             ->method('discoverMultiWordMatches');
+
+-        $this->stage->handle($context, fn() => 'next');
++        $this->stage->handle($context, fn(): string => 'next');
+     }
+
+     public function test_handle_skips_multi_word_when_single_word(): void
+@@ @@
+         $this->matchFinder->expects($this->once())
+             ->method('discoverVeryCloseMatches');
+
+-        $this->stage->handle($context, fn() => 'next');
++        $this->stage->handle($context, fn(): string => 'next');
+     }
+
+     public function test_handle_single_word_with_exact_match_small_index(): void
+     {
+         $wordIndex = [];
+-        for ($i = 0; $i < 50; $i++) {
+-            $wordIndex["word{$i}"] = [['indexable_type' => 'User', 'indexable_id' => $i]];
++        for ($i = 0; $i < 50; ++$i) {
++            $wordIndex['word' . $i] = [['indexable_type' => 'User', 'indexable_id' => $i]];
+         }
+
+         $context = $this->createContext('test', new SearchOptionsData(fuzzy: true), $wordIndex);
+@@ @@
+         $this->matchFinder->expects($this->never())
+             ->method('discoverCloseMatchesOptimized');
+
+-        $this->stage->handle($context, fn() => 'next');
++        $this->stage->handle($context, fn(): string => 'next');
+     }
+
+     public function test_handle_single_word_with_exact_match_large_index(): void
+     {
+         $wordIndex = [];
+-        for ($i = 0; $i < 2000; $i++) {
+-            $wordIndex["word{$i}"] = [['indexable_type' => 'User', 'indexable_id' => $i]];
++        for ($i = 0; $i < 2000; ++$i) {
++            $wordIndex['word' . $i] = [['indexable_type' => 'User', 'indexable_id' => $i]];
+         }
+
+         $context = $this->createContext('test', new SearchOptionsData(fuzzy: true), $wordIndex);
+@@ @@
+             ->method('discoverCloseMatchesOptimized')
+             ->with($context, 'test');
+
+-        $this->stage->handle($context, fn() => 'next');
++        $this->stage->handle($context, fn(): string => 'next');
+     }
+
+     public function test_handle_calls_next_with_results(): void
+@@ @@
+     {
+         $context = $this->createContext('test', new SearchOptionsData(), []);
+
+-        $next = function (SearchContext $ctx) {
++        $next = function (SearchContext $ctx): string {
+             return 'processed';
+         };
+
+@@ @@
+
+     public function test_get_priority(): void
+     {
+-        $this->assertEquals(75, $this->stage->getPriority());
++        $this->assertSame(75, $this->stage->getPriority());
+     }
+
+     public function test_get_type(): void
+     {
+-        $this->assertEquals(\Fuzzy\Enums\StageType::MATCH_DISCOVERY, $this->stage->getType());
++        $this->assertSame(StageType::MATCH_DISCOVERY, $this->stage->getType());
+     }
+ }
+    ----------- end diff -----------
+
+Applied rules:
+ * NewlineBetweenClassLikeStmtsRector
+ * EncapsedStringsToSprintfRector
+ * PostIncDecToPreIncDecRector
+ * AssertEqualsToSameRector
+ * ClassMethodArrayDocblockParamFromLocalCallsRector
+ * AddArrowFunctionReturnTypeRector
+ * ClosureReturnTypeRector
 
 
 33) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Feature/IntegrationTest.php:13
@@ -2721,7 +3429,763 @@ Applied rules:
  * NewlineBetweenClassLikeStmtsRector
 
 
-49) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Stages/RelevanceScoringStageTest.php:5
+49) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Contracts/SearchServiceInterface.php:4
+
+    ---------- begin diff ----------
+@@ @@
+
+ namespace Fuzzy\Contracts;
+
++use Fuzzy\Data\SearchResultData;
+ use Illuminate\Support\Collection;
+
+ /**
+@@ @@
+      * Get the cache manager instance.
+      *
+      * Provides access to cache operations for advanced cache management.
+-     *
+-     * @return CacheManagerInterface
+      */
+     public function getCacheManager(): CacheManagerInterface;
+
+@@ @@
+      * Get the model discovery instance.
+      *
+      * Provides access to model discovery for advanced model operations.
+-     *
+-     * @return ModelDiscoveryInterface
+      */
+     public function getModelDiscovery(): ModelDiscoveryInterface;
+
+@@ @@
+      * Get the index manager instance.
+      *
+      * Provides access to index operations for advanced index management.
+-     *
+-     * @return IndexManagerInterface
+      */
+     public function getIndexManager(): IndexManagerInterface;
+
+@@ @@
+      * Get the search processor instance.
+      *
+      * Provides access to search processor for advanced search operations.
+-     *
+-     * @return SearchProcessorInterface
+      */
+     public function getSearchProcessor(): SearchProcessorInterface;
+
+@@ @@
+      *
+      * @param string $query The search query string
+      * @param array<string, mixed> $options Search options
+-     * @return Collection<int, \Fuzzy\Data\SearchResultData> Collection of search results
++     * @return Collection<int, SearchResultData> Collection of search results
+      */
+     public function search(string $query, array $options = []): Collection;
+
+@@ @@
+      * @param string $modelClass The fully qualified model class name
+      * @param string $query The search query string
+      * @param array<string, mixed> $options Search options
+-     * @return Collection<int, \Fuzzy\Data\SearchResultData> Collection of search results
++     * @return Collection<int, SearchResultData> Collection of search results
+      */
+     public function searchInModel(string $modelClass, string $query, array $options = []): Collection;
+
+@@ @@
+      * @param array<int, string> $modelClasses Array of fully qualified model class names
+      * @param string $query The search query string
+      * @param array<string, mixed> $options Search options
+-     * @return Collection<int, \Fuzzy\Data\SearchResultData> Collection of search results
++     * @return Collection<int, SearchResultData> Collection of search results
+      */
+     public function searchInModels(array $modelClasses, string $query, array $options = []): Collection;
+ }
+    ----------- end diff -----------
+
+Applied rules:
+ * RemoveUselessReturnTagRector
+
+
+50) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/FuzzySearch.php:6
+
+    ---------- begin diff ----------
+@@ @@
+
+ use Illuminate\Support\Facades\Facade;
+ use Illuminate\Support\Collection;
+-use Fuzzy\Contracts\MustFuzzySearch;
+
+ /**
+  * Facade for the fuzzy search service
+    ----------- end diff -----------
+
+Applied rules:
+
+
+51) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/FuzzySearchServiceProvider.php:4
+
+    ---------- begin diff ----------
+@@ @@
+
+ namespace Fuzzy;
+
++use Fuzzy\Contracts\CacheManagerInterface;
++use Fuzzy\Contracts\ModelDiscoveryInterface;
++use Fuzzy\Contracts\IndexManagerInterface;
++use Fuzzy\Contracts\SearchProcessorInterface;
++use Fuzzy\Contracts\ResultFilterInterface;
++use Fuzzy\Contracts\PipelineManagerInterface;
++use Fuzzy\Contracts\SearchContextInterface;
++use Fuzzy\Contracts\ScoringEngineInterface;
++use Fuzzy\Config\AdvancedScoringConfig;
++use Fuzzy\Config\SimilarityCalculatorConfig;
++use Fuzzy\Services\FuzzySearchService;
+ use Fuzzy\Services\ServiceRegistrar;
+ use Illuminate\Support\ServiceProvider;
+
+@@ @@
+     public function provides(): array
+     {
+         return [
+-            \Fuzzy\Contracts\CacheManagerInterface::class,
+-            \Fuzzy\Contracts\ModelDiscoveryInterface::class,
+-            \Fuzzy\Contracts\IndexManagerInterface::class,
+-            \Fuzzy\Contracts\SearchProcessorInterface::class,
+-            \Fuzzy\Contracts\ResultFilterInterface::class,
+-            \Fuzzy\Contracts\PipelineManagerInterface::class,
+-            \Fuzzy\Contracts\SearchContextInterface::class,
+-            \Fuzzy\Contracts\ScoringEngineInterface::class,
+-            \Fuzzy\Config\AdvancedScoringConfig::class,
+-            \Fuzzy\Config\SimilarityCalculatorConfig::class,
+-            \Fuzzy\Services\FuzzySearchService::class,
++            CacheManagerInterface::class,
++            ModelDiscoveryInterface::class,
++            IndexManagerInterface::class,
++            SearchProcessorInterface::class,
++            ResultFilterInterface::class,
++            PipelineManagerInterface::class,
++            SearchContextInterface::class,
++            ScoringEngineInterface::class,
++            AdvancedScoringConfig::class,
++            SimilarityCalculatorConfig::class,
++            FuzzySearchService::class,
+             'laravel-fuzzy.search',
+         ];
+     }
+    ----------- end diff -----------
+
+Applied rules:
+
+
+52) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Repositories/IndexRepository.php:98
+
+    ---------- begin diff ----------
+@@ @@
+
+     /**
+      * {@inheritDoc}
++     * @return array<string, Model>
+      */
+     public function getPreloadedModelsMap(): array
+     {
+@@ @@
+
+     /**
+      * {@inheritDoc}
++     * @return array<string, mixed>
+      */
+     public function getStats(): array
+     {
+    ----------- end diff -----------
+
+Applied rules:
+ * DocblockGetterReturnArrayFromPropertyDocblockVarRector
+ * DocblockReturnArrayFromDirectArrayInstanceRector
+
+
+53) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/SearchContext.php:102
+
+    ---------- begin diff ----------
+@@ @@
+
+     /**
+      * Preload all required models for efficient access.
+-     *
+-     * @return void
+      */
+     private function preloadModels(): void
+     {
+@@ @@
+
+     /**
+      * {@inheritDoc}
++     * @return array<string, array>
+      */
+     public function getAllPotentialMatches(): array
+     {
+    ----------- end diff -----------
+
+Applied rules:
+ * RemoveUselessReturnTagRector
+ * DocblockGetterReturnArrayFromPropertyDocblockVarRector
+
+
+54) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/Algorithms/LevenshteinSimilarityAlgorithm.php:138
+
+    ---------- begin diff ----------
+@@ @@
+         $closeMatchBonus = $this->config->getCloseMatchBonus();
+
+         if ($levenshteinDistance <= $closeMatchThreshold && $longestLength >= $minimumLengthForBonus) {
+-            $currentSimilarity = min($currentSimilarity + $closeMatchBonus, FUZZY_SCORE_IDENTICAL);
++            return min($currentSimilarity + $closeMatchBonus, FUZZY_SCORE_IDENTICAL);
+         }
+
+         return $currentSimilarity;
+    ----------- end diff -----------
+
+Applied rules:
+ * CompleteMissingIfElseBracketRector
+ * ReturnEarlyIfVariableRector
+
+
+55) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/Algorithms/WordSimilarity/LetterDistanceCalculator.php:71
+
+    ---------- begin diff ----------
+@@ @@
+
+     /**
+      * Find matching letters between two sets with position windows.
++     * @param string[] $lettersA
++     * @param string[] $lettersB
+      */
+     private function findLetterMatches(array $lettersA, array $lettersB): array
+     {
+@@ @@
+
+     /**
+      * Find the best matching letter in the target string.
++     * @param array<int, mixed> $searchLetters
+      */
+     private function findBestLetterMatch(
+         string $targetLetter,
+@@ @@
+         $startSearch = max($startIndex, $currentPosition - $searchWindow);
+         $endSearch = min(count($searchLetters), $currentPosition + $searchWindow + $baseIncrement);
+
+-        for ($searchPosition = $startSearch; $searchPosition < $endSearch; $searchPosition++) {
++        for ($searchPosition = $startSearch; $searchPosition < $endSearch; ++$searchPosition) {
+             if (in_array($searchPosition, $usedPositions, true)) {
+                 continue;
+             }
+@@ @@
+
+     /**
+      * Calculate total distance from matched letter pairs.
++     * @param string[] $lettersA
++     * @param string[] $lettersB
+      */
+     private function calculateTotalMatchedDistance(array $matchedPairs, array $lettersA, array $lettersB): float
+     {
+@@ @@
+             );
+
+             if (!$pair['isExact']) {
+-                $imperfectMatchCount++;
++                ++$imperfectMatchCount;
+             }
+         }
+
+@@ @@
+         $unmatchedMultiplier = $this->config->getUnmatchedLetterMultiplier();
+         $totalDistance += ($unmatchedCountA + $unmatchedCountB) * $unmatchedPenaltyBase * $unmatchedMultiplier;
+
+-        $totalDistance += $imperfectMatchCount * $this->config->getImperfectMatchPenalty();
+-
+-        return $totalDistance;
++        return $totalDistance + $imperfectMatchCount * $this->config->getImperfectMatchPenalty();
+     }
+
+     /**
+@@ @@
+
+     /**
+      * Count common letters between two letter sets.
++     * @param string[] $lettersA
++     * @param string[] $lettersB
+      */
+     private function countCommonLetters(array $lettersA, array $lettersB): int
+     {
+@@ @@
+
+         foreach ($lettersA as $letterA) {
+             if (in_array($letterA, $lettersB, true)) {
+-                $commonCount++;
++                ++$commonCount;
+             }
+         }
+    ----------- end diff -----------
+
+Applied rules:
+ * SimplifyUselessVariableRector
+ * PostIncDecToPreIncDecRector
+ * AddParamArrayDocblockFromDimFetchAccessRector
+ * ClassMethodArrayDocblockParamFromLocalCallsRector
+
+
+56) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/Algorithms/WordSimilarity/WordMatchScorer.php:12
+
+    ---------- begin diff ----------
+@@ @@
+ class WordMatchScorer
+ {
+     private WordSimilarityComparatorConfig $config;
++
+     private WordSimilarityCalculator $wordSimilarityCalculator;
+
+     public function __construct(WordSimilarityComparatorConfig $config)
+@@ @@
+         $emptyTextPenalty = $this->calculateEmptyTextPenalty($queryWords);
+         $baseIncrement = $this->config->getBaseIncrement();
+
+-        if (empty($textWords)) {
++        if ($textWords === []) {
+             return $emptyTextPenalty * $sigma;
+         }
+
+         $bestScores = $this->findBestScoresForQuery($queryWords, $textWords);
+
+-        if (empty($bestScores)) {
++        if ($bestScores === []) {
+             return $emptyTextPenalty * $sigma;
+         }
+
+@@ @@
+
+         foreach ($scores as $score) {
+             if ($score > $threshold) {
+-                $badMatchCount++;
++                ++$badMatchCount;
+             }
+         }
+
+@@ @@
+         return $badMatchCount;
+     }
+
++    /**
++     * @param string[] $queryWords
++     */
+     private function calculateEmptyTextPenalty(array $queryWords): float
+     {
+         $wordCount = count($queryWords);
+    ----------- end diff -----------
+
+Applied rules:
+ * SimplifyEmptyCheckOnEmptyArrayRector
+ * NewlineBetweenClassLikeStmtsRector
+ * PostIncDecToPreIncDecRector
+ * ClassMethodArrayDocblockParamFromLocalCallsRector
+
+
+57) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/Algorithms/WordSimilarity/WordSimilarityCalculator.php:12
+
+    ---------- begin diff ----------
+@@ @@
+ class WordSimilarityCalculator
+ {
+     private WordSimilarityComparatorConfig $config;
++
+     private LetterDistanceCalculator $letterDistanceCalculator;
+
+     public function __construct(WordSimilarityComparatorConfig $config)
+@@ @@
+
+     /**
+      * Count common letters between two letter sets.
++     * @param string[] $lettersA
++     * @param string[] $lettersB
+      */
+     private function countCommonLetters(array $lettersA, array $lettersB): int
+     {
+@@ @@
+
+         foreach ($lettersA as $letterA) {
+             if (in_array($letterA, $lettersB, true)) {
+-                $commonCount++;
++                ++$commonCount;
+             }
+         }
+    ----------- end diff -----------
+
+Applied rules:
+ * NewlineBetweenClassLikeStmtsRector
+ * PostIncDecToPreIncDecRector
+ * ClassMethodArrayDocblockParamFromLocalCallsRector
+
+
+58) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/Algorithms/WordSimilarityComparator.php:7
+
+    ---------- begin diff ----------
+@@ @@
+ use Fuzzy\Contracts\StringNormalizerInterface;
+ use Fuzzy\Config\WordSimilarityComparatorConfig;
+ use Fuzzy\Services\Algorithms\WordSimilarity\WordMatchScorer;
+-use Fuzzy\Services\Algorithms\WordSimilarity\LetterDistanceCalculator;
+
+ /**
+  * Advanced lexical similarity comparator for strings.
+@@ @@
+ class WordSimilarityComparator
+ {
+     private StringNormalizerInterface $normalizer;
++
+     private WordSimilarityComparatorConfig $config;
++
+     private WordMatchScorer $wordMatchScorer;
+-    private LetterDistanceCalculator $letterDistanceCalculator;
+
+     /**
+      * Constructor for WordSimilarityComparator.
+@@ @@
+         $this->normalizer = $normalizer;
+         $this->config = $config ?? WordSimilarityComparatorConfig::createDefault();
+         $this->wordMatchScorer = new WordMatchScorer($this->config);
+-        $this->letterDistanceCalculator = new LetterDistanceCalculator($this->config);
+     }
+
+     /**
+@@ @@
+         }
+
+         // Empty query handling
+-        if (empty($queryWords)) {
++        if ($queryWords === []) {
+             return $this->config->getMaxScoreCap();
+         }
+
+         // Empty text handling - penalty based on query word count
+-        if (empty($textWords)) {
++        if ($textWords === []) {
+             $emptyTextPenalty = $this->calculateEmptyTextPenalty($queryWords);
+             return min($this->config->getMaxScoreCap(), $emptyTextPenalty);
+         }
+@@ @@
+
+         $filteredQueryWords = $this->filterShortWords($queryWords);
+
+-        if (empty($filteredQueryWords)) {
++        if ($filteredQueryWords === []) {
+             return $this->config->getMaxScoreCap();
+         }
+    ----------- end diff -----------
+
+Applied rules:
+ * SimplifyEmptyCheckOnEmptyArrayRector
+ * NewlineBetweenClassLikeStmtsRector
+ * RemoveUnusedPrivatePropertyRector
+
+
+59) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/CacheManagerService.php:4
+
+    ---------- begin diff ----------
+@@ @@
+
+ namespace Fuzzy\Services;
+
++use Carbon\Carbon;
+ use Fuzzy\Contracts\CacheManagerInterface;
+ use Fuzzy\Config\CacheConfig;
+ use Illuminate\Support\Facades\Cache;
+@@ @@
+ class CacheManagerService implements CacheManagerInterface
+ {
+     private const MIN_CACHE_KEY_LENGTH_FOR_HASH = 250;
++
+     private const STATS_CACHE_TYPE = 'stats';
+
+     private CacheConfig $config;
+@@ @@
+
+     /**
+      * Extract model class from parameters array
++     * @param array<int, mixed> $parameters
+      */
+     private function extractModelClassFromParameters(array $parameters): ?string
+     {
+@@ @@
+             return $parameters[0];
+         }
+
+-        // Pour search_in_models: [modelClasses, query, options]
+-        if (isset($parameters[0]) && is_array($parameters[0])) {
+-            // Pour l'invalidation, on ne stocke pas tous les modèles
+-            // On retourne null car l'invalidation se fera par modèle individuel
+-            return null;
+-        }
+-
+         return null;
+     }
+
+@@ @@
+         // Structure des données stockées
+         $keyData = [
+             'key' => $key,
+-            'created_at' => time(),
++            'created_at' => Carbon::now()
++                ->getTimestamp(),
+         ];
+
+         if ($modelClass !== null) {
+@@ @@
+                 $keyExists = true;
+                 break;
+             }
++
+             if (is_string($existingKeyData) && $existingKeyData === $key) {
+                 $keyExists = true;
+                 break;
+@@ @@
+      * Remove stats key from stored keys tracking.
+      *
+      * @param string $statsKey The stats cache key to remove
+-     * @return void
+      */
+     private function removeStatsKeyFromStorage(string $statsKey): void
+     {
+@@ @@
+                 $keyRemoved = true;
+                 continue;
+             }
++
+             $keysToKeep[] = $keyData;
+         }
+    ----------- end diff -----------
+
+Applied rules:
+ * TimeFuncCallToCarbonRector
+ * NewlineBetweenClassLikeStmtsRector
+ * NewlineAfterStatementRector
+ * RemoveUselessReturnTagRector
+ * RemoveDeadConditionAboveReturnRector
+ * AddParamArrayDocblockFromDimFetchAccessRector
+
+
+60) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/FuzzySearchService.php:4
+
+    ---------- begin diff ----------
+@@ @@
+
+ namespace Fuzzy\Services;
+
++use Fuzzy\Data\SearchResultData;
+ use Fuzzy\Contracts\CacheManagerInterface;
+ use Fuzzy\Contracts\IndexManagerInterface;
+ use Fuzzy\Contracts\ModelDiscoveryInterface;
+@@ @@
+     {
+         return $this->cacheManager->remember(
+             type: 'search',
+-            callback: fn() => $this->executeSearch($query, $options),
++            callback: fn(): Collection => $this->executeSearch($query, $options),
+             parameters: [$query, $options]
+         );
+     }
+@@ @@
+      *
+      * @param string $query The search query string
+      * @param array<string, mixed> $options Search options
+-     * @return Collection<int, \Fuzzy\Data\SearchResultData> Collection of search results
++     * @return Collection<int, SearchResultData> Collection of search results
+      */
+     private function executeSearch(string $query, array $options = []): Collection
+     {
+@@ @@
+     {
+         return $this->cacheManager->remember(
+             type: 'search_in_model',
+-            callback: fn() => $this->searchProcessor->searchInModel($modelClass, $query, $options),
++            callback: fn(): Collection => $this->searchProcessor->searchInModel($modelClass, $query, $options),
+             parameters: [$modelClass, $query, $options]
+         );
+     }
+@@ @@
+     {
+         return $this->cacheManager->remember(
+             type: 'search_in_models',
+-            callback: fn() => $this->searchProcessor->searchInModels($modelClasses, $query, $options),
++            callback: fn(): Collection => $this->searchProcessor->searchInModels($modelClasses, $query, $options),
+             parameters: [$modelClasses, $query, $options]
+         );
+     }
+    ----------- end diff -----------
+
+Applied rules:
+ * AddArrowFunctionReturnTypeRector
+
+
+61) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/IndexBuilder.php:4
+
+    ---------- begin diff ----------
+@@ @@
+
+ namespace Fuzzy\Services;
+
++use ArrayAccess;
+ use Fuzzy\Contracts\ContextualNormalizerInterface;
+ use Fuzzy\Contracts\MustFuzzySearch;
+ use Fuzzy\Models\FuzzyIndex;
+@@ @@
+      * from the model to preserve stop words where appropriate.
+      *
+      * @param MustFuzzySearch $model The searchable model instance to index
+-     * @return void
+      */
+     public function indexModel(MustFuzzySearch $model): void
+     {
+@@ @@
+     {
+         // Try Eloquent's getAttribute method
+         if (method_exists($model, 'getAttribute')) {
+-            /** @var \Illuminate\Database\Eloquent\Model $model */
++            /** @var Model $model */
+             return $model->getAttribute($field);
+         }
+
+@@ @@
+         }
+
+         // Try array access if model implements ArrayAccess
+-        if ($model instanceof \ArrayAccess && isset($model[$field])) {
++        if ($model instanceof ArrayAccess && isset($model[$field])) {
+             return $model[$field];
+         }
+
+@@ @@
+      * @param mixed $modelId The model's primary key value
+      * @param string $field The field name being indexed
+      * @param string $value The field value to index
+-     * @return void
+      */
+     public function indexField(string $modelType, mixed $modelId, string $field, string $value): void
+     {
+@@ @@
+
+         $words = $this->normalizer->splitIntoWords($normalizedValue);
+
+-        if (empty($words)) {
++        if ($words === []) {
+             return;
+         }
+
+@@ @@
+      * Efficiently indexes an array of models in a single operation.
+      *
+      * @param array<MustFuzzySearch|Model> $models Array of models to index
+-     * @return void
+      */
+     public function batchIndex(array $models): void
+     {
+    ----------- end diff -----------
+
+Applied rules:
+ * SimplifyEmptyCheckOnEmptyArrayRector
+ * RemoveUselessReturnTagRector
+
+
+62) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/IndexManagerService.php:13
+
+    ---------- begin diff ----------
+@@ @@
+ class IndexManagerService implements IndexManagerInterface
+ {
+     private const REINDEX_CHUNK_SIZE = 100;
++
+     private const PCT_FACTOR = 100;
+
+     public function __construct(
+@@ @@
+         return $this->indexRepository->getStats();
+     }
+
++    /**
++     * @return array<string, mixed>
++     */
+     public function getPreciseModelStats(string $modelClass): array
+     {
+         $this->modelDiscovery->validateModel($modelClass);
+@@ @@
+         $totalRecords = 0;
+         $indexableRecords = 0;
+
+-        $modelClass::chunk(self::REINDEX_CHUNK_SIZE, function ($models) use (&$totalRecords, &$indexableRecords) {
++        $modelClass::chunk(self::REINDEX_CHUNK_SIZE, function ($models) use (&$totalRecords, &$indexableRecords): void {
+             $totalRecords += count($models);
+
+             foreach ($models as $model) {
+                 if ($model->shouldBeIndexed()) {
+-                    $indexableRecords++;
++                    ++$indexableRecords;
+                 }
+             }
+         });
+    ----------- end diff -----------
+
+Applied rules:
+ * NewlineBetweenClassLikeStmtsRector
+ * PostIncDecToPreIncDecRector
+ * DocblockReturnArrayFromDirectArrayInstanceRector
+ * AddClosureVoidReturnTypeWhereNoReturnRector
+
+
+63) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/ModelDiscoveryService.php:13
+
+    ---------- begin diff ----------
+@@ @@
+ class ModelDiscoveryService implements ModelDiscoveryInterface
+ {
+     private const EXTRACT_NAMESPACE_REGEX = '/namespace\s+(.+?);/s';
++
+     private const EXTRACT_CLASS_REGEX = '/class\s+(\w+)(?:\s+extends|\s+implements|\s*\{)/';
+
+     /**
+    ----------- end diff -----------
+
+Applied rules:
+ * NewlineBetweenClassLikeStmtsRector
+
+
+64) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/PipelineStageManager.php:40
+
+    ---------- begin diff ----------
+@@ @@
+         $customStages = config('fuzzy.pipeline', []);
+
+         // Validate each custom stage
+-        foreach ($customStages as $index => $stage) {
++        foreach ($customStages as $stage) {
+             $this->validateStage($stage);
+         }
+
+@@ @@
+             if (in_array($stage, $seen, true)) {
+                 throw DuplicateStageException::duplicate($stage, $index + 1);
+             }
++
+             $seen[] = $stage;
+         }
+     }
+    ----------- end diff -----------
+
+Applied rules:
+ * NewlineAfterStatementRector
+ * RemoveUnusedForeachKeyRector
+
+
+65) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Stages/RelevanceScoringStageTest.php:5
 
     ---------- begin diff ----------
 @@ @@
@@ -2852,7 +4316,7 @@ Applied rules:
  * ClassMethodArrayDocblockParamFromLocalCallsRector
 
 
-50) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Stages/ScoringStageTest.php:17
+66) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Stages/ScoringStageTest.php:17
 
     ---------- begin diff ----------
 @@ @@
@@ -2868,7 +4332,7 @@ Applied rules:
 Applied rules:
 
 
-51) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Stages/SortAndLimitStageTest.php:5
+67) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Stages/SortAndLimitStageTest.php:5
 
     ---------- begin diff ----------
 @@ @@
@@ -2893,7 +4357,7 @@ Applied rules:
  * ClassMethodArrayDocblockParamFromLocalCallsRector
 
 
-52) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/database/migrations/2024_01_01_000000_create_non_indexable_users_table.php:17
+68) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/database/migrations/2024_01_01_000000_create_non_indexable_users_table.php:17
 
     ---------- begin diff ----------
 @@ @@
@@ -2911,7 +4375,7 @@ Applied rules:
  * AddClosureVoidReturnTypeWhereNoReturnRector
 
 
-53) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/database/migrations/2024_01_01_000000_create_non_searchable_models_table.php:17
+69) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/database/migrations/2024_01_01_000000_create_non_searchable_models_table.php:17
 
     ---------- begin diff ----------
 @@ @@
@@ -2929,7 +4393,7 @@ Applied rules:
  * AddClosureVoidReturnTypeWhereNoReturnRector
 
 
-54) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/ResultFilterService.php:4
+70) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/ResultFilterService.php:4
 
     ---------- begin diff ----------
 @@ @@
@@ -2955,7 +4419,7 @@ Applied rules:
  * FlipTypeControlToUseExclusiveTypeRector
 
 
-55) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/Scoring/ScoringEngine.php:113
+71) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/Scoring/ScoringEngine.php:113
 
     ---------- begin diff ----------
 @@ @@
@@ -3107,7 +4571,7 @@ Applied rules:
  * RemoveUselessReturnTagRector
 
 
-56) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/SearchProcessorService.php:4
+72) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/SearchProcessorService.php:4
 
     ---------- begin diff ----------
 @@ @@
@@ -3153,7 +4617,7 @@ Applied rules:
  * ClassMethodArrayDocblockParamFromLocalCallsRector
 
 
-57) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/ServiceRegistrar.php:4
+73) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/ServiceRegistrar.php:4
 
     ---------- begin diff ----------
 @@ @@
@@ -3161,6 +4625,7 @@ Applied rules:
  namespace Fuzzy\Services;
 
 +use RuntimeException;
++use Illuminate\Contracts\Console\Kernel;
  use Fuzzy\Commands\ClearCacheCommand;
  use Fuzzy\Commands\ClearIndexCommand;
  use Fuzzy\Commands\IndexSearchCommand;
@@ -3308,14 +4773,62 @@ Applied rules:
      private function publishMigrationsIfNotExists(): void
      {
 @@ @@
+         }
+
+         // Display skipped files message if any migrations were skipped
+-        if (!empty($skippedFiles) && $this->app->runningInConsole()) {
++        if ($skippedFiles !== [] && $this->app->runningInConsole()) {
+             $this->outputSkippedMigrationsMessage($skippedFiles);
+         }
 
          // Publish only the migrations that don't exist
-         // Using the publishes() method from ServiceProviderHelper trait
 -        if (!empty($filesToPublish)) {
 +        if ($filesToPublish !== []) {
              $this->publishes($filesToPublish, 'fuzzy-migrations');
+         } elseif ($this->app->runningInConsole()) {
+             $this->outputAllMigrationsSkippedMessage();
+@@ @@
+      * Display a message showing which migration files were skipped.
+      *
+      * @param array<int, string> $skippedFiles List of skipped migration file names
+-     * @return void
+      */
+     private function outputSkippedMigrationsMessage(array $skippedFiles): void
+     {
+@@ @@
+             $count === 1 ? 's' : ''
+         );
+
+-        $this->app->make('Illuminate\Contracts\Console\Kernel')->getOutput()->writeln($message);
++        $this->app->make(Kernel::class)->getOutput()->writeln($message);
+
+         foreach ($skippedFiles as $file) {
+-            $this->app->make('Illuminate\Contracts\Console\Kernel')->getOutput()->writeln(
++            $this->app->make(Kernel::class)->getOutput()->writeln(
+                 sprintf("     <fg=gray>→ %s</fg=gray>", $file)
+             );
          }
+
+-        $this->app->make('Illuminate\Contracts\Console\Kernel')->getOutput()->writeln(
++        $this->app->make(Kernel::class)->getOutput()->writeln(
+             "     <fg=yellow;options=bold>💡 Skipped to preserve existing custom migrations. Use --force to overwrite.</>"
+         );
+-        $this->app->make('Illuminate\Contracts\Console\Kernel')->getOutput()->writeln('');
++        $this->app->make(Kernel::class)->getOutput()->writeln('');
      }
+
+     /**
+      * Display a message when all migrations were skipped.
+-     *
+-     * @return void
+      */
+     private function outputAllMigrationsSkippedMessage(): void
+     {
+-        $output = $this->app->make('Illuminate\Contracts\Console\Kernel')->getOutput();
++        $output = $this->app->make(Kernel::class)->getOutput();
+
+         $output->writeln('');
+         $output->writeln('  <fg=yellow;options=bold>📁 All migration files already exist and were preserved.</>');
     ----------- end diff -----------
 
 Applied rules:
@@ -3323,11 +4836,12 @@ Applied rules:
  * EncapsedStringsToSprintfRector
  * NewlineAfterStatementRector
  * RemoveUselessReturnTagRector
+ * StringClassNameToClassConstantRector
  * AddArrowFunctionReturnTypeRector
  * ClosureReturnTypeRector
 
 
-58) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/SimilarityCalculator.php:4
+74) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/SimilarityCalculator.php:4
 
     ---------- begin diff ----------
 @@ @@
@@ -3372,7 +4886,7 @@ Applied rules:
  * NewlineBetweenClassLikeStmtsRector
 
 
-59) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/StringNormalizer.php:19
+75) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/StringNormalizer.php:19
 
     ---------- begin diff ----------
 @@ @@
@@ -3442,7 +4956,7 @@ Applied rules:
  * AddArrayFunctionClosureParamTypeRector
 
 
-60) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Stages/MatchDiscoveryStage/IndexOptimizer.php:13
+76) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Stages/MatchDiscoveryStage/IndexOptimizer.php:13
 
     ---------- begin diff ----------
 @@ @@
@@ -3504,7 +5018,7 @@ Applied rules:
  * DocblockReturnArrayFromDirectArrayInstanceRector
 
 
-61) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Stages/MatchDiscoveryStage/MatchFinder.php:13
+77) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Stages/MatchDiscoveryStage/MatchFinder.php:13
 
     ---------- begin diff ----------
 @@ @@
@@ -3555,7 +5069,7 @@ Applied rules:
  * AddParamArrayDocblockFromDimFetchAccessRector
 
 
-62) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Stages/RelevanceScoringStage.php:83
+78) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Stages/RelevanceScoringStage.php:83
 
     ---------- begin diff ----------
 @@ @@
@@ -3622,7 +5136,7 @@ Applied rules:
  * ClosureReturnTypeRector
 
 
-63) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Stages/ScoringStage.php:4
+79) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Stages/ScoringStage.php:4
 
     ---------- begin diff ----------
 @@ @@
@@ -3653,7 +5167,7 @@ Applied rules:
 Applied rules:
 
 
-64) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Traits/CommandHelpers.php:20
+80) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Traits/CommandHelpers.php:20
 
     ---------- begin diff ----------
 @@ @@
@@ -3728,7 +5242,7 @@ Applied rules:
  * RemoveUselessReturnTagRector
 
 
-65) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Traits/FuzzySearchable.php:4
+81) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Traits/FuzzySearchable.php:4
 
     ---------- begin diff ----------
 @@ @@
@@ -3764,7 +5278,7 @@ Applied rules:
  * ParamTypeByMethodCallTypeRector
 
 
-66) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Traits/ServiceProviderHelper.php:4
+82) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Traits/ServiceProviderHelper.php:4
 
     ---------- begin diff ----------
 @@ @@
@@ -3807,7 +5321,7 @@ Applied rules:
 Applied rules:
 
 
-67) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Feature/CommandsTest.php:453
+83) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Feature/CommandsTest.php:453
 
     ---------- begin diff ----------
 @@ @@
@@ -3862,7 +5376,7 @@ Applied rules:
  * ClassMethodArrayDocblockParamFromLocalCallsRector
 
 
-68) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Feature/ConfigurationTest.php:4
+84) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Feature/ConfigurationTest.php:4
 
     ---------- begin diff ----------
 @@ @@
@@ -3897,7 +5411,7 @@ Applied rules:
  * RemoveNullArgOnNullDefaultParamRector
 
 
-69) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Feature/FacadeTest.php:24
+85) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Feature/FacadeTest.php:24
 
     ---------- begin diff ----------
 @@ @@
@@ -3931,1429 +5445,6 @@ Applied rules:
 Applied rules:
  * NewlineBetweenClassLikeStmtsRector
  * AssertEqualsToSameRector
-
-
-70) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/Algorithms/WordSimilarity/LetterDistanceCalculatorTest.php:21
-
-    ---------- begin diff ----------
-@@ @@
-     public function test_calculate_letter_distance_identical_strings(): void
-     {
-         $distance = $this->calculator->calculateLetterDistance('hello', 'hello');
--        $this->assertEquals(FUZZY_DISTANCE_IDENTICAL, $distance);
-+        $this->assertSame(FUZZY_DISTANCE_IDENTICAL, $distance);
-     }
-
-     public function test_calculate_letter_distance_similar_strings(): void
-@@ @@
-         $distanceSame = $this->calculator->calculateLetterDistance('a', 'a');
-         $distanceDiff = $this->calculator->calculateLetterDistance('a', 'b');
-
--        $this->assertEquals(FUZZY_DISTANCE_IDENTICAL, $distanceSame);
-+        $this->assertSame(FUZZY_DISTANCE_IDENTICAL, $distanceSame);
-         $this->assertGreaterThan(0, $distanceDiff);
-     }
-
-@@ @@
-     public function test_calculate_letter_distance_with_single_character_matching(): void
-     {
-         $distance = $this->calculator->calculateLetterDistance('a', 'a');
--        $this->assertEquals(FUZZY_DISTANCE_IDENTICAL, $distance);
-+        $this->assertSame(FUZZY_DISTANCE_IDENTICAL, $distance);
-     }
-
-     public function test_calculate_letter_distance_with_empty_strings(): void
-     {
-         $distance = $this->calculator->calculateLetterDistance('', '');
--        $this->assertEquals(FUZZY_DISTANCE_IDENTICAL, $distance);
-+        $this->assertSame(FUZZY_DISTANCE_IDENTICAL, $distance);
-
-         $distance2 = $this->calculator->calculateLetterDistance('abc', '');
-         $this->assertGreaterThan(0, $distance2);
-@@ @@
-     public function test_calculate_letter_distance_with_numbers(): void
-     {
-         $distance = $this->calculator->calculateLetterDistance('123', '123');
--        $this->assertEquals(FUZZY_DISTANCE_IDENTICAL, $distance);
-+        $this->assertSame(FUZZY_DISTANCE_IDENTICAL, $distance);
-
-         $distance2 = $this->calculator->calculateLetterDistance('123', '124');
-         $this->assertGreaterThan(0, $distance2);
-    ----------- end diff -----------
-
-Applied rules:
- * AssertEqualsToSameRector
-
-
-71) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/Algorithms/WordSimilarity/WordSimilarityCalculatorTest.php:21
-
-    ---------- begin diff ----------
-@@ @@
-     public function test_calculate_word_similarity_exact_match(): void
-     {
-         $score = $this->calculator->calculateWordSimilarity('hello', 'hello');
--        $this->assertEquals(FUZZY_DISTANCE_IDENTICAL, $score);
-+        $this->assertSame(FUZZY_DISTANCE_IDENTICAL, $score);
-     }
-
-     public function test_calculate_word_similarity_contained_word(): void
-@@ @@
-     public function test_calculate_word_real_similarity_identical_letters(): void
-     {
-         $similarity = $this->calculator->calculateWordRealSimilarity('abc', 'abc');
--        $this->assertEquals(1.0, $similarity);
-+        $this->assertEqualsWithDelta(1.0, $similarity, PHP_FLOAT_EPSILON);
-     }
-
-     public function test_calculate_word_real_similarity_partial_letters(): void
-     {
-         $similarity = $this->calculator->calculateWordRealSimilarity('abc', 'abd');
--        $this->assertEquals(0.5, $similarity);
-+        $this->assertEqualsWithDelta(0.5, $similarity, PHP_FLOAT_EPSILON);
-     }
-
-     public function test_calculate_word_real_similarity_no_common_letters(): void
-     {
-         $similarity = $this->calculator->calculateWordRealSimilarity('abc', 'xyz');
--        $this->assertEquals(0.0, $similarity);
-+        $this->assertEqualsWithDelta(0.0, $similarity, PHP_FLOAT_EPSILON);
-     }
-
-     public function test_calculate_word_similarity_with_phonetic_similarity(): void
-@@ @@
-     {
-         $similarity = $this->calculator->calculateWordRealSimilarity('AbC', 'aBc');
-         // Après normalisation, les deux deviennent 'abc' -> similarité parfaite
--        $this->assertEquals(1.0, $similarity);
-+        $this->assertEqualsWithDelta(1.0, $similarity, PHP_FLOAT_EPSILON);
-     }
-
-     public function test_calculate_word_real_similarity_with_repeated_letters(): void
-     {
-         $similarity = $this->calculator->calculateWordRealSimilarity('aaa', 'aab');
--        $this->assertEquals(0.5, $similarity);
-+        $this->assertEqualsWithDelta(0.5, $similarity, PHP_FLOAT_EPSILON);
-     }
-
-     public function test_calculate_word_similarity_with_empty_words(): void
-     {
-         $score = $this->calculator->calculateWordSimilarity('', '');
--        $this->assertEquals(FUZZY_DISTANCE_IDENTICAL, $score);
-+        $this->assertSame(FUZZY_DISTANCE_IDENTICAL, $score);
-
-         $score2 = $this->calculator->calculateWordSimilarity('hello', '');
-         $this->assertGreaterThan(FUZZY_DISTANCE_IDENTICAL, $score2);
-@@ @@
-     public function test_calculate_word_similarity_single_letter(): void
-     {
-         $score = $this->calculator->calculateWordSimilarity('a', 'a');
--        $this->assertEquals(FUZZY_DISTANCE_IDENTICAL, $score);
-+        $this->assertSame(FUZZY_DISTANCE_IDENTICAL, $score);
-
-         $score2 = $this->calculator->calculateWordSimilarity('a', 'b');
-         $this->assertGreaterThan(FUZZY_DISTANCE_IDENTICAL, $score2);
-    ----------- end diff -----------
-
-Applied rules:
- * AssertEqualsOrAssertSameFloatParameterToSpecificMethodsTypeRector
- * AssertEqualsToSameRector
-
-
-72) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/CacheManagerServiceTest.php:52
-
-    ---------- begin diff ----------
-@@ @@
-         $this->cacheManager = new CacheManagerService();
-
-         $executed = false;
--        $result = $this->cacheManager->remember('test', function () use (&$executed) {
-+        $result = $this->cacheManager->remember('test', function () use (&$executed): string {
-             $executed = true;
-             return 'callback_result';
-         }, []);
-@@ @@
-
-         $callbackExecutions = 0;
-
--        $result1 = $this->cacheManager->remember('test', function () use (&$callbackExecutions) {
--            $callbackExecutions++;
-+        $result1 = $this->cacheManager->remember('test', function () use (&$callbackExecutions): string {
-+            ++$callbackExecutions;
-             return 'cached_value';
-         }, ['param1']);
-
--        $result2 = $this->cacheManager->remember('test', function () use (&$callbackExecutions) {
--            $callbackExecutions++;
-+        $result2 = $this->cacheManager->remember('test', function () use (&$callbackExecutions): string {
-+            ++$callbackExecutions;
-             return 'cached_value';
-         }, ['param1']);
-
--        $this->assertEquals(1, $callbackExecutions);
-+        $this->assertSame(1, $callbackExecutions);
-         $this->assertEquals('cached_value', $result1);
-         $this->assertEquals('cached_value', $result2);
-     }
-@@ @@
-
-         $callbackExecutions = 0;
-
--        $this->cacheManager->remember('test', function () use (&$callbackExecutions) {
--            $callbackExecutions++;
-+        $this->cacheManager->remember('test', function () use (&$callbackExecutions): string {
-+            ++$callbackExecutions;
-             return 'value1';
-         }, ['param1']);
-
--        $this->cacheManager->remember('test', function () use (&$callbackExecutions) {
--            $callbackExecutions++;
-+        $this->cacheManager->remember('test', function () use (&$callbackExecutions): string {
-+            ++$callbackExecutions;
-             return 'value2';
-         }, ['param2']);
-
--        $this->assertEquals(2, $callbackExecutions);
-+        $this->assertSame(2, $callbackExecutions);
-     }
-
-     public function test_remember_stores_model_metadata_for_search_in_model(): void
-@@ @@
-
-         $userParams = [User::class, 'john', []];
-
--        $this->cacheManager->remember('search_in_model', fn() => 'user_result', $userParams);
-+        $this->cacheManager->remember('search_in_model', fn(): string => 'user_result', $userParams);
-
-         $storageKey = $this->getCacheKeysStorageKey();
-         $storedKeys = Cache::get($storageKey, []);
-@@ @@
-         config(['fuzzy.cache.enabled' => true]);
-         $this->cacheManager = new CacheManagerService();
-
--        $this->cacheManager->remember('test', fn() => 'value', []);
-+        $this->cacheManager->remember('test', fn(): string => 'value', []);
-         $this->cacheManager->invalidateAll();
-
-         $callbackExecuted = false;
--        $result = $this->cacheManager->remember('test', function () use (&$callbackExecuted) {
-+        $result = $this->cacheManager->remember('test', function () use (&$callbackExecuted): string {
-             $callbackExecuted = true;
-             return 'new_value';
-         }, []);
-@@ @@
-         config(['fuzzy.cache.enabled' => true]);
-         $this->cacheManager = new CacheManagerService();
-
--        $this->cacheManager->remember('test', fn() => 'value', []);
-+        $this->cacheManager->remember('test', fn(): string => 'value', []);
-
-         $storageKey = $this->getCacheKeysStorageKey();
-         $this->assertNotNull(Cache::get($storageKey));
-@@ @@
-         $productParams = [Product::class, 'laptop', []];
-
-         // Mettre en cache des résultats pour User et Product
--        $this->cacheManager->remember('search_in_model', fn() => 'user_result', $userParams);
--        $this->cacheManager->remember('search_in_model', fn() => 'product_result', $productParams);
-+        $this->cacheManager->remember('search_in_model', fn(): string => 'user_result', $userParams);
-+        $this->cacheManager->remember('search_in_model', fn(): string => 'product_result', $productParams);
-
-         // Récupérer le storage des clés
-         $storageKey = $this->getCacheKeysStorageKey();
-@@ @@
-             if ($model === User::class) {
-                 $userCached = $key;
-             }
-+
-             if ($model === Product::class) {
-                 $productCached = $key;
-             }
-@@ @@
-             if ($model === User::class) {
-                 $userKeyStillExists = true;
-             }
-+
-             if ($model === Product::class) {
-                 $productKeyStillExists = true;
-             }
-@@ @@
-         $userCallbackExecuted = false;
-         $productCallbackExecuted = false;
-
--        $this->cacheManager->remember('search_in_model', function () use (&$userCallbackExecuted) {
-+        $this->cacheManager->remember('search_in_model', function () use (&$userCallbackExecuted): string {
-             $userCallbackExecuted = true;
-             return 'new_user_result';
-         }, $userParams);
-
--        $this->cacheManager->remember('search_in_model', function () use (&$productCallbackExecuted) {
-+        $this->cacheManager->remember('search_in_model', function () use (&$productCallbackExecuted): string {
-             $productCallbackExecuted = false;
-             return 'product_result';
-         }, $productParams);
-@@ @@
-         $longString = str_repeat('a', 300);
-         $params = [$longString];
-
--        $result = $this->cacheManager->remember('test', fn() => 'value', $params);
-+        $result = $this->cacheManager->remember('test', fn(): string => 'value', $params);
-
-         // Devrait retourner la valeur, pas la clé
-         $this->assertEquals('value', $result);
-@@ @@
-         // search_in_models n'a pas de modèle unique
-         $modelsParams = [[User::class, Product::class], 'query', []];
-
--        $this->cacheManager->remember('search_in_models', fn() => 'combined_result', $modelsParams);
-+        $this->cacheManager->remember('search_in_models', fn(): string => 'combined_result', $modelsParams);
-
-         $storageKey = $this->getCacheKeysStorageKey();
-         $storedKeys = Cache::get($storageKey, []);
-@@ @@
-
-         $executionCount = 0;
-
--        $result1 = $this->cacheManager->remember('test', function () use (&$executionCount) {
--            $executionCount++;
-+        $result1 = $this->cacheManager->remember('test', function () use (&$executionCount): string {
-+            ++$executionCount;
-             return 'cached_value';
-         }, []);
-
--        $result2 = $this->cacheManager->remember('test', function () use (&$executionCount) {
--            $executionCount++;
-+        $result2 = $this->cacheManager->remember('test', function () use (&$executionCount): string {
-+            ++$executionCount;
-             return 'cached_value';
-         }, []);
-
--        $this->assertEquals(1, $executionCount);
-+        $this->assertSame(1, $executionCount);
-         $this->assertEquals('cached_value', $result1);
-         $this->assertEquals('cached_value', $result2);
-     }
-    ----------- end diff -----------
-
-Applied rules:
- * PostIncDecToPreIncDecRector
- * NewlineAfterStatementRector
- * AssertEqualsToSameRector
- * AddArrowFunctionReturnTypeRector
- * ClosureReturnTypeRector
-
-
-73) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/IndexBuilderTest.php:4
-
-    ---------- begin diff ----------
-@@ @@
-
- namespace Fuzzy\Tests\Unit\Services;
-
-+use PHPUnit\Framework\Attributes\CoversClass;
-+use Carbon\Carbon;
- use Fuzzy\Models\FuzzyIndex;
- use Fuzzy\Services\IndexBuilder;
- use Fuzzy\Services\StringNormalizer;
-@@ @@
-
- /**
-  * Test suite for the IndexBuilder service.
-- *
-- * @covers \Fuzzy\Services\IndexBuilder
-  */
-+#[CoversClass(\Fuzzy\Services\IndexBuilder::class)]
- final class IndexBuilderTest extends TestCase
- {
-     private IndexBuilder $builder;
-@@ @@
-     public function test_update_or_create_existing_entry(): void
-     {
-         $modelType = User::class;
--        $modelId = time();
-+        $modelId = Carbon::now()
-+            ->getTimestamp();
-         $field = 'unique_test_field_' . $modelId;
-
-         // Utiliser des mots qui ne sont PAS des stop words
-    ----------- end diff -----------
-
-Applied rules:
- * TimeFuncCallToCarbonRector
- * CoversAnnotationWithValueToAttributeRector
-
-
-74) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/IndexManagerServiceTest.php:4
-
-    ---------- begin diff ----------
-@@ @@
-
- namespace Fuzzy\Tests\Unit\Services;
-
-+use Exception;
- use Fuzzy\Contracts\IndexRepositoryInterface;
- use Fuzzy\Contracts\ModelDiscoveryInterface;
- use Fuzzy\Services\IndexBuilder;
-@@ @@
- final class IndexManagerServiceTest extends TestCase
- {
-     private IndexManagerService $indexManager;
-+
-     private $indexBuilder;
-+
-     private $indexRepository;
-+
-     private $modelDiscovery;
-
-     protected function setUp(): void
-@@ @@
-
-         $stats = $this->indexManager->getStats();
-
--        $this->assertEquals($expectedStats, $stats);
-+        $this->assertSame($expectedStats, $stats);
-     }
-
-     public function test_get_precise_model_stats_returns_detailed_stats(): void
-@@ @@
-         // soit ignorer, soit utiliser DatabaseMigrations
-         try {
-             $this->indexManager->reindexModel($modelClass);
--        } catch (\Exception $e) {
-+        } catch (Exception $exception) {
-             // En environnement de test sans base, on ignore l'erreur
-             $this->addToAssertionCount(1);
-             return;
-    ----------- end diff -----------
-
-Applied rules:
- * CatchExceptionNameMatchingTypeRector
- * NewlineBetweenClassLikeStmtsRector
- * AssertEqualsToSameRector
-
-
-75) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/ModelDiscoveryServiceTest.php:4
-
-    ---------- begin diff ----------
-@@ @@
-
- namespace Fuzzy\Tests\Unit\Services;
-
--use Fuzzy\Contracts\MustFuzzySearch;
- use Fuzzy\Exceptions\ModelNotSearchableException;
- use Fuzzy\Services\ModelDiscoveryService;
- use Fuzzy\Tests\Fixtures\NonSearchableModel;
-    ----------- end diff -----------
-
-Applied rules:
-
-
-76) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/PipelineManagerServiceTest.php:4
-
-    ---------- begin diff ----------
-@@ @@
-
- namespace Fuzzy\Tests\Unit\Services;
-
-+use stdClass;
-+use ReflectionClass;
- use Fuzzy\Contracts\SearchContextInterface;
- use Fuzzy\Contracts\StageInterface;
- use Fuzzy\Services\PipelineManagerService;
-@@ @@
- final class PipelineManagerServiceTest extends TestCase
- {
-     private PipelineManagerService $pipelineManager;
-+
-     private $pipeline;
--    private $stages;
-
-     protected function setUp(): void
-     {
-@@ @@
-         $stage2 = Mockery::mock(StageInterface::class);
-         $stage2->shouldReceive('getPriority')->andReturn(60);
-
--        $this->stages = [$stage1, $stage2];
-+        $stages = [$stage1, $stage2];
-
-         $this->pipelineManager = new PipelineManagerService(
-             $this->pipeline,
--            $this->stages
-+            $stages
-         );
-     }
-
-@@ @@
-
-         $invalidStages = [
-             Mockery::mock(StageInterface::class)->shouldReceive('getPriority')->andReturn(50)->getMock(),
--            new \stdClass(), // Invalid stage
-+            new stdClass(), // Invalid stage
-         ];
-
-         new PipelineManagerService($this->pipeline, $invalidStages);
-@@ @@
-
-         $results = $this->pipelineManager->process($context);
-
--        $this->assertEquals($expectedResults, $results);
-+        $this->assertSame($expectedResults, $results);
-     }
-
-     public function test_process_returns_empty_array_when_pipeline_returns_empty(): void
-@@ @@
-             {
-                 return null;
-             }
-+
-+            /**
-+             * @return array{}
-+             */
-             public function getAllModelIds(): array
-             {
-                 return [];
-             }
-+
-             public function hasMultipleWords(): bool
-             {
-                 return false;
-             }
-+
-+            /**
-+             * @return array{}
-+             */
-             public function getQueryWords(): array
-             {
-                 return [];
-             }
-+
-             public function getNormalizedQuery(): string
-             {
-                 return '';
-             }
-+
-+            /**
-+             * @return array{}
-+             */
-             public function getWordIndex(): array
-             {
-                 return [];
-             }
-+
-+            /**
-+             * @return array{}
-+             */
-             public function getItemMap(): array
-             {
-                 return [];
-             }
-+
-+            /**
-+             * @return array{}
-+             */
-             public function getModelIndex(): array
-             {
-                 return [];
-             }
-+
-+            /**
-+             * @return array{}
-+             */
-             public function getIndexEntriesForModel(string $modelType, string $modelId): array
-             {
-                 return [];
-             }
-+
-             public function getModelClass(): string
-             {
-                 return '';
-             }
-+
-             public function addPotentialMatch(array $match): void {}
-+
-+            /**
-+             * @return array{}
-+             */
-             public function getPotentialMatchesForModel(string $key): array
-             {
-                 return [];
-             }
-+
-+            /**
-+             * @return array{}
-+             */
-             public function getAllPotentialMatches(): array
-             {
-                 return [];
-             }
-+
-             public function hasPotentialMatches(string $key): bool
-             {
-                 return false;
-@@ @@
-         $service->process($mockContext);
-
-         // Verify the execution order was set by our mock
--        $this->assertEquals([1, 2], $executionOrder);
-+        $this->assertSame([1, 2], $executionOrder);
-     }
-
-     public function test_process_passes_context_through_pipeline(): void
-@@ @@
-     {
-         // Use a simple anonymous class instead of Mockery for context
-         $mockContext = new class implements SearchContextInterface {
-+            /**
-+             * @var string[]
-+             */
-             public array $results = ['final_result'];
-
-             public function getModelInstance(string $key): ?object
-@@ @@
-             {
-                 return null;
-             }
-+
-+            /**
-+             * @return array{}
-+             */
-             public function getAllModelIds(): array
-             {
-                 return [];
-             }
-+
-             public function hasMultipleWords(): bool
-             {
-                 return false;
-             }
-+
-+            /**
-+             * @return array{}
-+             */
-             public function getQueryWords(): array
-             {
-                 return [];
-             }
-+
-             public function getNormalizedQuery(): string
-             {
-                 return '';
-             }
-+
-+            /**
-+             * @return array{}
-+             */
-             public function getWordIndex(): array
-             {
-                 return [];
-             }
-+
-+            /**
-+             * @return array{}
-+             */
-             public function getItemMap(): array
-             {
-                 return [];
-             }
-+
-+            /**
-+             * @return array{}
-+             */
-             public function getModelIndex(): array
-             {
-                 return [];
-             }
-+
-+            /**
-+             * @return array{}
-+             */
-             public function getIndexEntriesForModel(string $modelType, string $modelId): array
-             {
-                 return [];
-             }
-+
-             public function getModelClass(): string
-             {
-                 return '';
-             }
-+
-             public function addPotentialMatch(array $match): void {}
-+
-+            /**
-+             * @return array{}
-+             */
-             public function getPotentialMatchesForModel(string $key): array
-             {
-                 return [];
-             }
-+
-+            /**
-+             * @return array{}
-+             */
-             public function getAllPotentialMatches(): array
-             {
-                 return [];
-             }
-+
-             public function hasPotentialMatches(string $key): bool
-             {
-                 return false;
-@@ @@
-
-         $results = $this->pipelineManager->process($mockContext);
-
--        $this->assertEquals(['final_result'], $results);
-+        $this->assertSame(['final_result'], $results);
-     }
-
-     public function test_process_sorts_stages_by_priority_descending(): void
-@@ @@
-         $stages = [$mediumPriorityStage, $lowPriorityStage, $highPriorityStage];
-
-         // Create a temporary service to check sorting
--        $reflection = new \ReflectionClass(PipelineManagerService::class);
-+        $reflection = new ReflectionClass(PipelineManagerService::class);
-         $method = $reflection->getMethod('validateAndSortStages');
-         $method->setAccessible(true);
-    ----------- end diff -----------
-
-Applied rules:
- * NewlineBetweenClassLikeStmtsRector
- * NarrowUnusedSetUpDefinedPropertyRector
- * AssertEqualsToSameRector
- * DocblockReturnArrayFromDirectArrayInstanceRector
- * DocblockVarArrayFromPropertyDefaultsRector
-
-
-77) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/PipelineStageManagerTest.php:4
-
-    ---------- begin diff ----------
-@@ @@
-
- namespace Fuzzy\Tests\Unit\Services;
-
--use Fuzzy\Contracts\StageInterface;
- use Fuzzy\Exceptions\DuplicateStageException;
- use Fuzzy\Services\PipelineStageManager;
- use Fuzzy\Stages\MatchDiscoveryStage;
-@@ @@
-             SortAndLimitStage::class,
-         ];
-
--        $this->assertEquals($expected, $stages);
-+        $this->assertSame($expected, $stages);
-     }
-
-     /**
-    ----------- end diff -----------
-
-Applied rules:
- * AssertEqualsToSameRector
-
-
-78) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/ResultFilterServiceTest.php:40
-
-    ---------- begin diff ----------
-@@ @@
-         $filtered = $this->resultFilter->filterAndSort($results, 0.5);
-
-         $this->assertCount(2, $filtered);
--        $this->assertEquals(0.8, $filtered[0]->score);
--        $this->assertEquals(0.6, $filtered[1]->score);
-+        $this->assertEqualsWithDelta(0.8, $filtered[0]->score, PHP_FLOAT_EPSILON);
-+        $this->assertEqualsWithDelta(0.6, $filtered[1]->score, PHP_FLOAT_EPSILON);
-     }
-
-     public function test_filter_and_sort_sorts_by_score_descending(): void
-@@ @@
-
-         $filtered = $this->resultFilter->filterAndSort($results, 0.0);
-
--        $this->assertEquals(0.9, $filtered[0]->score);
--        $this->assertEquals(0.7, $filtered[1]->score);
--        $this->assertEquals(0.6, $filtered[2]->score);
-+        $this->assertEqualsWithDelta(0.9, $filtered[0]->score, PHP_FLOAT_EPSILON);
-+        $this->assertEqualsWithDelta(0.7, $filtered[1]->score, PHP_FLOAT_EPSILON);
-+        $this->assertEqualsWithDelta(0.6, $filtered[2]->score, PHP_FLOAT_EPSILON);
-     }
-
-     public function test_filter_and_sort_removes_null_results(): void
-@@ @@
-
-         $filtered = $this->resultFilter->filterAndSort($results, 0.0);
-
--        $this->assertEquals(0, array_key_first($filtered->toArray()));
--        $this->assertEquals(1, array_key_last($filtered->toArray()));
-+        $this->assertSame(0, array_key_first($filtered->toArray()));
-+        $this->assertSame(1, array_key_last($filtered->toArray()));
-     }
- }
-    ----------- end diff -----------
-
-Applied rules:
- * AssertEqualsOrAssertSameFloatParameterToSpecificMethodsTypeRector
- * AssertEqualsToSameRector
-
-
-79) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/ScoringEngineTest.php:21
-
-    ---------- begin diff ----------
-@@ @@
- final class ScoringEngineTest extends TestCase
- {
-     private ScoringEngineInterface $scoringEngine;
-+
-     private SearchContext $searchContext;
-
-     protected function setUp(): void
-@@ @@
-
-     /**
-      * Creates a test index entry.
-+     * @return array<string, string|string[]|float>
-      */
-     private function createTestIndexEntry(string $field = 'name'): array
-     {
-@@ @@
-         // Assert: Should return perfect score
-         $this->assertEqualsWithDelta(1.0, $score, PHP_FLOAT_EPSILON);
-     }
-+
-     /**
-      * Test fallback score uses similarity calculator.
-      */
-    ----------- end diff -----------
-
-Applied rules:
- * NewlineBetweenClassLikeStmtsRector
- * DocblockReturnArrayFromDirectArrayInstanceRector
-
-
-80) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/SearchProcessorServiceTest.php:19
-
-    ---------- begin diff ----------
-@@ @@
- final class SearchProcessorServiceTest extends TestCase
- {
-     private SearchProcessorService $searchProcessor;
-+
-     private $pipeline;
-+
-     private $normalizer;
--    private $similarityCalculator;
-     private $indexRepository;
--    private $scoringEngine;
-     private $modelDiscovery;
-+
-     private $resultFilter;
-
-     protected function setUp(): void
-@@ @@
-
-         $this->pipeline = Mockery::mock(Pipeline::class);
-         $this->normalizer = Mockery::mock(StringNormalizer::class);
--        $this->similarityCalculator = Mockery::mock(SimilarityCalculator::class);
-+        $similarityCalculator = Mockery::mock(SimilarityCalculator::class);
-         $this->indexRepository = Mockery::mock(IndexRepositoryInterface::class);
--        $this->scoringEngine = Mockery::mock(ScoringEngine::class);
-+        $scoringEngine = Mockery::mock(ScoringEngine::class);
-         $this->modelDiscovery = Mockery::mock(ModelDiscoveryInterface::class);
-         $this->resultFilter = Mockery::mock(ResultFilterInterface::class);
-
-@@ @@
-         $this->searchProcessor = new SearchProcessorService(
-             $this->pipeline,
-             $this->normalizer,
--            $this->similarityCalculator,
-+            $similarityCalculator,
-             $this->indexRepository,
--            $this->scoringEngine,
-+            $scoringEngine,
-             $this->modelDiscovery,
-             $this->resultFilter
-         );
-@@ @@
-
-         $this->resultFilter->shouldReceive('filterAndSort')
-             ->once()
--            ->with(Mockery::on(function ($collection) use ($pipelineResults) {
-+            ->with(Mockery::on(function ($collection): bool {
-                 return $collection instanceof Collection && $collection->count() === 2;
-             }), Mockery::any())
-             ->andReturn(collect($pipelineResults));
-    ----------- end diff -----------
-
-Applied rules:
- * NewlineBetweenClassLikeStmtsRector
- * RemoveUnusedClosureVariableUseRector
- * NarrowUnusedSetUpDefinedPropertyRector
- * ClosureReturnTypeRector
-
-
-81) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/ServiceRegistrarTest.php:4
-
-    ---------- begin diff ----------
-@@ @@
-
- namespace Fuzzy\Tests\Unit\Services;
-
-+use ReflectionClass;
-+use Fuzzy\Tests\Fixtures\CustomStage;
-+use RuntimeException;
- use Fuzzy\Commands\ClearCacheCommand;
- use Fuzzy\Commands\ClearIndexCommand;
- use Fuzzy\Commands\IndexSearchCommand;
-@@ @@
- final class ServiceRegistrarTest extends TestCase
- {
-     private ServiceRegistrar $registrar;
-+
-     private ServiceProvider $provider;
-
-     protected function setUp(): void
-@@ @@
-             provider: $this->provider
-         );
-
--        $this->app->detectEnvironment(fn() => 'testing');
-+        $this->app->detectEnvironment(fn(): string => 'testing');
-     }
-
-     protected function tearDown(): void
-@@ @@
-         $calculator = $this->app->make(SimilarityCalculator::class);
-
-         // Assert: Verify algorithms are registered using reflection
--        $reflection = new \ReflectionClass($calculator);
-+        $reflection = new ReflectionClass($calculator);
-         $algorithmsProperty = $reflection->getProperty('algorithms');
-         $algorithmsProperty->setAccessible(true);
-+
-         $algorithms = $algorithmsProperty->getValue($calculator);
-
-         $this->assertCount(3, $algorithms);
-@@ @@
-         $calculator = $this->app->make(SimilarityCalculator::class);
-
-         // Assert: Verify LCS algorithm config is correctly injected
--        $reflection = new \ReflectionClass($calculator);
-+        $reflection = new ReflectionClass($calculator);
-         $algorithmsProperty = $reflection->getProperty('algorithms');
-         $algorithmsProperty->setAccessible(true);
-+
-         $algorithms = $algorithmsProperty->getValue($calculator);
-
--        $lcsReflection = new \ReflectionClass($algorithms[0]);
-+        $lcsReflection = new ReflectionClass($algorithms[0]);
-         $lcsConfigProperty = $lcsReflection->getProperty('config');
-         $lcsConfigProperty->setAccessible(true);
-+
-         $lcsConfig = $lcsConfigProperty->getValue($algorithms[0]);
-         $this->assertInstanceOf(LongestCommonSubstringConfig::class, $lcsConfig);
-
-         // Assert: Verify Levenshtein algorithm config is correctly injected
--        $levReflection = new \ReflectionClass($algorithms[1]);
-+        $levReflection = new ReflectionClass($algorithms[1]);
-         $levConfigProperty = $levReflection->getProperty('config');
-         $levConfigProperty->setAccessible(true);
-+
-         $levConfig = $levConfigProperty->getValue($algorithms[1]);
-         $this->assertInstanceOf(LevenshteinAlgorithmConfig::class, $levConfig);
-
-         // Assert: Verify Prefix algorithm config is correctly injected
--        $prefixReflection = new \ReflectionClass($algorithms[2]);
-+        $prefixReflection = new ReflectionClass($algorithms[2]);
-         $prefixConfigProperty = $prefixReflection->getProperty('config');
-         $prefixConfigProperty->setAccessible(true);
-+
-         $prefixConfig = $prefixConfigProperty->getValue($algorithms[2]);
-         $this->assertInstanceOf(PrefixAlgorithmConfig::class, $prefixConfig);
-     }
-@@ @@
-     public function test_register_all_handles_custom_pipeline_stages(): void
-     {
-         // Arrange: Set custom pipeline stages configuration
--        config(['fuzzy.pipeline' => [\Fuzzy\Tests\Fixtures\CustomStage::class]]);
-+        config(['fuzzy.pipeline' => [CustomStage::class]]);
-
-         // Act: Register all services
-         $this->registrar->registerAll();
-@@ @@
-
-         try {
-             // Act & Assert: Expect exception when helpers file is missing
--            $this->expectException(\RuntimeException::class);
-+            $this->expectException(RuntimeException::class);
-             $this->expectExceptionMessage('helpers.php not found at');
-
-             $registrar = new ServiceRegistrar(
-@@ @@
-         $indexBuilder = $this->app->make(IndexBuilder::class);
-
-         // Assert: Verify normalizer dependency is properly injected
--        $reflection = new \ReflectionClass($indexBuilder);
-+        $reflection = new ReflectionClass($indexBuilder);
-         $property = $reflection->getProperty('normalizer');
-         $property->setAccessible(true);
-+
-         $normalizer = $property->getValue($indexBuilder);
-
-         $this->assertInstanceOf(ContextualNormalizerInterface::class, $normalizer);
-@@ @@
-     public function test_multiple_register_calls_are_safe(): void
-     {
-         // Act: Call registerAll multiple times
--        for ($i = 0; $i < 3; $i++) {
-+        for ($i = 0; $i < 3; ++$i) {
-             $this->registrar->registerAll();
-         }
-    ----------- end diff -----------
-
-Applied rules:
- * NewlineBetweenClassLikeStmtsRector
- * NewlineBeforeNewAssignSetRector
- * PostIncDecToPreIncDecRector
- * AddArrowFunctionReturnTypeRector
-
-
-82) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/StringNormalizerTest.php:158
-
-    ---------- begin diff ----------
-@@ @@
-         $this->normalizer->setCurrentField('name');
-         $result = $this->normalizer->normalizeQuery($input);
-
--        $this->assertEquals('jean de la fontaine', $result);
-+        $this->assertSame('jean de la fontaine', $result);
-
-         $this->normalizer->setCurrentField(null);
-         $this->normalizer->setProtectedFields([]);
-@@ @@
-         $result = $this->normalizer->normalizeQuery($input);
-
-         // 'the', 'and', 'are', 'in' sont supprimés, reste 'cat dog house'
--        $this->assertEquals('cat dog house', $result);
-+        $this->assertSame('cat dog house', $result);
-
-         $this->normalizer->setCurrentField(null);
-         $this->normalizer->setProtectedFields([]);
-@@ @@
-
-         // Champ protégé : les stop words sont conservés
-         $resultProtected = $this->normalizer->normalizeForField($value, 'full_name');
--        $this->assertEquals('john and jane doe', $resultProtected);
-+        $this->assertSame('john and jane doe', $resultProtected);
-
-         // Champ non protégé : les stop words sont supprimés
-         $resultNonProtected = $this->normalizer->normalizeForField($value, 'description');
--        $this->assertEquals('john jane doe', $resultNonProtected);
-+        $this->assertSame('john jane doe', $resultNonProtected);
-
-         $this->normalizer->setProtectedFields([]);
-     }
-@@ @@
-         $email = 'john.doe+test@example.com';
-         $result = $this->normalizer->normalize($email);
-         // Les caractères spéciaux sont supprimés par normalize()
--        $this->assertEquals('johndoetestexamplecom', $result);
-+        $this->assertSame('johndoetestexamplecom', $result);
-     }
-
-     public function test_name_with_multiple_stop_words(): void
-@@ @@
-         $this->normalizer->setCurrentField('name');
-         $result = $this->normalizer->normalizeQuery($name);
-
--        $this->assertEquals('charles de gaulle et jean de la fontaine', $result);
-+        $this->assertSame('charles de gaulle et jean de la fontaine', $result);
-
-         $this->normalizer->setCurrentField(null);
-         $this->normalizer->setProtectedFields([]);
-@@ @@
-     {
-         $protectedFields = ['name', 'email', 'username'];
-         $this->normalizer->setProtectedFields($protectedFields);
--        $this->assertEquals($protectedFields, $this->normalizer->getProtectedFields());
-+        $this->assertSame($protectedFields, $this->normalizer->getProtectedFields());
-         $this->normalizer->setProtectedFields([]);
-     }
- }
-    ----------- end diff -----------
-
-Applied rules:
- * AssertEqualsToSameRector
-
-
-83) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/WordSimilarityComparatorTest.php:14
-
-    ---------- begin diff ----------
-@@ @@
- final class WordSimilarityComparatorTest extends TestCase
- {
-     private WordSimilarityComparator $comparator;
--    private StringNormalizer $normalizer;
-
-     /**
-      * Set up test dependencies.
-@@ @@
-     protected function setUp(): void
-     {
-         parent::setUp();
--        $this->normalizer = new StringNormalizer();
-+        $normalizer = new StringNormalizer();
-         $this->comparator = new WordSimilarityComparator(
--            normalizer: $this->normalizer
-+            normalizer: $normalizer
-         );
-     }
-
-@@ @@
-                 $expectedScore,
-                 $score,
-                 0.01,
--                "Failed for: '$inputA' vs '$inputB'. Got: $score, Expected: $expectedScore"
-+                sprintf("Failed for: '%s' vs '%s'. Got: %s, Expected: %s", $inputA, $inputB, $score, $expectedScore)
-             );
-         }
-     }
-@@ @@
-             $this->assertLessThanOrEqual(
-                 $maxScore,
-                 $score,
--                "Score too high for: '$inputA' vs '$inputB'. Got: $score, Max: $maxScore"
-+                sprintf("Score too high for: '%s' vs '%s'. Got: %s, Max: %s", $inputA, $inputB, $score, $maxScore)
-             );
-             $this->assertGreaterThanOrEqual(
-                 0.1,
-                 $score,
--                "Should have at least minimal penalty for non-exact match. Got: $score"
-+                'Should have at least minimal penalty for non-exact match. Got: ' . $score
-             );
-         }
-     }
-@@ @@
-             $this->assertLessThanOrEqual(
-                 $maxScore,
-                 $score,
--                "Score too high for: '$inputA' vs '$inputB'. Got: $score, Max: $maxScore"
-+                sprintf("Score too high for: '%s' vs '%s'. Got: %s, Max: %s", $inputA, $inputB, $score, $maxScore)
-             );
-             $this->assertGreaterThanOrEqual(
-                 0.1,
-                 $score,
--                "Should have at least minimal penalty for non-exact match. Got: $score"
-+                'Should have at least minimal penalty for non-exact match. Got: ' . $score
-             );
-         }
-     }
-@@ @@
-             $this->assertLessThanOrEqual(
-                 $maxScore,
-                 $score,
--                "Score too high for: '$inputA' vs '$inputB'. Got: $score, Max: $maxScore"
-+                sprintf("Score too high for: '%s' vs '%s'. Got: %s, Max: %s", $inputA, $inputB, $score, $maxScore)
-             );
-             $this->assertGreaterThanOrEqual(
-                 0.1,
-                 $score,
--                "Should have at least minimal penalty for non-exact match. Got: $score"
-+                'Should have at least minimal penalty for non-exact match. Got: ' . $score
-             );
-         }
-     }
-@@ @@
-             $this->assertGreaterThanOrEqual(
-                 $expectedMinPenalty,
-                 $score,
--                "Score too low for: '$inputA' vs '$inputB'. Got: $score, Min: $expectedMinPenalty"
-+                sprintf("Score too low for: '%s' vs '%s'. Got: %s, Min: %s", $inputA, $inputB, $score, $expectedMinPenalty)
-             );
-         }
-     }
-@@ @@
-         $this->assertGreaterThan(
-             $scoreSigma1,
-             $scoreSigma2,
--            "Sigma=2.0 ($scoreSigma2) should give higher score than Sigma=1.0 ($scoreSigma1)"
-+            sprintf('Sigma=2.0 (%s) should give higher score than Sigma=1.0 (%s)', $scoreSigma2, $scoreSigma1)
-         );
-         $this->assertLessThan(
-             $scoreSigma1,
-             $scoreSigma05,
--            "Sigma=0.5 ($scoreSigma05) should give lower score than Sigma=1.0 ($scoreSigma1)"
-+            sprintf('Sigma=0.5 (%s) should give lower score than Sigma=1.0 (%s)', $scoreSigma05, $scoreSigma1)
-         );
-     }
-
-@@ @@
-             $this->assertLessThanOrEqual(
-                 $maxScore,
-                 $score,
--                "Score too high for: '$inputA' vs '$inputB'. Got: $score, Max: $maxScore"
-+                sprintf("Score too high for: '%s' vs '%s'. Got: %s, Max: %s", $inputA, $inputB, $score, $maxScore)
-             );
-         }
-     }
-@@ @@
-                 0.0,
-                 $score,
-                 0.01,
--                "Exact match should return 0 for: '$inputA' vs '$inputB'. Got: $score"
-+                sprintf("Exact match should return 0 for: '%s' vs '%s'. Got: %s", $inputA, $inputB, $score)
-             );
-         }
-     }
-@@ @@
-             $this->assertLessThanOrEqual(
-                 $maxScore,
-                 $score,
--                "Score too high for: '$inputA' vs '$inputB'. Got: $score, Max: $maxScore"
-+                sprintf("Score too high for: '%s' vs '%s'. Got: %s, Max: %s", $inputA, $inputB, $score, $maxScore)
-             );
-             $this->assertGreaterThan(0.0, $score);
-         }
-@@ @@
-         $difference1 = $scoreSigma1 - $scoreSigma05;
-         $difference2 = $scoreSigma2 - $scoreSigma1;
-
--        $this->assertGreaterThan(0.02, $difference1, "Sigma should have noticeable effect (diff1: $difference1)");
--        $this->assertGreaterThan(0.02, $difference2, "Sigma should have noticeable effect (diff2: $difference2)");
-+        $this->assertGreaterThan(0.02, $difference1, sprintf('Sigma should have noticeable effect (diff1: %s)', $difference1));
-+        $this->assertGreaterThan(0.02, $difference2, sprintf('Sigma should have noticeable effect (diff2: %s)', $difference2));
-     }
-
-     /**
-@@ @@
-                 0.0,
-                 $score,
-                 0.01,
--                "Case should be ignored for: '$inputA' vs '$inputB'. Got: $score"
-+                sprintf("Case should be ignored for: '%s' vs '%s'. Got: %s", $inputA, $inputB, $score)
-             );
-         }
-     }
-    ----------- end diff -----------
-
-Applied rules:
- * EncapsedStringsToSprintfRector
- * NarrowUnusedSetUpDefinedPropertyRector
-
-
-84) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Stages/MatchDiscoveryStage/MatchFinderTest.php:4
-
-    ---------- begin diff ----------
-@@ @@
-
- namespace Fuzzy\Tests\Unit\Stages\MatchDiscoveryStage;
-
-+use ReflectionProperty;
- use Fuzzy\Contracts\IndexRepositoryInterface;
- use Fuzzy\Services\Scoring\ScoringEngine;
- use Fuzzy\Stages\MatchDiscoveryStage\MatchFinder;
-@@ @@
- final class MatchFinderTest extends TestCase
- {
-     private MatchFinder $finder;
-+
-     private StringNormalizer $normalizer;
-+
-     private SimilarityCalculator&MockObject $similarityCalculator;
-
-     protected function setUp(): void
-@@ @@
-         $this->similarityCalculator = $this->createMock(SimilarityCalculator::class);
-     }
-
-+    /**
-+     * @param array<array<string, array<int, array<string, mixed>>>, mixed> $wordIndex
-+     */
-     private function createContext(
-         string $query,
-         SearchOptionsData $options,
-@@ @@
-             indexDataArray: []
-         );
-
--        $reflection = new \ReflectionProperty($context, 'indexData');
-+        $reflection = new ReflectionProperty($context, 'indexData');
-         $reflection->setAccessible(true);
-         $reflection->setValue($context, $indexData);
-
-@@ @@
-         ];
-
-         $this->similarityCalculator->method('calculateWordSimilarity')
--            ->willReturnCallback(function ($a, $b) {
-+            ->willReturnCallback(function (string $a, string $b): float {
-                 if ($a === 'php' && $b === 'ph') {
-                     return 0.9;
-                 }
-+
-                 return 0.5;
-             });
-
-@@ @@
-     {
-         // Build a large word index
-         $wordIndex = [];
--        for ($i = 0; $i < 100; $i++) {
--            $wordIndex["word{$i}"] = [['indexable_type' => 'User', 'indexable_id' => $i]];
-+        for ($i = 0; $i < 100; ++$i) {
-+            $wordIndex['word' . $i] = [['indexable_type' => 'User', 'indexable_id' => $i]];
-         }
-+
-         $wordIndex['php'] = [['indexable_type' => 'User', 'indexable_id' => 100]];
-
-         $this->similarityCalculator->method('calculateWordSimilarity')
-    ----------- end diff -----------
-
-Applied rules:
- * NewlineBetweenClassLikeStmtsRector
- * EncapsedStringsToSprintfRector
- * PostIncDecToPreIncDecRector
- * NewlineAfterStatementRector
- * TypeWillReturnCallableArrowFunctionRector
- * ClassMethodArrayDocblockParamFromLocalCallsRector
-
-
-85) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Stages/MatchDiscoveryStageTest.php:4
-
-    ---------- begin diff ----------
-@@ @@
-
- namespace Fuzzy\Tests\Unit\Stages;
-
-+use Fuzzy\Enums\StageType;
- use Fuzzy\Contracts\IndexRepositoryInterface;
- use Fuzzy\Services\Scoring\ScoringEngine;
- use ReflectionProperty;
-@@ @@
- final class MatchDiscoveryStageTest extends TestCase
- {
-     private MatchDiscoveryStage $stage;
-+
-     private StringNormalizer $normalizer;
-+
-     private SimilarityCalculator&MockObject $similarityCalculator;
-+
-     private MatchFinder&MockObject $matchFinder;
-
-     protected function setUp(): void
-@@ @@
-         );
-     }
-
-+    /**
-+     * @param array<array<string, array<int, array<string, mixed>>>, mixed> $wordIndex
-+     */
-     private function createContext(
-         string $query,
-         SearchOptionsData $options,
-@@ @@
-             ->method('discoverVeryCloseMatches')
-             ->with($context, 'test', $wordIndex);
-
--        $this->stage->handle($context, fn() => 'next');
-+        $this->stage->handle($context, fn(): string => 'next');
-     }
-
-     /**
-@@ @@
-             ->method('discoverMultiWordMatches')
-             ->with($context);
-
--        $this->stage->handle($context, fn() => 'next');
-+        $this->stage->handle($context, fn(): string => 'next');
-     }
-
-     public function test_handle_skips_fuzzy_when_disabled(): void
-@@ @@
-         $this->matchFinder->expects($this->once())
-             ->method('discoverMultiWordMatches');
-
--        $this->stage->handle($context, fn() => 'next');
-+        $this->stage->handle($context, fn(): string => 'next');
-     }
-
-     public function test_handle_skips_multi_word_when_single_word(): void
-@@ @@
-         $this->matchFinder->expects($this->once())
-             ->method('discoverVeryCloseMatches');
-
--        $this->stage->handle($context, fn() => 'next');
-+        $this->stage->handle($context, fn(): string => 'next');
-     }
-
-     public function test_handle_single_word_with_exact_match_small_index(): void
-     {
-         $wordIndex = [];
--        for ($i = 0; $i < 50; $i++) {
--            $wordIndex["word{$i}"] = [['indexable_type' => 'User', 'indexable_id' => $i]];
-+        for ($i = 0; $i < 50; ++$i) {
-+            $wordIndex['word' . $i] = [['indexable_type' => 'User', 'indexable_id' => $i]];
-         }
-
-         $context = $this->createContext('test', new SearchOptionsData(fuzzy: true), $wordIndex);
-@@ @@
-         $this->matchFinder->expects($this->never())
-             ->method('discoverCloseMatchesOptimized');
-
--        $this->stage->handle($context, fn() => 'next');
-+        $this->stage->handle($context, fn(): string => 'next');
-     }
-
-     public function test_handle_single_word_with_exact_match_large_index(): void
-     {
-         $wordIndex = [];
--        for ($i = 0; $i < 2000; $i++) {
--            $wordIndex["word{$i}"] = [['indexable_type' => 'User', 'indexable_id' => $i]];
-+        for ($i = 0; $i < 2000; ++$i) {
-+            $wordIndex['word' . $i] = [['indexable_type' => 'User', 'indexable_id' => $i]];
-         }
-
-         $context = $this->createContext('test', new SearchOptionsData(fuzzy: true), $wordIndex);
-@@ @@
-             ->method('discoverCloseMatchesOptimized')
-             ->with($context, 'test');
-
--        $this->stage->handle($context, fn() => 'next');
-+        $this->stage->handle($context, fn(): string => 'next');
-     }
-
-     public function test_handle_calls_next_with_results(): void
-@@ @@
-     {
-         $context = $this->createContext('test', new SearchOptionsData(), []);
-
--        $next = function (SearchContext $ctx) {
-+        $next = function (SearchContext $ctx): string {
-             return 'processed';
-         };
-
-@@ @@
-
-     public function test_get_priority(): void
-     {
--        $this->assertEquals(75, $this->stage->getPriority());
-+        $this->assertSame(75, $this->stage->getPriority());
-     }
-
-     public function test_get_type(): void
-     {
--        $this->assertEquals(\Fuzzy\Enums\StageType::MATCH_DISCOVERY, $this->stage->getType());
-+        $this->assertSame(StageType::MATCH_DISCOVERY, $this->stage->getType());
-     }
- }
-    ----------- end diff -----------
-
-Applied rules:
- * NewlineBetweenClassLikeStmtsRector
- * EncapsedStringsToSprintfRector
- * PostIncDecToPreIncDecRector
- * AssertEqualsToSameRector
- * ClassMethodArrayDocblockParamFromLocalCallsRector
- * AddArrowFunctionReturnTypeRector
- * ClosureReturnTypeRector
 
 
  [OK] 85 files would have been changed (dry-run) by Rector                                                              

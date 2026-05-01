@@ -336,6 +336,7 @@ class ServiceRegistrar
         // Get all migration files from source
         $migrationFiles = glob($sourceMigrationsPath . '/*.php');
         $filesToPublish = [];
+        $skippedFiles = [];
 
         foreach ($migrationFiles as $sourceFile) {
             $fileName = basename($sourceFile);
@@ -344,13 +345,66 @@ class ServiceRegistrar
             // Only include files that don't already exist in target
             if (!file_exists($targetFile)) {
                 $filesToPublish[$sourceFile] = $targetFile;
+            } else {
+                $skippedFiles[] = $fileName;
             }
         }
 
+        // Display skipped files message if any migrations were skipped
+        if (!empty($skippedFiles) && $this->app->runningInConsole()) {
+            $this->outputSkippedMigrationsMessage($skippedFiles);
+        }
+
         // Publish only the migrations that don't exist
-        // Using the publishes() method from ServiceProviderHelper trait
         if (!empty($filesToPublish)) {
             $this->publishes($filesToPublish, 'fuzzy-migrations');
+        } elseif ($this->app->runningInConsole()) {
+            $this->outputAllMigrationsSkippedMessage();
         }
+    }
+
+    /**
+     * Display a message showing which migration files were skipped.
+     *
+     * @param array<int, string> $skippedFiles List of skipped migration file names
+     * @return void
+     */
+    private function outputSkippedMigrationsMessage(array $skippedFiles): void
+    {
+        $count = count($skippedFiles);
+        $message = sprintf(
+            "  <fg=yellow;options=bold>📁 %d %s already exist%s:</>",
+            $count,
+            $count === 1 ? 'migration file' : 'migration files',
+            $count === 1 ? 's' : ''
+        );
+
+        $this->app->make('Illuminate\Contracts\Console\Kernel')->getOutput()->writeln($message);
+
+        foreach ($skippedFiles as $file) {
+            $this->app->make('Illuminate\Contracts\Console\Kernel')->getOutput()->writeln(
+                sprintf("     <fg=gray>→ %s</fg=gray>", $file)
+            );
+        }
+
+        $this->app->make('Illuminate\Contracts\Console\Kernel')->getOutput()->writeln(
+            "     <fg=yellow;options=bold>💡 Skipped to preserve existing custom migrations. Use --force to overwrite.</>"
+        );
+        $this->app->make('Illuminate\Contracts\Console\Kernel')->getOutput()->writeln('');
+    }
+
+    /**
+     * Display a message when all migrations were skipped.
+     *
+     * @return void
+     */
+    private function outputAllMigrationsSkippedMessage(): void
+    {
+        $output = $this->app->make('Illuminate\Contracts\Console\Kernel')->getOutput();
+
+        $output->writeln('');
+        $output->writeln('  <fg=yellow;options=bold>📁 All migration files already exist and were preserved.</>');
+        $output->writeln('  <fg=yellow;options=bold>💡 Use --force to overwrite existing migrations.</>');
+        $output->writeln('');
     }
 }
