@@ -39,7 +39,6 @@ use Fuzzy\SearchContext;
 use Fuzzy\Traits\ServiceProviderHelper;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Pipeline\Pipeline;
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\ServiceProvider;
 
 /**
@@ -366,6 +365,7 @@ class ServiceRegistrar
 
     /**
      * Display a message showing which migration files were skipped.
+     * Uses simple console output that works in all environments.
      *
      * @param array<int, string> $skippedFiles List of skipped migration file names
      * @return void
@@ -373,97 +373,29 @@ class ServiceRegistrar
     private function outputSkippedMigrationsMessage(array $skippedFiles): void
     {
         $count = count($skippedFiles);
+        $filesList = implode("\n   - ", $skippedFiles);
 
-        try {
-            // Try to use Artisan facade for output (works during vendor:publish)
-            if (Artisan::getFacadeApplication() && method_exists(Artisan::getFacadeApplication(), 'make')) {
-                $output = Artisan::getFacadeApplication()->make('Illuminate\Contracts\Console\Kernel')->getOutput();
-                if ($output) {
-                    $this->writeOutputMessages($output, $skippedFiles, $count);
-                    return;
-                }
-            }
-        } catch (\Exception $e) {
-            // Fallback to simple output if Artisan doesn't respond
-        }
-
-        // Fallback: Simple console output using error_log or info
         $message = sprintf(
-            '[Fuzzy] %d migration file(s) already exist and were preserved: %s',
+            "\n[Fuzzy] %d migration file(s) already exist and were preserved:\n   - %s\n[Fuzzy] Use --force to overwrite existing migrations.\n",
             $count,
-            implode(', ', $skippedFiles)
+            $filesList
         );
 
-        if (function_exists('info')) {
-            info($message);
-            info('[Fuzzy] Use --force to overwrite existing migrations.');
-        } else {
-            error_log($message);
-            error_log('[Fuzzy] Use --force to overwrite existing migrations.');
-        }
-    }
-
-    /**
-     * Write output messages using the console output interface.
-     *
-     * @param object $output Console output instance
-     * @param array<int, string> $skippedFiles List of skipped files
-     * @param int $count Number of skipped files
-     * @return void
-     */
-    private function writeOutputMessages(object $output, array $skippedFiles, int $count): void
-    {
-        $message = sprintf(
-            "  <fg=yellow;options=bold>📁 %d %s already exist%s:</>",
-            $count,
-            $count === 1 ? 'migration file' : 'migration files',
-            $count === 1 ? 's' : ''
-        );
-
-        $output->writeln($message);
-
-        foreach ($skippedFiles as $file) {
-            $output->writeln(sprintf("     <fg=gray>→ %s</fg=gray>", $file));
-        }
-
-        $output->writeln(
-            "     <fg=yellow;options=bold>💡 Skipped to preserve existing custom migrations. Use --force to overwrite.</>"
-        );
-        $output->writeln('');
+        // Use error_log which works in all environments (CLI, composer, etc.)
+        error_log($message);
     }
 
     /**
      * Display a message when all migrations were skipped.
+     * Uses simple console output that works in all environments.
      *
      * @return void
      */
     private function outputAllMigrationsSkippedMessage(): void
     {
-        try {
-            // Try to use Artisan facade for output (works during vendor:publish)
-            if (Artisan::getFacadeApplication() && method_exists(Artisan::getFacadeApplication(), 'make')) {
-                $output = Artisan::getFacadeApplication()->make('Illuminate\Contracts\Console\Kernel')->getOutput();
-                if ($output) {
-                    $output->writeln('');
-                    $output->writeln('  <fg=yellow;options=bold>📁 All migration files already exist and were preserved.</>');
-                    $output->writeln('  <fg=yellow;options=bold>💡 Use --force to overwrite existing migrations.</>');
-                    $output->writeln('');
-                    return;
-                }
-            }
-        } catch (\Exception $e) {
-            // Fallback to simple output
-        }
+        $message = "\n[Fuzzy] All migration files already exist and were preserved.\n[Fuzzy] Use --force to overwrite existing migrations.\n";
 
-        // Fallback: Simple console output
-        $message = '[Fuzzy] All migration files already exist and were preserved.';
-
-        if (function_exists('info')) {
-            info($message);
-            info('[Fuzzy] Use --force to overwrite existing migrations.');
-        } else {
-            error_log($message);
-            error_log('[Fuzzy] Use --force to overwrite existing migrations.');
-        }
+        // Use error_log which works in all environments (CLI, composer, etc.)
+        error_log($message);
     }
 }

@@ -1,5 +1,5 @@
 # Rector Refactoring Report
-*Generated: ven. 01 mai 2026 18:06:11 WAT*
+*Generated: ven. 01 mai 2026 18:12:10 WAT*
 
 
 85 files with changes
@@ -2953,8 +2953,6 @@ Applied rules:
  namespace Fuzzy\Services;
 
 +use RuntimeException;
-+use Illuminate\Contracts\Console\Kernel;
-+use Exception;
  use Fuzzy\Commands\ClearCacheCommand;
  use Fuzzy\Commands\ClearIndexCommand;
  use Fuzzy\Commands\IndexSearchCommand;
@@ -3117,7 +3115,7 @@ Applied rules:
          } elseif ($this->app->runningInConsole()) {
              $this->outputAllMigrationsSkippedMessage();
 @@ @@
-      * Display a message showing which migration files were skipped.
+      * Uses simple console output that works in all environments.
       *
       * @param array<int, string> $skippedFiles List of skipped migration file names
 -     * @return void
@@ -3125,64 +3123,21 @@ Applied rules:
      private function outputSkippedMigrationsMessage(array $skippedFiles): void
      {
 @@ @@
-         try {
-             // Try to use Artisan facade for output (works during vendor:publish)
-             if (Artisan::getFacadeApplication() && method_exists(Artisan::getFacadeApplication(), 'make')) {
--                $output = Artisan::getFacadeApplication()->make('Illuminate\Contracts\Console\Kernel')->getOutput();
-+                $output = Artisan::getFacadeApplication()->make(Kernel::class)->getOutput();
-                 if ($output) {
-                     $this->writeOutputMessages($output, $skippedFiles, $count);
-                     return;
-                 }
-             }
--        } catch (\Exception $e) {
-+        } catch (Exception $exception) {
-             // Fallback to simple output if Artisan doesn't respond
-         }
-
-@@ @@
-      * @param object $output Console output instance
-      * @param array<int, string> $skippedFiles List of skipped files
-      * @param int $count Number of skipped files
--     * @return void
-      */
-     private function writeOutputMessages(object $output, array $skippedFiles, int $count): void
-     {
-@@ @@
-
      /**
       * Display a message when all migrations were skipped.
+      * Uses simple console output that works in all environments.
 -     *
 -     * @return void
       */
      private function outputAllMigrationsSkippedMessage(): void
      {
-@@ @@
-         try {
-             // Try to use Artisan facade for output (works during vendor:publish)
-             if (Artisan::getFacadeApplication() && method_exists(Artisan::getFacadeApplication(), 'make')) {
--                $output = Artisan::getFacadeApplication()->make('Illuminate\Contracts\Console\Kernel')->getOutput();
-+                $output = Artisan::getFacadeApplication()->make(Kernel::class)->getOutput();
-                 if ($output) {
-                     $output->writeln('');
-                     $output->writeln('  <fg=yellow;options=bold>📁 All migration files already exist and were preserved.</>');
-@@ @@
-                     return;
-                 }
-             }
--        } catch (\Exception $e) {
-+        } catch (Exception $exception) {
-             // Fallback to simple output
-         }
     ----------- end diff -----------
 
 Applied rules:
  * SimplifyEmptyCheckOnEmptyArrayRector
- * CatchExceptionNameMatchingTypeRector
  * EncapsedStringsToSprintfRector
  * NewlineAfterStatementRector
  * RemoveUselessReturnTagRector
- * StringClassNameToClassConstantRector
  * AddArrowFunctionReturnTypeRector
  * ClosureReturnTypeRector
 
