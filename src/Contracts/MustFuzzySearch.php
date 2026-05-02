@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Fuzzy\Contracts;
 
+use Fuzzy\Enums\IndexationLevel;
+
 /**
  * Interface for models that support fuzzy search indexing and searching.
  *
@@ -100,4 +102,22 @@ interface MustFuzzySearch
      * @return array<int, string> List of field names that should preserve stop words
      */
     public function getProtectedFields(): array;
+
+    /**
+     * Get the indexation level defining which lifecycle events trigger indexing.
+     *
+     * This static method allows models to control which events (create, update, delete)
+     * will automatically update the search index. By default, returns IndexationLevel::ALL.
+     *
+     * Override this method in your model to customize indexing behavior:
+     * ```php
+     * public static function getIndexationLevel(): IndexationLevel
+     * {
+     *     return IndexationLevel::CREATE_AND_UPDATE; // Don't index on delete
+     * }
+     * ```
+     *
+     * @return IndexationLevel The indexation level configuration
+     */
+    public static function getIndexationLevel(): IndexationLevel;
 }

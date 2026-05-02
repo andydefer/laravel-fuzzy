@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Fuzzy\Traits;
 
+use Fuzzy\Enums\IndexationLevel;
 use Illuminate\Support\Collection;
 use Fuzzy\Services\FuzzySearchService;
 
@@ -26,27 +27,57 @@ trait FuzzySearchable
      * Boot the fuzzy searchable trait
      *
      * Registers model event listeners to automatically manage search index
-     * during create, update, and delete operations.
+     * during create, update, and delete operations. The events that are
+     * actually registered depend on the model's getIndexationLevel() method.
      *
      * @return void
      */
     protected static function bootFuzzySearchable(): void
     {
-        static::created(static function ($model): void {
-            if ($model->shouldBeIndexed()) {
-                app(FuzzySearchService::class)->getIndexManager()->indexModel($model);
-            }
-        });
+        $indexationLevel = static::getIndexationLevel();
 
-        static::updated(static function ($model): void {
-            if ($model->shouldBeIndexed()) {
-                app(FuzzySearchService::class)->getIndexManager()->updateModelIndex($model);
-            }
-        });
+        if ($indexationLevel->hasEvent('create')) {
+            static::created(static function ($model): void {
+                if ($model->shouldBeIndexed()) {
+                    app(FuzzySearchService::class)->getIndexManager()->indexModel($model);
+                }
+            });
+        }
 
-        static::deleted(static function ($model): void {
-            app(FuzzySearchService::class)->getIndexManager()->removeModel($model);
-        });
+        if ($indexationLevel->hasEvent('update')) {
+            static::updated(static function ($model): void {
+                if ($model->shouldBeIndexed()) {
+                    app(FuzzySearchService::class)->getIndexManager()->updateModelIndex($model);
+                }
+            });
+        }
+
+        if ($indexationLevel->hasEvent('delete')) {
+            static::deleted(static function ($model): void {
+                app(FuzzySearchService::class)->getIndexManager()->removeModel($model);
+            });
+        }
+    }
+
+    /**
+     * Get the indexation level defining which lifecycle events trigger indexing.
+     *
+     * This static method allows models to control which events (create, update, delete)
+     * will automatically update the search index. By default, returns IndexationLevel::ALL.
+     *
+     * Override this method in your model to customize indexing behavior:
+     * ```php
+     * public static function getIndexationLevel(): IndexationLevel
+     * {
+     *     return IndexationLevel::CREATE_AND_UPDATE; // Don't index on delete
+     * }
+     * ```
+     *
+     * @return IndexationLevel The indexation level configuration
+     */
+    public static function getIndexationLevel(): IndexationLevel
+    {
+        return IndexationLevel::ALL;
     }
 
     /**

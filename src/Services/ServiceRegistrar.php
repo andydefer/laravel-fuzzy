@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Fuzzy\Services;
 
+use Fuzzy\Cache\LaravelCacheStore;
 use Fuzzy\Commands\ClearCacheCommand;
 use Fuzzy\Commands\ClearIndexCommand;
 use Fuzzy\Commands\IndexSearchCommand;
@@ -15,6 +16,7 @@ use Fuzzy\Config\PrefixAlgorithmConfig;
 use Fuzzy\Config\SimilarityCalculatorConfig;
 use Fuzzy\Config\WordSimilarityComparatorConfig;
 use Fuzzy\Contracts\CacheManagerInterface;
+use Fuzzy\Contracts\CacheStoreInterface;
 use Fuzzy\Contracts\ContextualNormalizerInterface;
 use Fuzzy\Contracts\IndexManagerInterface;
 use Fuzzy\Contracts\IndexRepositoryInterface;
@@ -93,6 +95,9 @@ class ServiceRegistrar
 
     private function registerContracts(): void
     {
+        // Register CacheStoreInterface with Laravel implementation
+        $this->app->bind(CacheStoreInterface::class, LaravelCacheStore::class);
+
         $bindings = [
             CacheManagerInterface::class => CacheManagerService::class,
             ModelDiscoveryInterface::class => ModelDiscoveryService::class,
@@ -118,7 +123,14 @@ class ServiceRegistrar
         $this->app->singleton(StringNormalizer::class, fn() => new StringNormalizer());
 
         $this->app->singleton(ResultFilterService::class, fn() => new ResultFilterService());
-        $this->app->singleton(CacheManagerService::class, fn() => new CacheManagerService());
+
+        // CacheManagerService with CacheStoreInterface injection
+        $this->app->singleton(CacheManagerService::class, function ($app) {
+            return new CacheManagerService(
+                cache: $app->make(CacheStoreInterface::class)
+            );
+        });
+
         $this->app->singleton(ModelDiscoveryService::class, fn() => new ModelDiscoveryService());
 
         $this->app->singleton(PipelineStageManager::class, fn($app) => new PipelineStageManager($app));
@@ -221,35 +233,27 @@ class ServiceRegistrar
             __DIR__ . '/../../config/fuzzy.php' => config_path('fuzzy.php'),
         ], 'fuzzy-config');
 
-        // Publication des migrations (Laravel gère automatiquement l'affichage SKIPPED)
+        // Publication des migrations
         $this->registerMigrationsForPublishing();
     }
 
     /**
      * Enregistre les fichiers de migration pour publication.
-     * 
-     * IMPORTANT: Cette méthode n'exécute PAS de vérification conditionnelle
-     * ni d'affichage. Elle enregistre simplement les fichiers pour publication.
-     * Laravel se charge d'afficher automatiquement "SKIPPED" pour les
-     * fichiers qui existent déjà et de les copier le cas échéant.
      */
     private function registerMigrationsForPublishing(): void
     {
         $sourceMigrationsPath = __DIR__ . '/../../database/migrations';
 
-        // Si le dossier source n'existe pas, rien à publier
         if (!is_dir($sourceMigrationsPath)) {
             return;
         }
 
-        // Récupérer tous les fichiers de migration
         $migrationFiles = glob($sourceMigrationsPath . '/*.php');
 
         if (empty($migrationFiles)) {
             return;
         }
 
-        // Préparer le tableau source => destination
         $filesToPublish = [];
         foreach ($migrationFiles as $sourceFile) {
             $fileName = basename($sourceFile);
@@ -257,11 +261,6 @@ class ServiceRegistrar
             $filesToPublish[$sourceFile] = $targetFile;
         }
 
-        // Enregistrer pour publication
-        // Laravel gère automatiquement:
-        // - L'affichage "SKIPPED" pour les fichiers existants
-        // - La copie des fichiers manquants
-        // - Les messages formatés de façon cohérente
         $this->publishes($filesToPublish, 'fuzzy-migrations');
     }
 }

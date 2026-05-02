@@ -10,6 +10,14 @@ use Fuzzy\Exceptions\ModelNotSearchableException;
 use ReflectionClass;
 use Symfony\Component\Finder\Finder;
 
+/**
+ * Service for discovering models that implement MustFuzzySearch interface.
+ *
+ * This service scans configured directories to find all model classes that
+ * implement the MustFuzzySearch interface. No configuration file is needed.
+ *
+ * @package Fuzzy\Services
+ */
 class ModelDiscoveryService implements ModelDiscoveryInterface
 {
     private const EXTRACT_NAMESPACE_REGEX = '/namespace\s+(.+?);/s';
@@ -18,18 +26,13 @@ class ModelDiscoveryService implements ModelDiscoveryInterface
     /**
      * Get all searchable models.
      *
-     * Returns models from configuration if set, otherwise discovers them automatically.
+     * Discovers all models implementing MustFuzzySearch interface by scanning
+     * the configured directories.
      *
      * @return array<int, string> Array of fully qualified model class names
      */
     public function getSearchableModels(): array
     {
-        $configuredModels = config('fuzzy.searchable_models', []);
-
-        if (!empty($configuredModels)) {
-            return $this->filterValidModels($configuredModels);
-        }
-
         return $this->discoverSearchableModels();
     }
 
@@ -65,19 +68,6 @@ class ModelDiscoveryService implements ModelDiscoveryInterface
     }
 
     /**
-     * Filter array to only include valid searchable models.
-     *
-     * @param array<int, string> $modelClasses Array of model class names
-     * @return array<int, string> Filtered array of valid models
-     */
-    private function filterValidModels(array $modelClasses): array
-    {
-        return array_filter($modelClasses, function (string $modelClass): bool {
-            return $this->isValidModel($modelClass);
-        });
-    }
-
-    /**
      * Discover models implementing MustFuzzySearch interface.
      *
      * Scans configured directories for PHP files and extracts model classes.
@@ -109,8 +99,7 @@ class ModelDiscoveryService implements ModelDiscoveryInterface
     /**
      * Get paths for model discovery.
      *
-     * Always scans the app/Models directory and the test fixtures
-     * for better development experience.
+     * Scans the app/Models directory and the test fixtures directory.
      *
      * @return array<int, string> Array of directory paths
      */

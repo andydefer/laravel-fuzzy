@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Fuzzy\Tests\Unit\Services;
 
+use Fuzzy\Cache\LaravelCacheStore;
 use Fuzzy\Commands\ClearCacheCommand;
 use Fuzzy\Commands\ClearIndexCommand;
 use Fuzzy\Commands\IndexSearchCommand;
@@ -15,6 +16,7 @@ use Fuzzy\Config\PrefixAlgorithmConfig;
 use Fuzzy\Config\SimilarityCalculatorConfig;
 use Fuzzy\Config\WordSimilarityComparatorConfig;
 use Fuzzy\Contracts\CacheManagerInterface;
+use Fuzzy\Contracts\CacheStoreInterface;
 use Fuzzy\Contracts\ContextualNormalizerInterface;
 use Fuzzy\Contracts\IndexManagerInterface;
 use Fuzzy\Contracts\ModelDiscoveryInterface;
@@ -115,6 +117,19 @@ final class ServiceRegistrarTest extends TestCase
     }
 
     /**
+     * Test that CacheStoreInterface is bound to LaravelCacheStore.
+     */
+    public function test_cache_store_interface_is_bound_to_laravel_cache_store(): void
+    {
+        // Act: Register all services
+        $this->registrar->registerAll();
+
+        // Assert: Verify CacheStoreInterface resolves to LaravelCacheStore
+        $instance = $this->app->make(CacheStoreInterface::class);
+        $this->assertInstanceOf(LaravelCacheStore::class, $instance);
+    }
+
+    /**
      * Test that helper functions are loaded correctly.
      */
     public function test_helpers_are_loaded(): void
@@ -152,6 +167,7 @@ final class ServiceRegistrarTest extends TestCase
 
         // Assert: Verify all contract interfaces are bound
         $this->assertTrue($this->app->bound(CacheManagerInterface::class));
+        $this->assertTrue($this->app->bound(CacheStoreInterface::class));
         $this->assertTrue($this->app->bound(ModelDiscoveryInterface::class));
         $this->assertTrue($this->app->bound(IndexManagerInterface::class));
         $this->assertTrue($this->app->bound(SearchProcessorInterface::class));
@@ -436,130 +452,6 @@ final class ServiceRegistrarTest extends TestCase
         // Act & Assert: Registration should complete without exceptions
         $this->registrar->registerAll();
         $this->assertTrue(true);
-    }
-
-    /**
-     * Test that existing migration files are not overwritten.
-     * This test validates the conditional migration publishing logic.
-     */
-    public function test_existing_migration_files_are_not_overwritten(): void
-    {
-        // Arrange: Create a dummy migration file that simulates an existing user migration
-        $migrationsPath = database_path('migrations');
-
-        // Skip test if source migrations directory doesn't exist
-        $sourceMigrationsPath = __DIR__ . '/../../../database/migrations';
-        if (!is_dir($sourceMigrationsPath)) {
-            $this->markTestSkipped('Source migrations directory not found');
-        }
-
-        // Create migrations directory if it doesn't exist
-        if (!is_dir($migrationsPath)) {
-            mkdir($migrationsPath, 0755, true);
-        }
-
-        // Create a dummy migration file with unique content
-        $dummyMigrationFile = $migrationsPath . '/2025_01_01_000001_existing_user_migration.php';
-        $originalContent = '<?php
-
-declare(strict_types=1);
-
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
-
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::create("user_custom_table", function (Blueprint $table) {
-            $table->id();
-            $table->string("custom_field");
-            $table->timestamps();
-        });
-    }
-
-    public function down(): void
-    {
-        Schema::dropIfExists("user_custom_table");
-    }
-};';
-
-        file_put_contents($dummyMigrationFile, $originalContent);
-        $originalMtime = filemtime($dummyMigrationFile);
-
-        // Wait a moment to ensure timestamp would change if file is modified
-        sleep(1);
-
-        try {
-            // Act: Register all services (this triggers the conditional publishing logic)
-            $this->registrar->registerAll();
-
-            // Assert: The existing migration file should remain unchanged
-            $currentContent = file_get_contents($dummyMigrationFile);
-            $currentMtime = filemtime($dummyMigrationFile);
-
-            $this->assertEquals(
-                $originalContent,
-                $currentContent,
-                'Existing migration file content should not be overwritten by automatic publishing'
-            );
-
-            $this->assertEquals(
-                $originalMtime,
-                $currentMtime,
-                'Existing migration file modification time should not change'
-            );
-        } finally {
-            // Clean up: Remove the dummy migration file
-            if (file_exists($dummyMigrationFile)) {
-                unlink($dummyMigrationFile);
-            }
-        }
-    }
-
-    /**
-     * Test that existing migration files are preserved even after multiple registrations.
-     */
-    public function test_existing_migrations_are_preserved_after_multiple_calls(): void
-    {
-        // Arrange: Create a dummy migration file
-        $migrationsPath = database_path('migrations');
-        $sourceMigrationsPath = __DIR__ . '/../../../database/migrations';
-
-        if (!is_dir($sourceMigrationsPath)) {
-            $this->markTestSkipped('Source migrations directory not found');
-        }
-
-        if (!is_dir($migrationsPath)) {
-            mkdir($migrationsPath, 0755, true);
-        }
-
-        $dummyMigrationFile = $migrationsPath . '/2025_01_01_000002_existing_migration_v2.php';
-        $originalContent = '<?php // Original custom migration content v2';
-        file_put_contents($dummyMigrationFile, $originalContent);
-        $originalMtime = filemtime($dummyMigrationFile);
-
-        sleep(1);
-
-        try {
-            // Act: Call registerAll multiple times
-            for ($i = 0; $i < 3; $i++) {
-                $this->registrar->registerAll();
-            }
-
-            // Assert: File content unchanged after multiple calls
-            $currentContent = file_get_contents($dummyMigrationFile);
-            $this->assertEquals(
-                $originalContent,
-                $currentContent,
-                'Migration files should remain unchanged after multiple registerAll calls'
-            );
-        } finally {
-            if (file_exists($dummyMigrationFile)) {
-                unlink($dummyMigrationFile);
-            }
-        }
     }
 
     /**

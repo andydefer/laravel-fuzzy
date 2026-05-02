@@ -94,10 +94,5 @@ abstract class TestCase extends Orchestra
             'default' => 0.5,
         ]);
         $app['config']->set('fuzzy.eager_load', []);
-
-        $app['config']->set('fuzzy.searchable_models', [
-            User::class,
-            Product::class,
-        ]);
     }
 }

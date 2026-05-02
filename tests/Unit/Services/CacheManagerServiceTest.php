@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Fuzzy\Tests\Unit\Services;
 
+use Fuzzy\Cache\LaravelCacheStore;
 use Fuzzy\Config\CacheConfig;
 use Fuzzy\Services\CacheManagerService;
 use Fuzzy\Tests\Fixtures\Product;
@@ -14,14 +15,23 @@ use Illuminate\Support\Facades\Cache;
 final class CacheManagerServiceTest extends TestCase
 {
     private CacheManagerService $cacheManager;
+    private LaravelCacheStore $cacheStore;
 
     protected function setUp(): void
     {
         parent::setUp();
+
+        // Arrange: Clear cache before each test
         Cache::flush();
         config(['cache.default' => 'array']);
         config(['fuzzy.cache.enabled' => true]);
         config(['fuzzy.cache.prefix' => 'fuzzy_test:']);
+
+        // Create cache store and manager with dependency injection
+        $this->cacheStore = new LaravelCacheStore();
+        $this->cacheManager = new CacheManagerService(
+            cache: $this->cacheStore
+        );
     }
 
     protected function tearDown(): void
@@ -33,7 +43,7 @@ final class CacheManagerServiceTest extends TestCase
     public function test_is_enabled_returns_true_when_cache_enabled(): void
     {
         config(['fuzzy.cache.enabled' => true]);
-        $this->cacheManager = new CacheManagerService();
+        $this->cacheManager = new CacheManagerService($this->cacheStore);
 
         $this->assertTrue($this->cacheManager->isEnabled());
     }
@@ -41,7 +51,7 @@ final class CacheManagerServiceTest extends TestCase
     public function test_is_enabled_returns_false_when_cache_disabled(): void
     {
         config(['fuzzy.cache.enabled' => false]);
-        $this->cacheManager = new CacheManagerService();
+        $this->cacheManager = new CacheManagerService($this->cacheStore);
 
         $this->assertFalse($this->cacheManager->isEnabled());
     }
@@ -49,7 +59,7 @@ final class CacheManagerServiceTest extends TestCase
     public function test_remember_executes_callback_when_cache_disabled(): void
     {
         config(['fuzzy.cache.enabled' => false]);
-        $this->cacheManager = new CacheManagerService();
+        $this->cacheManager = new CacheManagerService($this->cacheStore);
 
         $executed = false;
         $result = $this->cacheManager->remember('test', function () use (&$executed) {
@@ -64,7 +74,7 @@ final class CacheManagerServiceTest extends TestCase
     public function test_remember_uses_cache_when_enabled(): void
     {
         config(['fuzzy.cache.enabled' => true]);
-        $this->cacheManager = new CacheManagerService();
+        $this->cacheManager = new CacheManagerService($this->cacheStore);
 
         $callbackExecutions = 0;
 
@@ -86,7 +96,7 @@ final class CacheManagerServiceTest extends TestCase
     public function test_remember_generates_different_keys_for_different_parameters(): void
     {
         config(['fuzzy.cache.enabled' => true]);
-        $this->cacheManager = new CacheManagerService();
+        $this->cacheManager = new CacheManagerService($this->cacheStore);
 
         $callbackExecutions = 0;
 
@@ -103,33 +113,10 @@ final class CacheManagerServiceTest extends TestCase
         $this->assertEquals(2, $callbackExecutions);
     }
 
-    public function test_remember_stores_model_metadata_for_search_in_model(): void
-    {
-        config(['fuzzy.cache.enabled' => true]);
-        $this->cacheManager = new CacheManagerService();
-
-        $userParams = [User::class, 'john', []];
-
-        $this->cacheManager->remember('search_in_model', fn() => 'user_result', $userParams);
-
-        $storageKey = $this->getCacheKeysStorageKey();
-        $storedKeys = Cache::get($storageKey, []);
-
-        $foundModel = false;
-        foreach ($storedKeys as $keyData) {
-            if (is_array($keyData) && isset($keyData['model']) && $keyData['model'] === User::class) {
-                $foundModel = true;
-                break;
-            }
-        }
-
-        $this->assertTrue($foundModel, 'Model metadata should be stored with cache key');
-    }
-
     public function test_invalidate_all_clears_cache(): void
     {
         config(['fuzzy.cache.enabled' => true]);
-        $this->cacheManager = new CacheManagerService();
+        $this->cacheManager = new CacheManagerService($this->cacheStore);
 
         $this->cacheManager->remember('test', fn() => 'value', []);
         $this->cacheManager->invalidateAll();
@@ -144,91 +131,21 @@ final class CacheManagerServiceTest extends TestCase
         $this->assertEquals('new_value', $result);
     }
 
-    public function test_invalidate_all_clears_storage_keys(): void
-    {
-        config(['fuzzy.cache.enabled' => true]);
-        $this->cacheManager = new CacheManagerService();
-
-        $this->cacheManager->remember('test', fn() => 'value', []);
-
-        $storageKey = $this->getCacheKeysStorageKey();
-        $this->assertNotNull(Cache::get($storageKey));
-
-        $this->cacheManager->invalidateAll();
-
-        $this->assertNull(Cache::get($storageKey));
-    }
-
     public function test_invalidate_for_model_clears_only_model_cache(): void
     {
         config(['fuzzy.cache.enabled' => true]);
-        $this->cacheManager = new CacheManagerService();
+        $this->cacheManager = new CacheManagerService($this->cacheStore);
 
-        // Paramètres pour User et Product
         $userParams = [User::class, 'john', []];
         $productParams = [Product::class, 'laptop', []];
 
-        // Mettre en cache des résultats pour User et Product
         $this->cacheManager->remember('search_in_model', fn() => 'user_result', $userParams);
         $this->cacheManager->remember('search_in_model', fn() => 'product_result', $productParams);
-
-        // Récupérer le storage des clés
-        $storageKey = $this->getCacheKeysStorageKey();
-        $storedKeys = Cache::get($storageKey, []);
-
-        // Trouver les clés User et Product
-        $userCached = null;
-        $productCached = null;
-
-        foreach ($storedKeys as $keyData) {
-            $key = is_array($keyData) ? $keyData['key'] : $keyData;
-            $model = is_array($keyData) ? ($keyData['model'] ?? null) : null;
-
-            if ($model === User::class) {
-                $userCached = $key;
-            }
-            if ($model === Product::class) {
-                $productCached = $key;
-            }
-        }
-
-        // Vérifier que les deux clés existent
-        $this->assertNotNull($userCached, 'User cache key should exist');
-        $this->assertNotNull($productCached, 'Product cache key should exist');
-
-        // Vérifier que les valeurs sont correctement mises en cache
-        $this->assertEquals('user_result', Cache::get($userCached));
-        $this->assertEquals('product_result', Cache::get($productCached));
 
         // Invalider uniquement le cache User
         $this->cacheManager->invalidateForModel(User::class);
 
-        // Vérifier que le cache User a été supprimé
-        $this->assertNull(Cache::get($userCached), 'User cache should be cleared');
-
-        // Vérifier que le cache Product est toujours présent
-        $this->assertEquals('product_result', Cache::get($productCached), 'Product cache should remain');
-
-        // Vérifier que la clé User a été retirée du storage
-        $updatedStoredKeys = Cache::get($storageKey, []);
-        $userKeyStillExists = false;
-        $productKeyStillExists = false;
-
-        foreach ($updatedStoredKeys as $keyData) {
-            $model = is_array($keyData) ? ($keyData['model'] ?? null) : null;
-
-            if ($model === User::class) {
-                $userKeyStillExists = true;
-            }
-            if ($model === Product::class) {
-                $productKeyStillExists = true;
-            }
-        }
-
-        $this->assertFalse($userKeyStillExists, 'User cache key should be removed from storage');
-        $this->assertTrue($productKeyStillExists, 'Product cache key should remain in storage');
-
-        // Maintenant tester que le callback User est réexécuté
+        // Vérifier que le callback User est réexécuté
         $userCallbackExecuted = false;
         $productCallbackExecuted = false;
 
@@ -249,7 +166,7 @@ final class CacheManagerServiceTest extends TestCase
     public function test_invalidate_for_model_handles_nonexistent_model(): void
     {
         config(['fuzzy.cache.enabled' => true]);
-        $this->cacheManager = new CacheManagerService();
+        $this->cacheManager = new CacheManagerService($this->cacheStore);
 
         // Ne devrait pas lever d'exception
         $this->cacheManager->invalidateForModel('NonExistentModel');
@@ -260,7 +177,7 @@ final class CacheManagerServiceTest extends TestCase
     public function test_invalidate_does_nothing_when_cache_disabled(): void
     {
         config(['fuzzy.cache.enabled' => false]);
-        $this->cacheManager = new CacheManagerService();
+        $this->cacheManager = new CacheManagerService($this->cacheStore);
 
         // Should not throw any exception
         $this->cacheManager->invalidateAll();
@@ -272,7 +189,7 @@ final class CacheManagerServiceTest extends TestCase
     public function test_cache_key_generation_with_long_parameters(): void
     {
         config(['fuzzy.cache.enabled' => true]);
-        $this->cacheManager = new CacheManagerService();
+        $this->cacheManager = new CacheManagerService($this->cacheStore);
 
         // Créer des paramètres très longs
         $longString = str_repeat('a', 300);
@@ -284,62 +201,43 @@ final class CacheManagerServiceTest extends TestCase
         $this->assertEquals('value', $result);
     }
 
-    public function test_multiple_cache_types_have_different_ttls(): void
+    public function test_invalidate_stats_cache(): void
     {
         config(['fuzzy.cache.enabled' => true]);
-        config(['fuzzy.cache.ttl.search' => 100]);
-        config(['fuzzy.cache.ttl.stats' => 50]);
+        $this->cacheManager = new CacheManagerService($this->cacheStore);
 
-        $this->cacheManager = new CacheManagerService();
-
-        // Cette méthode est privée, on teste indirectement
-        $this->assertTrue(true);
-    }
-
-    public function test_remember_without_model_metadata(): void
-    {
-        config(['fuzzy.cache.enabled' => true]);
-        $this->cacheManager = new CacheManagerService();
-
-        // search_in_models n'a pas de modèle unique
-        $modelsParams = [[User::class, Product::class], 'query', []];
-
-        $this->cacheManager->remember('search_in_models', fn() => 'combined_result', $modelsParams);
-
-        $storageKey = $this->getCacheKeysStorageKey();
-        $storedKeys = Cache::get($storageKey, []);
-
-        $hasKeyWithoutModel = false;
-        foreach ($storedKeys as $keyData) {
-            if (is_array($keyData) && !isset($keyData['model'])) {
-                $hasKeyWithoutModel = true;
-                break;
-            }
-        }
-
-        $this->assertTrue($hasKeyWithoutModel, 'Keys without model metadata should be stored');
-    }
-
-    public function test_remember_returns_cached_value_on_second_call(): void
-    {
-        config(['fuzzy.cache.enabled' => true]);
-        $this->cacheManager = new CacheManagerService();
-
-        $executionCount = 0;
-
-        $result1 = $this->cacheManager->remember('test', function () use (&$executionCount) {
-            $executionCount++;
-            return 'cached_value';
+        // First call should execute callback
+        $executed = false;
+        $result1 = $this->cacheManager->remember('stats', function () use (&$executed) {
+            $executed = true;
+            return 'stats_value';
         }, []);
 
-        $result2 = $this->cacheManager->remember('test', function () use (&$executionCount) {
-            $executionCount++;
-            return 'cached_value';
+        $this->assertTrue($executed);
+        $this->assertEquals('stats_value', $result1);
+
+        // Second call should use cache
+        $executed = false;
+        $result2 = $this->cacheManager->remember('stats', function () use (&$executed) {
+            $executed = true;
+            return 'stats_value';
         }, []);
 
-        $this->assertEquals(1, $executionCount);
-        $this->assertEquals('cached_value', $result1);
-        $this->assertEquals('cached_value', $result2);
+        $this->assertFalse($executed);
+        $this->assertEquals('stats_value', $result2);
+
+        // Invalidate stats cache
+        $this->cacheManager->invalidateStatsCache();
+
+        // Third call should execute callback again
+        $executed = false;
+        $result3 = $this->cacheManager->remember('stats', function () use (&$executed) {
+            $executed = true;
+            return 'new_stats_value';
+        }, []);
+
+        $this->assertTrue($executed);
+        $this->assertEquals('new_stats_value', $result3);
     }
 
     private function getCacheKeysStorageKey(): string

@@ -6,8 +6,15 @@ namespace Fuzzy\Tests\Feature;
 
 use Fuzzy\Contracts\SearchServiceInterface;
 use Fuzzy\Models\FuzzyIndex;
+use Fuzzy\Tests\Fixtures\CreateAndUpdateUser;
+use Fuzzy\Tests\Fixtures\CreateOnlyUser;
+use Fuzzy\Tests\Fixtures\DeleteOnlyUser;
+use Fuzzy\Tests\Fixtures\NoneUser;
+use Fuzzy\Tests\Fixtures\NonIndexableCreateOnlyUser;
+use Fuzzy\Tests\Fixtures\NonIndexableUpdateOnlyUser;
 use Fuzzy\Tests\Fixtures\NonIndexableUser;
 use Fuzzy\Tests\Fixtures\Product;
+use Fuzzy\Tests\Fixtures\UpdateOnlyUser;
 use Fuzzy\Tests\Fixtures\User;
 use Fuzzy\Tests\TestCase;
 
@@ -34,6 +41,13 @@ final class ShouldBeIndexedTest extends TestCase
         User::query()->delete();
         Product::query()->delete();
         NonIndexableUser::query()->delete();
+        CreateOnlyUser::query()->delete();
+        CreateAndUpdateUser::query()->delete();
+        UpdateOnlyUser::query()->delete();
+        DeleteOnlyUser::query()->delete();
+        NoneUser::query()->delete();
+        NonIndexableCreateOnlyUser::query()->delete();
+        NonIndexableUpdateOnlyUser::query()->delete();
 
         $this->searchService = app(SearchServiceInterface::class);
     }
@@ -210,14 +224,13 @@ final class ShouldBeIndexedTest extends TestCase
             ->where('indexable_id', $product->id)
             ->count();
 
-        $this->assertEquals(2, $indexableUserEntries); // 2 fields: name, email
+        $this->assertEquals(2, $indexableUserEntries);
         $this->assertEquals(0, $nonIndexableUserEntries);
-        $this->assertEquals(2, $productEntries); // 2 fields: name, description
+        $this->assertEquals(2, $productEntries);
     }
 
     /**
      * Test that updating a model respects shouldBeIndexed.
-     * On utilise updateModelIndex pour mettre à jour l'index après modification.
      */
     public function test_update_respects_should_be_indexed(): void
     {
@@ -240,8 +253,6 @@ final class ShouldBeIndexedTest extends TestCase
         $user->type = 'admin';
         $user->save();
 
-        // Utiliser updateModelIndex pour supprimer les anciennes entrées et recréer
-        // Comme shouldBeIndexed() retourne maintenant false, updateModelIndex supprimera les entrées
         $this->searchService->getIndexManager()->updateModelIndex($user);
 
         // Assert: User should no longer be indexed
@@ -249,5 +260,279 @@ final class ShouldBeIndexedTest extends TestCase
             ->where('indexable_id', $user->id)
             ->count();
         $this->assertEquals(0, $entriesAfter);
+    }
+
+    /**
+     * Test that shouldBeIndexed overrides IndexationLevel for manual indexing.
+     */
+    public function test_should_be_indexed_overrides_indexation_level_for_manual_indexing(): void
+    {
+        // Arrange: Create a model with ALL events but shouldBeIndexed() = false
+        $user = NonIndexableUser::create([
+            'name' => 'Admin User',
+            'email' => 'admin@example.com',
+            'type' => 'admin',
+        ]);
+
+        // Act: Try to manually index
+        $this->searchService->getIndexManager()->indexModel($user);
+
+        // Assert: No index entries because shouldBeIndexed() is false
+        $entries = FuzzyIndex::where('indexable_type', NonIndexableUser::class)
+            ->where('indexable_id', $user->id)
+            ->get();
+
+        $this->assertCount(0, $entries);
+    }
+
+    /**
+     * Test that shouldBeIndexed overrides IndexationLevel for auto indexing.
+     */
+    public function test_should_be_indexed_overrides_indexation_level_for_auto_created(): void
+    {
+        // Arrange: Create a model with ALL events but shouldBeIndexed() = false
+        $user = NonIndexableUser::create([
+            'name' => 'Admin User',
+            'email' => 'admin@example.com',
+            'type' => 'admin',
+        ]);
+
+        // Assert: No index entries were auto-created
+        $entries = FuzzyIndex::where('indexable_type', NonIndexableUser::class)
+            ->where('indexable_id', $user->id)
+            ->get();
+
+        $this->assertCount(0, $entries);
+    }
+
+    /**
+     * Test that shouldBeIndexed false prevents ALL auto-indexing events.
+     */
+    public function test_should_be_indexed_false_prevents_all_auto_events(): void
+    {
+        // Arrange: Create a model with ALL events but shouldBeIndexed() = false
+        $user = NonIndexableUser::create([
+            'name' => 'Admin User',
+            'email' => 'admin@example.com',
+            'type' => 'admin',
+        ]);
+
+        // Verify no index on create
+        $this->assertEquals(0, FuzzyIndex::where('indexable_type', NonIndexableUser::class)->count());
+
+        // Act: Update the model
+        $user->name = 'Updated Admin';
+        $user->save();
+
+        // Assert: Still no index entries
+        $this->assertEquals(0, FuzzyIndex::where('indexable_type', NonIndexableUser::class)->count());
+
+        // Act: Delete the model
+        $user->delete();
+
+        // Assert: Still no index entries
+        $this->assertEquals(0, FuzzyIndex::where('indexable_type', NonIndexableUser::class)->count());
+    }
+
+    /**
+     * Test that shouldBeIndexed false prevents CREATE_ONLY auto-indexing.
+     */
+    public function test_should_be_indexed_false_prevents_create_only_auto_index(): void
+    {
+        // Arrange: Create a model with CREATE_ONLY but shouldBeIndexed() = false
+        $user = new class extends CreateOnlyUser {
+            public function shouldBeIndexed(): bool
+            {
+                return false;
+            }
+        };
+
+        $user->name = 'Create Only Admin';
+        $user->email = 'createonlyadmin@example.com';
+        $user->type = 'admin';
+        $user->save();
+
+        // Assert: No index entries because shouldBeIndexed() is false
+        $entries = FuzzyIndex::where('indexable_type', get_class($user))
+            ->where('indexable_id', $user->id)
+            ->get();
+
+        $this->assertCount(0, $entries);
+    }
+
+    /**
+     * Test that shouldBeIndexed false prevents UPDATE_ONLY auto-indexing.
+     */
+    public function test_should_be_indexed_false_prevents_update_only_auto_index(): void
+    {
+        // Arrange: Create a model with shouldBeIndexed() = true first
+        $user = UpdateOnlyUser::create([
+            'name' => 'Update Only Admin',
+            'email' => 'updateonlyadmin@example.com',
+            'type' => 'user',
+        ]);
+
+        // Manually index (works because shouldBeIndexed = true)
+        $this->searchService->getIndexManager()->indexModel($user);
+
+        // Verify it's indexed
+        $count = FuzzyIndex::where('indexable_type', UpdateOnlyUser::class)
+            ->where('indexable_id', $user->id)
+            ->count();
+        $this->assertEquals(2, $count);
+
+        // Change type to make shouldBeIndexed() return false
+        $user->type = 'admin';
+        $user->save();
+
+        // Act: Update the model
+        $user->name = 'Updated Admin Name';
+        $user->save();
+
+        // The index should still have the old name (not updated)
+        $entry = FuzzyIndex::where('indexable_type', UpdateOnlyUser::class)
+            ->where('indexable_id', $user->id)
+            ->where('field', 'name')
+            ->first();
+
+        $this->assertNotNull($entry);
+        $this->assertEquals('Update Only Admin', $entry->original_value);
+        $this->assertNotEquals('Updated Admin Name', $entry->original_value);
+    }
+
+    /**
+     * Test DELETE_ONLY auto-removal behavior with shouldBeIndexed false.
+     */
+    public function test_should_be_indexed_false_does_not_prevent_delete_only_auto_removal(): void
+    {
+        // Arrange: Create a model with shouldBeIndexed() = true first
+        $user = DeleteOnlyUser::create([
+            'name' => 'Delete Only Admin',
+            'email' => 'deleteonlyadmin@example.com',
+            'type' => 'user',
+        ]);
+
+        // Manually index
+        $this->searchService->getIndexManager()->indexModel($user);
+
+        // Verify it's indexed
+        $count = FuzzyIndex::where('indexable_type', DeleteOnlyUser::class)
+            ->where('indexable_id', $user->id)
+            ->count();
+        $this->assertEquals(2, $count);
+
+        // Change type to make shouldBeIndexed() return false
+        $user->type = 'admin';
+        $user->save();
+
+        // Act: Delete the model
+        $user->delete();
+
+        // Note: Delete event does NOT check shouldBeIndexed() in the trait
+        // So entries are always removed on delete
+        $entries = FuzzyIndex::where('indexable_type', DeleteOnlyUser::class)
+            ->where('indexable_id', $user->id)
+            ->get();
+
+        $this->assertCount(0, $entries);
+    }
+
+    /**
+     * Test the priority: shouldBeIndexed has higher priority than IndexationLevel.
+     */
+    public function test_should_be_indexed_has_higher_priority_than_indexation_level(): void
+    {
+        // Scenario 1: ALL level + shouldBeIndexed() = false -> NO indexing
+        $adminUser = NonIndexableUser::create([
+            'name' => 'Admin',
+            'email' => 'admin@example.com',
+            'type' => 'admin',
+        ]);
+        $this->assertEquals(0, FuzzyIndex::where('indexable_type', NonIndexableUser::class)->count());
+
+        // Scenario 2: NONE level + shouldBeIndexed() = true -> manual indexing works
+        $noneUser = NoneUser::create([
+            'name' => 'None User',
+            'email' => 'none@example.com',
+            'type' => 'user',
+        ]);
+
+        $this->searchService->getIndexManager()->indexModel($noneUser);
+        $this->assertEquals(2, FuzzyIndex::where('indexable_type', NoneUser::class)->count());
+
+        // Scenario 3: CREATE_ONLY level + shouldBeIndexed() = false -> NO auto-indexing
+        $createOnlyAdmin = NonIndexableCreateOnlyUser::create([
+            'name' => 'Create Only Admin',
+            'email' => 'createonlyadmin@example.com',
+            'type' => 'admin',
+        ]);
+        $this->assertEquals(0, FuzzyIndex::where('indexable_type', NonIndexableCreateOnlyUser::class)->count());
+
+        // Scenario 4: UPDATE_ONLY level + shouldBeIndexed() = false -> NO auto-indexing
+        // First create with shouldBeIndexed = true
+        $updateOnlyUser = UpdateOnlyUser::create([
+            'name' => 'Update Only Admin',
+            'email' => 'updateonlyadmin@example.com',
+            'type' => 'user',
+        ]);
+
+        $this->searchService->getIndexManager()->indexModel($updateOnlyUser);
+        $this->assertEquals(2, FuzzyIndex::where('indexable_type', UpdateOnlyUser::class)
+            ->where('indexable_id', $updateOnlyUser->id)
+            ->count());
+
+        // Change type to make shouldBeIndexed = false
+        $updateOnlyUser->type = 'admin';
+        $updateOnlyUser->save();
+
+        // Update the model
+        $updateOnlyUser->name = 'Updated Admin Name';
+        $updateOnlyUser->save();
+
+        // Index still has old name
+        $entry = FuzzyIndex::where('indexable_type', UpdateOnlyUser::class)
+            ->where('indexable_id', $updateOnlyUser->id)
+            ->where('field', 'name')
+            ->first();
+
+        $this->assertNotNull($entry);
+        $this->assertEquals('Update Only Admin', $entry->original_value);
+        $this->assertNotEquals('Updated Admin Name', $entry->original_value);
+    }
+
+    /**
+     * Test that shouldBeIndexed returning true allows indexing regardless of IndexationLevel.
+     */
+    public function test_should_be_indexed_true_allows_indexing_regardless_of_level(): void
+    {
+        // NONE level + shouldBeIndexed() = true
+        $noneUser = NoneUser::create([
+            'name' => 'None User',
+            'email' => 'none@example.com',
+            'type' => 'user',
+        ]);
+
+        $this->searchService->getIndexManager()->indexModel($noneUser);
+        $this->assertEquals(2, FuzzyIndex::where('indexable_type', NoneUser::class)->count());
+
+        // DELETE_ONLY level + shouldBeIndexed() = true
+        $deleteUser = DeleteOnlyUser::create([
+            'name' => 'Delete User',
+            'email' => 'delete@example.com',
+            'type' => 'user',
+        ]);
+
+        $this->searchService->getIndexManager()->indexModel($deleteUser);
+        $this->assertEquals(2, FuzzyIndex::where('indexable_type', DeleteOnlyUser::class)->count());
+
+        // UPDATE_ONLY level + shouldBeIndexed() = true
+        $updateUser = UpdateOnlyUser::create([
+            'name' => 'Update User',
+            'email' => 'update@example.com',
+            'type' => 'user',
+        ]);
+
+        $this->searchService->getIndexManager()->indexModel($updateUser);
+        $this->assertEquals(2, FuzzyIndex::where('indexable_type', UpdateOnlyUser::class)->count());
     }
 }

@@ -8,6 +8,11 @@
 1. [Introduction](#-introduction)
 2. [Installation rapide](#-installation-rapide)
 3. [Préparer vos modèles](#-préparer-vos-modèles)
+   - [Interface et Trait](#interface-et-trait)
+   - [Configuration de l'indexation automatique (IndexationLevel)](#configuration-de-lindexation-automatique-indexationlevel)
+   - [Méthode `shouldBeIndexed()` - Contrôle d'indexation](#méthode-shouldbeindexed---contrôle-dindexation)
+   - [Différence entre IndexationLevel et shouldBeIndexed](#différence-entre-indexationlevel-et-shouldbeindexed)
+   - [Champs protégés](#champs-protégés-vs-non-protégés)
 4. [Indexation des données](#-indexation-des-données)
 5. [Recherche](#-recherche)
 6. [Formatage des résultats](#-formatage-des-résultats)
@@ -33,6 +38,7 @@
 - Trier les résultats par pertinence réelle
 - Indexer automatiquement vos modèles Eloquent
 - Personnaliser chaque étape du processus de recherche
+- **Contrôler finement l'indexation automatique** avec `IndexationLevel`
 
 **Problème résolu** : Implémentez une recherche performante et tolérante aux erreurs directement dans votre base de données, sans dépendre de services externes coûteux comme Algolia ou Meilisearch.
 
@@ -70,6 +76,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Fuzzy\Contracts\MustFuzzySearch;
 use Fuzzy\Traits\FuzzySearchable;
+use Fuzzy\Enums\IndexationLevel;
 
 class Product extends Model implements MustFuzzySearch
 {
@@ -84,19 +91,25 @@ class Product extends Model implements MustFuzzySearch
         return ['name', 'description'];
     }
 
-    // 3. Contrôler quels enregistrements sont indexés (OPTIONNEL)
+    // 3. Contrôler quels enregistrements sont indexables (RECOMMANDÉ)
     public function shouldBeIndexed(): bool
     {
         return $this->is_active === true;
     }
 
-    // 4. Formateur personnalisé (OPTIONNEL)
+    // 4. Configurer quels événements déclenchent l'indexation auto (OPTIONNEL)
+    public static function getIndexationLevel(): IndexationLevel
+    {
+        return IndexationLevel::CREATE_AND_UPDATE; // Pas d'indexation sur suppression
+    }
+
+    // 5. Formateur personnalisé (OPTIONNEL)
     public function getFuzzyFormat(): ?string
     {
         return ProductSearchData::class;
     }
 
-    // 5. Champs protégés (préservent les stop words) (OPTIONNEL)
+    // 6. Champs protégés (préservent les stop words) (OPTIONNEL)
     public function getProtectedFields(): array
     {
         return ['name']; // "Jean de La Fontaine" garde "de" et "la"
@@ -104,9 +117,71 @@ class Product extends Model implements MustFuzzySearch
 }
 ```
 
+### Configuration de l'indexation automatique (IndexationLevel)
+
+L'enum `IndexationLevel` permet de contrôler précisément quels événements du modèle déclenchent une indexation automatique:
+
+```php
+use Fuzzy\Enums\IndexationLevel;
+
+class Product extends Model implements MustFuzzySearch
+{
+    use FuzzySearchable;
+
+    // Seulement lors de la création
+    public static function getIndexationLevel(): IndexationLevel
+    {
+        return IndexationLevel::CREATE_ONLY;
+    }
+
+    // Seulement lors de la mise à jour
+    public static function getIndexationLevel(): IndexationLevel
+    {
+        return IndexationLevel::UPDATE_ONLY;
+    }
+
+    // Seulement lors de la suppression
+    public static function getIndexationLevel(): IndexationLevel
+    {
+        return IndexationLevel::DELETE_ONLY;
+    }
+
+    // Création et mise à jour uniquement (pas de suppression)
+    public static function getIndexationLevel(): IndexationLevel
+    {
+        return IndexationLevel::CREATE_AND_UPDATE;
+    }
+
+    // Aucune indexation automatique (indexation manuelle uniquement)
+    public static function getIndexationLevel(): IndexationLevel
+    {
+        return IndexationLevel::NONE;
+    }
+
+    // Tous les événements (comportement par défaut)
+    public static function getIndexationLevel(): IndexationLevel
+    {
+        return IndexationLevel::ALL;
+    }
+}
+```
+
+#### Valeurs disponibles de l'enum IndexationLevel
+
+| Valeur | Événements déclenchés | Cas d'usage |
+|--------|----------------------|-------------|
+| `NONE` | Aucun | Indexation manuelle uniquement (via commande) |
+| `CREATE_ONLY` | création seulement | Logs d'audit, données immuables |
+| `UPDATE_ONLY` | mise à jour seulement | Données de référence mises à jour périodiquement |
+| `DELETE_ONLY` | suppression seulement | Nettoyage d'index |
+| `CREATE_AND_UPDATE` | création + mise à jour | Contenu éditable (suppression non indexée) |
+| `CREATE_AND_DELETE` | création + suppression | Données temporaires |
+| `UPDATE_AND_DELETE` | mise à jour + suppression | Données préexistantes modifiables |
+| `ALL` | tous (défaut) | Cas standard |
+
 ### Méthode `shouldBeIndexed()` - Contrôle d'indexation
 
-Cette méthode détermine quels enregistrements sont inclus dans l'index:
+Cette méthode détermine quels **enregistrements** sont inclus dans l'index, indépendamment des événements déclenchés:
 
 ```php
 // Exemple 1: Uniquement les produits actifs
@@ -126,6 +201,126 @@ public function shouldBeIndexed(): bool
 {
     return $this->published_at <= now() && $this->is_public;
 }
+
+// Exemple 4: Jamais indexé (utile pour tests ou modèles abstraits)
+public function shouldBeIndexed(): bool
+{
+    return false;
+}
+```
+
+### Différence entre IndexationLevel et shouldBeIndexed
+
+Ces deux mécanismes sont **complémentaires** et ont des responsabilités distinctes:
+
+| Mécanisme | Responsabilité | Contrôle | Portée |
+|-----------|----------------|----------|--------|
+| **`IndexationLevel`** | **QUAND** indexer automatiquement | Les événements déclencheurs | Au niveau de la classe |
+| **`shouldBeIndexed()`** | **SI** le modèle peut être indexé | L'éligibilité individuelle | Au niveau de l'enregistrement |
+
+#### Schéma de fonctionnement
+
+```
+Événement du modèle (create/update/delete)
+    ↓
+Vérification: L'événement est-il dans IndexationLevel ?
+    ↓ OUI
+Vérification: shouldBeIndexed() retourne-t-il true ?
+    ↓ OUI
+Indexation effectuée
+```
+
+#### Exemples concrets
+
+```php
+class Article extends Model implements MustFuzzySearch
+{
+    use FuzzySearchable;
+
+    // Configuration: S'indexer sur create et update uniquement
+    public static function getIndexationLevel(): IndexationLevel
+    {
+        return IndexationLevel::CREATE_AND_UPDATE;
+    }
+
+    // Condition: Seulement les articles publiés sont indexables
+    public function shouldBeIndexed(): bool
+    {
+        return $this->status === 'published';
+    }
+}
+
+// Scénario 1: Article non publié
+$article = Article::create(['title' => 'Brouillon', 'status' => 'draft']);
+// → shouldBeIndexed() = false → AUCUNE indexation, même si CREATE est autorisé
+
+// Scénario 2: Article publié
+$article = Article::create(['title' => 'Publié', 'status' => 'published']);
+// → shouldBeIndexed() = true → Indexation effectuée (CREATE autorisé)
+
+// Scénario 3: Article publié devient brouillon
+$article->status = 'draft';
+$article->save();
+// → shouldBeIndexed() = false → L'index est SUPPRIMÉ (même si UPDATE_ONLY)
+```
+
+#### Cas particuliers et subtilités
+
+**1. Indexation manuelle (commande `fuzzy:index` ou `indexModel()`)**
+
+Les commandes manuelles **ignorent** `IndexationLevel` mais **respectent** `shouldBeIndexed()`:
+
+```php
+// Même avec IndexationLevel::NONE
+public static function getIndexationLevel(): IndexationLevel
+{
+    return IndexationLevel::NONE; // Pas d'indexation auto
+}
+
+public function shouldBeIndexed(): bool
+{
+    return true; // Indexable
+}
+
+// La commande manuelle fonctionne quand même:
+php artisan fuzzy:index --force
+// → Le modèle sera indexé car la commande appelle indexModel() directement
+```
+
+**2. Événement de suppression**
+
+L'événement `deleted` **ne vérifie PAS** `shouldBeIndexed()`:
+
+```php
+public function shouldBeIndexed(): bool
+{
+    return false; // Jamais indexé normalement
+}
+
+// Si le modèle a été indexé manuellement avant
+$product->delete();
+// → L'index sera SUPPRIMÉ même si shouldBeIndexed() = false
+// C'est intentionnel: on nettoie toujours l'index lors de la suppression
+```
+
+**3. Priorité absolue de `shouldBeIndexed()`**
+
+La méthode `shouldBeIndexed()` a toujours la **priorité la plus haute**:
+
+```php
+// Même avec IndexationLevel::ALL
+public static function getIndexationLevel(): IndexationLevel
+{
+    return IndexationLevel::ALL;
+}
+
+public function shouldBeIndexed(): bool
+{
+    return false; // Désactive TOUTE indexation
+}
+
+// Aucune indexation automatique ne se produira
+// Les commandes manuelles seront aussi bloquées
 ```
 
 ### Champs protégés vs non protégés
@@ -139,20 +334,24 @@ public function shouldBeIndexed(): bool
 
 ## 🔄 Indexation des données
 
-### Indexation automatique (recommandée)
+### Indexation automatique
 
-Le trait `FuzzySearchable` écoute automatiquement les événements du modèle:
+Le trait `FuzzySearchable` écoute automatiquement les événements configurés via `IndexationLevel`:
 
 ```php
-// Création - indexé automatiquement
-$product = Product::create(['name' => 'Laptop', 'description' => '...']);
+// Si IndexationLevel::ALL (défaut)
+$product = Product::create(['name' => 'Laptop']);  // ✅ Indexé
+$product->name = 'Gaming Laptop'; $product->save(); // ✅ Mis à jour
+$product->delete();                                 // ✅ Supprimé
 
-// Mise à jour - index mis à jour automatiquement
-$product->name = 'Gaming Laptop';
-$product->save();
+// Si IndexationLevel::CREATE_ONLY
+$product = Product::create(['name' => 'Laptop']);  // ✅ Indexé
+$product->name = 'Gaming Laptop'; $product->save(); // ❌ Pas de mise à jour
+$product->delete();                                 // ❌ Pas de suppression
 
-// Suppression - retiré de l'index automatiquement
-$product->delete();
+// Si IndexationLevel::NONE
+$product = Product::create(['name' => 'Laptop']);  // ❌ Pas indexé
+// Indexation manuelle uniquement via commande
 ```
 
 ### Indexation manuelle
@@ -185,17 +384,20 @@ class ProductController extends Controller
 ### Commandes d'indexation
 
 ```bash
-# Indexer tous les modèles
+# Indexation incrémentale (par défaut) - uniquement nouveaux/modifiés
 php artisan fuzzy:index
 
-# Indexer un modèle spécifique
-php artisan fuzzy:index "App\Models\Product"
-
-# Forcer la réindexation (supprime et recrée)
+# Indexation forcée (supprime puis recrée tout)
 php artisan fuzzy:index --force
+
+# Indexer un modèle spécifique avec force
+php artisan fuzzy:index "App\Models\Product" --force
 
 # Indexer avec une taille de lot personnalisée
 php artisan fuzzy:index --chunk=500
+
+# Lister les modèles découvrables (sans indexer)
+php artisan fuzzy:index --list
 
 # Afficher les statistiques de l'index
 php artisan fuzzy:stats
@@ -342,25 +544,6 @@ class User extends Model implements MustFuzzySearch
 }
 ```
 
-### Formatage inline avec callback
-
-```php
-use Fuzzy\Data\SearchResultData;
-
-$result = SearchResultData::withFormatter(
-    item: $user,
-    score: 0.95,
-    modelType: 'User',
-    formatter: fn($user) => [
-        'id' => $user->id,
-        'display_name' => $user->full_name,
-        'profile_url' => route('profile', $user)
-    ],
-    matchedField: 'name',
-    matchedValue: 'John Doe'
-);
-```
-
 ---
 
 ## 🔧 Pipeline de recherche
@@ -383,8 +566,6 @@ Requête brute → Étape 1 → Étape 2 → Étape 3 → Étape 4 → Étape 5 
 
 ### Ajouter une étape personnalisée
 
-1. **Créer votre stage**:
-
 ```php
 <?php
 
@@ -397,7 +578,6 @@ use Closure;
 
 class MyCustomStage implements StageInterface
 {
-    // Priorité plus haute = exécution plus tôt
     private const PRIORITY = 80;
     
     public function getPriority(): int
@@ -413,38 +593,21 @@ class MyCustomStage implements StageInterface
     public function handle(SearchContextInterface $context, Closure $next): mixed
     {
         // Votre logique personnalisée ici
-        // Accédez à la requête: $context->query
-        // Accédez aux options: $context->options
-        
-        // Exemple: logging
         \Log::info('Search executed', [
             'query' => $context->query->originalQuery
         ]);
         
-        // Passer à l'étape suivante
         return $next($context);
     }
 }
 ```
 
-2. **Ajouter à la configuration**:
+Ajoutez à la configuration `config/fuzzy.php`:
 
 ```php
-// config/fuzzy.php
 'pipeline' => [
     App\Stages\MyCustomStage::class,
 ],
-```
-
-### Types de stages disponibles
-
-```php
-use Fuzzy\Enums\StageType;
-
-StageType::PRE_PROCESSING    // Avant la recherche (normalisation, validation)
-StageType::MATCH_DISCOVERY   // Découverte des correspondances
-StageType::SCORING           // Calcul des scores
-StageType::POST_PROCESSING   // Après le scoring (filtrage, tri)
 ```
 
 ---
@@ -475,12 +638,6 @@ Score final = Score_base × Poids_champ + Bonus - Pénalités
 | **Couverture complète** | +30% | Tous les mots de la requête sont trouvés |
 | **Couverture élevée** | +15% | Plus de 75% des mots sont trouvés |
 | **Lettres consécutives** | +5% à +50% | Selon la longueur de la séquence |
-
-### Pénalités
-
-| Pénalité | Valeur | Condition |
-|----------|--------|-----------|
-| **Requête courte** | -40% | Moins de 4 caractères |
 
 ---
 
@@ -524,18 +681,33 @@ Compare le début des chaînes.
 Score_final = (LCS_score × 0.4) + (Levenshtein_score × 0.3) + (Prefix_score × 0.2)
 ```
 
-### Similarité phonétique
-
-Le package utilise également l'algorithme **Soundex** pour détecter les mots qui sonnent similaire:
-
-```php
-// "Catherine" et "Katherine" → même code Soundex
-// Score de similarité plus élevé automatiquement
-```
-
 ---
 
 ## 💾 Système de cache
+
+Le package utilise une abstraction `CacheStoreInterface` pour le cache, permettant de changer facilement de système de cache (Laravel cache, Redis, Memcached, etc.) sans modifier le code métier.
+
+### Configuration du cache
+
+```php
+// config/fuzzy.php
+'cache' => [
+    'enabled' => env('FUZZY_SEARCH_CACHE_ENABLED', true),
+    'driver' => env('FUZZY_SEARCH_CACHE_DRIVER', 'laravel'),
+    'prefix' => 'fuzzy_search:',
+    'ttl' => [
+        'search' => 3600,           // Recherches globales: 1 heure
+        'search_in_model' => 3600,  // Recherches par modèle: 1 heure
+        'search_in_models' => 3600, // Recherches multi-modèles: 1 heure
+        'stats' => 30,              // Statistiques: 30 secondes
+    ],
+    'invalidation' => [
+        'on_index' => true,   // Invalider cache lors de l'indexation
+        'on_update' => true,  // Invalider cache lors des mises à jour
+        'on_delete' => true,  // Invalider cache lors des suppressions
+    ],
+],
+```
 
 ### Types de cache et TTL
 
@@ -545,13 +717,6 @@ Le package utilise également l'algorithme **Soundex** pour détecter les mots q
 | `search_in_model` | 3600s (1h) | Recherches dans un modèle |
 | `search_in_models` | 3600s (1h) | Recherches multi-modèles |
 | `stats` | 30s | Statistiques de l'index |
-
-### Invalidation automatique
-
-Le cache est automatiquement invalidé lors de:
-- **Indexation** (`on_index` = true)
-- **Mise à jour** (`on_update` = true)
-- **Suppression** (`on_delete` = true)
 
 ### Gestion manuelle du cache
 
@@ -592,8 +757,6 @@ php artisan fuzzy:clear-cache --stats --force
 
 ## 🛑 Gestion des stop words
 
-Les stop words sont des mots courants ignorés dans les recherches (le, la, and, the, etc.).
-
 ### Stop words intégrés
 
 | Langue | Stop words |
@@ -617,14 +780,6 @@ La locale est automatiquement détectée depuis Laravel:
 |---------|--------------|
 | ≤ 3 mots | Les stop words sont **conservés** |
 | ≥ 4 mots | Les stop words sont **supprimés** |
-
-```php
-// Requête courte → stop words conservés
-// "the cat" → "the cat"
-
-// Requête longue → stop words supprimés
-// "the quick brown fox" → "quick brown fox"
-```
 
 ### Champs protégés
 
@@ -696,10 +851,14 @@ php artisan fuzzy:index --chunk=50
 
 ## ⚙️ Configuration complète
 
-Voici le fichier de configuration complet `config/fuzzy.php` avec toutes les options disponibles:
+Le fichier de configuration `config/fuzzy.php` contient toutes les options disponibles. Publiez-le avec:
+
+```bash
+php artisan vendor:publish --provider="Fuzzy\FuzzySearchServiceProvider"
+```
 
 <details>
-<summary>📄 Cliquez pour voir la configuration complète</summary>
+<summary>📄 Voir la configuration complète</summary>
 
 ```php
 <?php
@@ -708,6 +867,7 @@ return [
     // Cache Configuration
     'cache' => [
         'enabled' => env('FUZZY_SEARCH_CACHE_ENABLED', true),
+        'driver' => env('FUZZY_SEARCH_CACHE_DRIVER', 'laravel'),
         'prefix' => 'fuzzy_search:',
         'ttl' => [
             'search' => 3600,
@@ -953,19 +1113,22 @@ return [
 ### Indexation
 
 ```bash
-# Indexer tous les modèles
+# Indexation incrémentale (défaut) - uniquement nouveaux/modifiés
 php artisan fuzzy:index
+
+# Indexation forcée (supprime puis recrée tout)
+php artisan fuzzy:index --force
 
 # Indexer un modèle spécifique
 php artisan fuzzy:index "App\Models\Product"
 
-# Forcer la réindexation
-php artisan fuzzy:index --force
+# Indexer un modèle spécifique avec force
+php artisan fuzzy:index "App\Models\Product" --force
 
 # Taille de lot personnalisée
 php artisan fuzzy:index --chunk=500
 
-# Lister les modèles sans indexer
+# Lister les modèles découvrables (sans indexer)
 php artisan fuzzy:index --list
 ```
 
@@ -1010,6 +1173,7 @@ php artisan fuzzy:stats
 | `MustFuzzySearch` | Interface que vos modèles doivent implémenter |
 | `SearchServiceInterface` | Service principal de recherche |
 | `CacheManagerInterface` | Gestion du cache |
+| `CacheStoreInterface` | Abstraction du système de cache |
 | `IndexManagerInterface` | Gestion de l'indexation |
 | `SearchProcessorInterface` | Traitement des recherches |
 | `StageInterface` | Interface pour les stages du pipeline |
@@ -1023,12 +1187,25 @@ php artisan fuzzy:stats
 | `FuzzySearchableData` | Base pour formatage personnalisé |
 | `SearchContext` | Contexte de recherche (pipeline) |
 | `StringNormalizer` | Normalisation des chaînes |
+| `LaravelCacheStore` | Implémentation Laravel du cache |
 
 ### Enums
 
 ```php
+use Fuzzy\Enums\IndexationLevel;
 use Fuzzy\Enums\StageType;
 
+// Contrôle des événements d'indexation
+IndexationLevel::NONE              // Aucun événement
+IndexationLevel::CREATE_ONLY       // Création uniquement
+IndexationLevel::UPDATE_ONLY       // Mise à jour uniquement
+IndexationLevel::DELETE_ONLY       // Suppression uniquement
+IndexationLevel::CREATE_AND_UPDATE // Création + mise à jour
+IndexationLevel::CREATE_AND_DELETE // Création + suppression
+IndexationLevel::UPDATE_AND_DELETE // Mise à jour + suppression
+IndexationLevel::ALL               // Tous les événements (défaut)
+
+// Types de stages du pipeline
 StageType::PRE_PROCESSING     // Prétraitement
 StageType::MATCH_DISCOVERY    // Découverte correspondances
 StageType::SCORING            // Scoring
@@ -1053,7 +1230,8 @@ FUZZY_DISTANCE_IDENTICAL // 0.0 - Distance identique
 **Causes possibles:**
 1. Index non créé
 2. `shouldBeIndexed()` retourne false
-3. Stop words supprimés malencontreusement
+3. `IndexationLevel` configuré pour ne pas indexer l'événement concerné
+4. Stop words supprimés malencontreusement
 
 **Solutions:**
 ```bash
@@ -1067,6 +1245,9 @@ php artisan fuzzy:index --force
 php artisan tinker
 >>> $product = Product::first();
 >>> $product->shouldBeIndexed();
+
+# Vérifier IndexationLevel
+>>> $product::getIndexationLevel();
 ```
 
 ### Problème: Performance lente
@@ -1114,6 +1295,24 @@ public function getProtectedFields(): array
         'default' => 0.5,    // Réduire l'importance par défaut
     ],
 ],
+```
+
+### Problème: Indexation automatique ne fonctionne pas
+
+**Vérifications:**
+```php
+// 1. Vérifier IndexationLevel
+public static function getIndexationLevel(): IndexationLevel
+{
+    // Doit inclure l'événement concerné
+    return IndexationLevel::CREATE_AND_UPDATE;
+}
+
+// 2. Vérifier shouldBeIndexed()
+public function shouldBeIndexed(): bool
+{
+    return true; // Doit retourner true
+}
 ```
 
 ---

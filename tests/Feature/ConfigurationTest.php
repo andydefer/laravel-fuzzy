@@ -34,41 +34,47 @@ final class ConfigurationTest extends TestCase
     }
 
     /**
-     * Test that searchable models are correctly discovered from configuration.
+     * Test that models implementing MustFuzzySearch are auto-discovered.
+     * 
+     * Note: Configuration 'fuzzy.searchable_models' is deprecated.
+     * Models are discovered automatically by scanning directories.
      */
-    public function test_searchable_models_configuration(): void
+    public function test_models_are_auto_discovered(): void
     {
-        // Arrange: Configure explicit list of searchable models
-        Config::set('fuzzy.searchable_models', [
-            User::class,
-            Product::class,
-        ]);
+        // Arrange: Clear any configuration that might interfere
+        Config::set('fuzzy.searchable_models', []);
 
-        // Act: Retrieve searchable models through the discovery service
+        // Act: Retrieve searchable models through auto-discovery
         $modelDiscovery = app(ModelDiscoveryInterface::class);
         $discoveredModels = $modelDiscovery->getSearchableModels();
 
-        // Assert: Verify both configured models are present and count is correct
+        // Assert: Models implementing MustFuzzySearch should be discovered
+        $this->assertIsArray($discoveredModels, 'Auto-discovery should return an array of models');
+        $this->assertNotEmpty($discoveredModels, 'Auto-discovery should find at least one model');
+
+        // Verify specific test fixtures are discovered
         $this->assertContains(User::class, $discoveredModels, 'User model should be discoverable');
         $this->assertContains(Product::class, $discoveredModels, 'Product model should be discoverable');
-        $this->assertCount(2, $discoveredModels, 'Exactly 2 models should be discovered');
     }
 
     /**
-     * Test that auto-discovery works when no models are explicitly configured.
+     * Test that auto-discovery always works regardless of configuration.
      */
     public function test_auto_discovery_always_enabled(): void
     {
-        // Arrange: Clear configured models to force auto-discovery behavior
-        Config::set('fuzzy.searchable_models', []);
+        // Arrange: Ensure no configuration is set
+        Config::set('fuzzy.searchable_models', null);
 
         // Act: Retrieve searchable models without explicit configuration
         $modelDiscovery = app(ModelDiscoveryInterface::class);
         $discoveredModels = $modelDiscovery->getSearchableModels();
 
-        // Assert: Models should be discovered automatically from registered searchable traits
+        // Assert: Models should be discovered automatically
         $this->assertIsArray($discoveredModels, 'Auto-discovery should return an array of models');
         $this->assertNotEmpty($discoveredModels, 'Auto-discovery should find at least one model');
+
+        // Verify User model is discovered (implements MustFuzzySearch)
+        $this->assertContains(User::class, $discoveredModels, 'User model should be auto-discovered');
     }
 
     /**
@@ -392,8 +398,6 @@ final class ConfigurationTest extends TestCase
     {
         // Arrange: Remove coverage bonus configuration entirely
         Config::set('fuzzy.scoring.coverage_bonus', null);
-
-        // Clear config cache to ensure fresh load
         Config::offsetUnset('fuzzy.scoring.coverage_bonus');
 
         // Act: Retrieve coverage bonus configuration with defaults

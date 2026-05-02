@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Fuzzy\Services;
 
 use Fuzzy\Contracts\CacheManagerInterface;
+use Fuzzy\Contracts\CacheStoreInterface;
 use Fuzzy\Config\CacheConfig;
-use Illuminate\Support\Facades\Cache;
 
 class CacheManagerService implements CacheManagerInterface
 {
@@ -14,9 +14,11 @@ class CacheManagerService implements CacheManagerInterface
     private const STATS_CACHE_TYPE = 'stats';
 
     private CacheConfig $config;
+    private CacheStoreInterface $cache;
 
-    public function __construct(?CacheConfig $config = null)
+    public function __construct(CacheStoreInterface $cache, ?CacheConfig $config = null)
     {
+        $this->cache = $cache;
         $this->config = $config ?? CacheConfig::fromConfig();
     }
 
@@ -34,7 +36,6 @@ class CacheManagerService implements CacheManagerInterface
         $cacheKey = $this->generateCacheKey($type, $parameters);
         $ttl = $this->getTtlForCacheType($type);
 
-        // Extraire le modèle des paramètres si présent
         $modelClass = $this->extractModelClassFromParameters($parameters);
 
         return $this->cacheRemember($cacheKey, $ttl, $callback, $modelClass);
@@ -58,9 +59,6 @@ class CacheManagerService implements CacheManagerInterface
         $this->deleteCacheKeysForModel($modelClass);
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function invalidateStatsCache(): void
     {
         if (!$this->config->isEnabled()) {
@@ -68,9 +66,8 @@ class CacheManagerService implements CacheManagerInterface
         }
 
         $statsKey = $this->generateCacheKey(self::STATS_CACHE_TYPE, []);
-        Cache::forget($statsKey);
+        $this->cache->forget($statsKey);
 
-        // Also remove from stored keys tracking if exists
         $this->removeStatsKeyFromStorage($statsKey);
     }
 
@@ -97,20 +94,13 @@ class CacheManagerService implements CacheManagerInterface
         return $key;
     }
 
-    /**
-     * Extract model class from parameters array
-     */
     private function extractModelClassFromParameters(array $parameters): ?string
     {
-        // Pour search_in_model: [modelClass, query, options]
         if (isset($parameters[0]) && is_string($parameters[0]) && class_exists($parameters[0])) {
             return $parameters[0];
         }
 
-        // Pour search_in_models: [modelClasses, query, options]
         if (isset($parameters[0]) && is_array($parameters[0])) {
-            // Pour l'invalidation, on ne stocke pas tous les modèles
-            // On retourne null car l'invalidation se fera par modèle individuel
             return null;
         }
 
@@ -120,15 +110,14 @@ class CacheManagerService implements CacheManagerInterface
     private function cacheRemember(string $key, int $ttl, callable $callback, ?string $modelClass = null): mixed
     {
         $this->storeCacheKey($key, $modelClass);
-        return Cache::remember($key, $ttl, $callback);
+        return $this->cache->remember($key, $ttl, $callback);
     }
 
     private function storeCacheKey(string $key, ?string $modelClass = null): void
     {
         $storageKey = $this->config->getCacheKeysStorageKey();
-        $storedKeys = Cache::get($storageKey, []);
+        $storedKeys = $this->cache->get($storageKey) ?? [];
 
-        // Structure des données stockées
         $keyData = [
             'key' => $key,
             'created_at' => time(),
@@ -138,7 +127,6 @@ class CacheManagerService implements CacheManagerInterface
             $keyData['model'] = $modelClass;
         }
 
-        // Vérifier si la clé existe déjà
         $keyExists = false;
         foreach ($storedKeys as $existingKeyData) {
             if (is_array($existingKeyData) && $existingKeyData['key'] === $key) {
@@ -153,27 +141,27 @@ class CacheManagerService implements CacheManagerInterface
 
         if (!$keyExists) {
             $storedKeys[] = $keyData;
-            Cache::put($storageKey, $storedKeys, $this->config->getMaxTtl());
+            $this->cache->put($storageKey, $storedKeys, $this->config->getMaxTtl());
         }
     }
 
     private function deleteStoredCacheKeys(): void
     {
         $storageKey = $this->config->getCacheKeysStorageKey();
-        $storedKeys = Cache::get($storageKey, []);
+        $storedKeys = $this->cache->get($storageKey) ?? [];
 
         foreach ($storedKeys as $keyData) {
             $key = is_array($keyData) ? $keyData['key'] : $keyData;
-            Cache::forget($key);
+            $this->cache->forget($key);
         }
 
-        Cache::forget($storageKey);
+        $this->cache->forget($storageKey);
     }
 
     private function deleteCacheKeysForModel(string $modelClass): void
     {
         $storageKey = $this->config->getCacheKeysStorageKey();
-        $storedKeys = Cache::get($storageKey, []);
+        $storedKeys = $this->cache->get($storageKey) ?? [];
 
         $keysToDelete = [];
         $keysToKeep = [];
@@ -182,7 +170,6 @@ class CacheManagerService implements CacheManagerInterface
             $key = is_array($keyData) ? $keyData['key'] : $keyData;
             $keyModel = is_array($keyData) ? ($keyData['model'] ?? null) : null;
 
-            // Si la clé est associée à ce modèle, on la supprime
             if ($keyModel === $modelClass) {
                 $keysToDelete[] = $key;
             } else {
@@ -190,27 +177,19 @@ class CacheManagerService implements CacheManagerInterface
             }
         }
 
-        // Supprimer les clés du cache
         foreach ($keysToDelete as $key) {
-            Cache::forget($key);
+            $this->cache->forget($key);
         }
 
-        // Mettre à jour le storage
         if ($keysToDelete !== []) {
-            Cache::put($storageKey, $keysToKeep, $this->config->getMaxTtl());
+            $this->cache->put($storageKey, $keysToKeep, $this->config->getMaxTtl());
         }
     }
 
-    /**
-     * Remove stats key from stored keys tracking.
-     *
-     * @param string $statsKey The stats cache key to remove
-     * @return void
-     */
     private function removeStatsKeyFromStorage(string $statsKey): void
     {
         $storageKey = $this->config->getCacheKeysStorageKey();
-        $storedKeys = Cache::get($storageKey, []);
+        $storedKeys = $this->cache->get($storageKey) ?? [];
 
         $keysToKeep = [];
         $keyRemoved = false;
@@ -225,7 +204,7 @@ class CacheManagerService implements CacheManagerInterface
         }
 
         if ($keyRemoved) {
-            Cache::put($storageKey, $keysToKeep, $this->config->getMaxTtl());
+            $this->cache->put($storageKey, $keysToKeep, $this->config->getMaxTtl());
         }
     }
 }
