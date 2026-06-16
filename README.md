@@ -1317,6 +1317,37 @@ public function shouldBeIndexed(): bool
 
 ---
 
+## 🗑️ Désinstallation
+
+### Prérequis avant désinstallation
+
+**Important :** Avant de désinstaller le package, vous DEVEZ supprimer toutes les références dans votre code :
+
+```bash
+# 1. Supprimer l'utilisation des traits dans vos modèles
+# Recherchez tous les "use FuzzySearchable" dans vos fichiers
+grep -r "use FuzzySearchable" app/Models/
+
+# 2. Supprimer l'implémentation de l'interface MustFuzzySearch
+# Recherchez toutes les classes qui implémentent l'interface
+grep -r "implements MustFuzzySearch" app/Models/
+
+# 3. Supprimer les appels à fuzzySearch() dans votre code
+grep -r "fuzzySearch" app/
+
+# 4. Supprimer les migrations
+php artisan migrate:rollback --path=vendor/andydefer/laravel-fuzzy/database/migrations
+# OU supprimer manuellement les migrations dans database/migrations/
+
+# 5. Supprimer la configuration
+php artisan vendor:publish --provider="Fuzzy\FuzzySearchServiceProvider" --tag=fuzzy-config --force
+# Puis supprimer config/fuzzy.php manuellement
+
+# 6. Ensuite seulement désinstaller
+composer remove andydefer/laravel-fuzzy
+
+---
+
 ## 🤝 Contribution
 
 ### Workflow de contribution

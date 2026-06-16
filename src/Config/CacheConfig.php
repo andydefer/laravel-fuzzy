@@ -73,7 +73,7 @@ final class CacheConfig implements ConfigInterface
         $config = config('fuzzy.cache', []);
 
         return new self(
-            enabled: $config['enabled'] ?? self::DEFAULT_ENABLED,
+            enabled: (bool) $config['enabled'] ?? self::DEFAULT_ENABLED,
             prefix: $config['prefix'] ?? self::DEFAULT_PREFIX,
             ttlSearch: $config['ttl']['search'] ?? self::DEFAULT_TTL_SEARCH,
             ttlSearchInModel: $config['ttl']['search_in_model'] ?? self::DEFAULT_TTL_SEARCH_IN_MODEL,

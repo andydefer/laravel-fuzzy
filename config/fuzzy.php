@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 return [
+
     /**
      * --------------------------------------------------------------------------
      * Fuzzy Search Package Configuration
@@ -11,8 +12,6 @@ return [
      * This file contains the configuration for the Fuzzy Search package.
      * All values can be customized to fine-tune the search behavior,
      * performance, and scoring logic.
-     *
-     * @package Fuzzy
      */
 
     /**
@@ -23,6 +22,7 @@ return [
      * Controls caching behavior to improve search performance.
      */
     'cache' => [
+
         /**
          * Enable/disable caching globally.
          * Impact: When disabled, every search recomputes results (slower but always fresh).
@@ -65,11 +65,12 @@ return [
      * Default values applied to all searches when not explicitly overridden.
      */
     'default_options' => [
+
         /**
          * Minimum relevance score for a result to be included (0.0 to 1.0).
          * Impact: Higher values return fewer but more relevant results.
          */
-        'min_score' => 0.1,
+        'min_score' => 0.4,
 
         /**
          * Maximum number of results to return.
@@ -87,7 +88,7 @@ return [
          * Similarity threshold for fuzzy matches (0.0 to 1.0).
          * Impact: Higher values require closer matches, reducing false positives.
          */
-        'threshold' => 0.1,
+        'threshold' => 0.4,
     ],
 
     /**
@@ -98,11 +99,12 @@ return [
      * Controls how content is indexed for searching.
      */
     'index' => [
+
         /**
          * Minimum word length to index (characters).
          * Impact: Shorter words are ignored to reduce index size and noise.
          */
-        'min_word_length' => 2,
+        'min_word_length' => 3,
 
         /**
          * Maximum word length to index (characters).
@@ -150,6 +152,7 @@ return [
      * sous-chaîne commune entre deux mots.
      */
     'lcs' => [
+
         /**
          * Index de base pour l'initialisation des tableaux et la vérification des chaînes vides.
          * Impact: Détermine la valeur de départ pour les indices (généralement 0).
@@ -178,6 +181,7 @@ return [
      * d'édition entre deux chaînes.
      */
     'levenshtein' => [
+
         /**
          * Longueur représentant une chaîne vide.
          * Impact: Détermine quand une chaîne est considérée comme vide (généralement 0).
@@ -188,7 +192,7 @@ return [
          * Seuil de distance pour appliquer une pénalité (nombre de caractères).
          * Impact: Les distances supérieures à ce seuil déclenchent une pénalité progressive.
          */
-        'distance_penalty_threshold' => 2,
+        'distance_penalty_threshold' => 3,
 
         /**
          * Facteur de pénalité de base pour la distance de Levenshtein.
@@ -236,6 +240,7 @@ return [
      * des chaînes pour les correspondances.
      */
     'prefix' => [
+
         /**
          * Longueur minimale de préfixe pour la correspondance (caractères).
          * Impact: Les préfixes plus courts que cette longueur sont ignorés.
@@ -276,6 +281,7 @@ return [
      * normaliser les chaînes avant comparaison.
      */
     'regex' => [
+
         /**
          * Pattern pour supprimer les caractères spéciaux.
          * Impact: Garde uniquement les lettres, chiffres et espaces.
@@ -303,20 +309,21 @@ return [
      * Shared parameters used across multiple similarity algorithms.
      */
     'similarity' => [
+
         /**
          * Minimum query length required for similarity calculation.
          * Impact: Shorter queries are ignored to avoid meaningless searches.
          */
-        'min_query_length' => 2,
+        'min_query_length' => 3,
 
         /**
          * Weights for each similarity algorithm in composite scoring.
          * Impact: Higher weights give more importance to that algorithm's score.
          */
         'algorithm_weights' => [
-            'longest_common_substring' => 0.4,
-            'levenshtein' => 0.3,
-            'prefix' => 0.2,
+            'longest_common_substring' => 0.7,
+            'levenshtein' => 0.25,
+            'prefix' => 0.05,
         ],
 
         /**
@@ -419,7 +426,7 @@ return [
          * Penalty per unmatched letter.
          * Impact: Higher values penalize unmatched letters more heavily.
          */
-        'unmatched_letter_penalty' => 0.15,
+        'unmatched_letter_penalty' => 0.35,
 
         /**
          * Maximum score cap.
@@ -431,7 +438,7 @@ return [
          * Penalty per character for word mismatches.
          * Impact: Higher values penalize character differences more.
          */
-        'word_penalty_per_char' => 0.04,
+        'word_penalty_per_char' => 0.10,
 
         /**
          * Multiplier for length-based penalties.
@@ -443,19 +450,19 @@ return [
          * Minimum penalty value to avoid zero penalties.
          * Impact: Ensures non-exact matches always have at least this penalty.
          */
-        'minimal_penalty' => 0.3,
+        'minimal_penalty' => 0.7,
 
         /**
          * Penalty for fuzzy matches.
          * Impact: Applied when matches are not exact but still considered valid.
          */
-        'match_fuzziness_penalty' => 0.1,
+        'match_fuzziness_penalty' => 0.4,
 
         /**
          * Minimum ratio for word matches (0.0 to 1.0).
          * Impact: Words with similarity below this are considered non-matching.
          */
-        'min_word_match_ratio' => 0.8,
+        'min_word_match_ratio' => 0.90,
 
         /**
          * Threshold for short word detection.
@@ -467,13 +474,13 @@ return [
          * Threshold for very bad matches.
          * Impact: Scores above this trigger an additional penalty.
          */
-        'very_bad_match_threshold' => 4.0,
+        'very_bad_match_threshold' => 3.0,
 
         /**
          * Penalty for very bad matches.
          * Impact: Added to scores above the very bad match threshold.
          */
-        'very_bad_match_penalty' => 0.8,
+        'very_bad_match_penalty' => 1.5,
 
         /**
          * Strictness factor increase per word.
@@ -485,7 +492,7 @@ return [
          * Threshold for real similarity detection (0.0 to 1.0).
          * Impact: Similarity below this triggers additional real similarity checks.
          */
-        'real_similarity_threshold' => 0.35,
+        'real_similarity_threshold' => 0.50,
 
         /**
          * Base penalty when real similarity is below threshold.
@@ -503,7 +510,7 @@ return [
          * Threshold for low similarity detection (0.0 to 1.0).
          * Impact: Similarity below this triggers an additional penalty.
          */
-        'low_similarity_threshold' => 0.3,
+        'low_similarity_threshold' => 0.45,
 
         /**
          * Penalty for low similarity matches.
@@ -617,7 +624,7 @@ return [
          * Multiplier for unmatched letter penalties.
          * Impact: Amplifies the effect of unmatched letter penalties.
          */
-        'unmatched_letter_multiplier' => 1.5,
+        'unmatched_letter_multiplier' => 2.5,
     ],
 
     /**
@@ -639,21 +646,21 @@ return [
         'start_index' => 0,
         'empty_text_penalty_factor' => 100,
         'max_score_cap' => 10.0,
-        'unmatched_letter_penalty' => 0.15,
-        'unmatched_letter_multiplier' => 1.5,
-        'word_penalty_per_char' => 0.04,
+        'unmatched_letter_penalty' => 0.35,
+        'unmatched_letter_multiplier' => 2.5,
+        'word_penalty_per_char' => 0.10,
         'length_penalty_multiplier' => 0.04,
-        'minimal_penalty' => 0.3,
-        'match_fuzziness_penalty' => 0.1,
-        'min_word_match_ratio' => 0.8,
+        'minimal_penalty' => 0.7,
+        'match_fuzziness_penalty' => 0.4,
+        'min_word_match_ratio' => 0.90,
         'short_word_threshold' => 3,
-        'very_bad_match_threshold' => 4.0,
-        'very_bad_match_penalty' => 0.8,
+        'very_bad_match_threshold' => 3.0,
+        'very_bad_match_penalty' => 1.5,
         'strictness_factor_per_word' => 0.05,
-        'real_similarity_threshold' => 0.35,
+        'real_similarity_threshold' => 0.50,
         'real_similarity_base_penalty' => 1.5,
         'real_similarity_multiplier' => 1.5,
-        'low_similarity_threshold' => 0.3,
+        'low_similarity_threshold' => 0.45,
         'low_similarity_penalty' => 2.0,
         'basic_similarity_threshold' => 0.2,
         'basic_similarity_fallback' => 2.5,
@@ -680,12 +687,31 @@ return [
 
     /**
      * --------------------------------------------------------------------------
+     * Relevance Scoring Configuration
+     * --------------------------------------------------------------------------
+     *
+     * Controls how final relevance scores are calculated and normalized.
+     * These settings affect the end-user result ranking.
+     */
+    'relevance_scoring' => [
+        'penalty' => 10.0,
+        'default_max_results' => 20,
+        'original_score_weight' => 0.7,
+        'relevance_score_weight' => 0.3,
+        'max_normalized_relevance' => 100.0,
+        'min_normalized_relevance' => 0.0,
+        'normalization_factor' => 10.0,
+    ],
+
+    /**
+     * --------------------------------------------------------------------------
      * Scoring Configuration
      * --------------------------------------------------------------------------
      *
      * Controls scoring behavior including coverage bonuses and field weights.
      */
     'scoring' => [
+
         /**
          * Coverage Bonus Configuration
          * ------------------------------------------------
@@ -694,6 +720,7 @@ return [
          * bonus points are added to the final score.
          */
         'coverage_bonus' => [
+
             /**
              * Minimum coverage ratio to apply full bonus (0.0 to 1.0).
              * Example: 0.75 means 75% of query words must match to get full bonus.
@@ -758,6 +785,7 @@ return [
         /**
          * Bonus values for high-quality matches.
          * Impact: Higher bonuses increase scores for desirable match characteristics.
+         *
          * @deprecated Use 'coverage_bonus' section instead for coverage-related bonuses
          */
         'bonuses' => [
@@ -765,7 +793,6 @@ return [
             'full_coverage' => 0.3,
             'high_coverage' => 0.15,
         ],
-
         'min_consecutive_length' => 2,
         'max_consecutive_bonus_key' => 5,
         'early_position_threshold' => 0.2,
@@ -803,21 +830,4 @@ return [
         'min_trigram_length' => 3,
     ],
 
-    /**
-     * --------------------------------------------------------------------------
-     * Relevance Scoring Configuration
-     * --------------------------------------------------------------------------
-     *
-     * Controls how final relevance scores are calculated and normalized.
-     * These settings affect the end-user result ranking.
-     */
-    'relevance_scoring' => [
-        'penalty' => 10.0,
-        'default_max_results' => 20,
-        'original_score_weight' => 0.7,
-        'relevance_score_weight' => 0.3,
-        'max_normalized_relevance' => 100.0,
-        'min_normalized_relevance' => 0.0,
-        'normalization_factor' => 10.0,
-    ],
 ];

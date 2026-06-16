@@ -1,527 +1,14 @@
 # Rector Refactoring Report
-*Generated: sam. 02 mai 2026 05:24:40 WAT*
+*Generated: mar. 16 juin 2026 09:25:41 WAT*
 
 
 94 files with changes
 =====================
 
-1) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/database/migrations/2024_01_01_000000_create_non_indexable_users_table.php:17
+1) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Config/WordSimilarityComparatorConfig.php:322
 
     ---------- begin diff ----------
-@@ @@
-      */
-     public function up(): void
-     {
--        Schema::create('non_indexable_users', function (Blueprint $table) {
-+        Schema::create('non_indexable_users', function (Blueprint $table): void {
-             $table->id();
-             $table->string('name');
-             $table->string('email')->unique();
-    ----------- end diff -----------
-
-Applied rules:
- * AddClosureVoidReturnTypeWhereNoReturnRector
-
-
-2) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/database/migrations/2024_01_01_000000_create_non_searchable_models_table.php:17
-
-    ---------- begin diff ----------
-@@ @@
-      */
-     public function up(): void
-     {
--        Schema::create('non_searchable_models', function (Blueprint $table) {
-+        Schema::create('non_searchable_models', function (Blueprint $table): void {
-             $table->id();
-             $table->string('name');
-             $table->string('email')->unique();
-    ----------- end diff -----------
-
-Applied rules:
- * AddClosureVoidReturnTypeWhereNoReturnRector
-
-
-3) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Commands/ClearCacheCommand.php:39
-
-    ---------- begin diff ----------
-@@ @@
-
-     /**
-      * Execute the console command.
--     *
--     * @return void
-      */
-     public function handle(): void
-     {
-@@ @@
-
-     /**
-      * Clear only statistics cache.
--     *
--     * @return void
-      */
-     private function clearStatisticsCache(): void
-     {
-@@ @@
-      * Clear cache for a specific model.
-      *
-      * @param string $modelClass The model class to clear cache for
--     * @return void
-      */
-     private function clearCacheForSpecificModel(string $modelClass): void
-     {
-@@ @@
-
-     /**
-      * Clear entire fuzzy search cache.
--     *
--     * @return void
-      */
-     private function clearEntireCache(): void
-     {
-@@ @@
-
-     /**
-      * Get the search service instance from the container.
--     *
--     * @return SearchServiceInterface
-      */
-     private function getSearchService(): SearchServiceInterface
-     {
-    ----------- end diff -----------
-
-Applied rules:
- * RemoveUselessReturnTagRector
-
-
-4) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Commands/ClearIndexCommand.php:41
-
-    ---------- begin diff ----------
-@@ @@
-      *
-      * Routes to either clear a specific model's index or all indexes
-      * based on provided arguments.
--     *
--     * @return void
-      */
-     public function handle(): void
-     {
-@@ @@
-      *
-      * @param string $modelClass The fully qualified model class name
-      * @param bool $shouldSkipConfirmation Whether to bypass user confirmation
--     * @return void
-      */
-     protected function clearModelIndex(string $modelClass, bool $shouldSkipConfirmation): void
-     {
-@@ @@
-      * Clear all search index entries from the database.
-      *
-      * @param bool $shouldSkipConfirmation Whether to bypass user confirmation
--     * @return void
-      */
-     protected function clearAllIndexes(bool $shouldSkipConfirmation): void
-     {
-    ----------- end diff -----------
-
-Applied rules:
- * RemoveUselessReturnTagRector
-
-
-5) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Commands/IndexSearchCommand.php:23
-
-    ---------- begin diff ----------
-@@ @@
-     use CommandHelpers;
-
-     /**
--     * Default chunk size for batch processing when not specified in options.
--     */
--    private const DEFAULT_CHUNK_SIZE = 100;
--
--    /**
-      * Chunk size used for statistics calculation to avoid memory issues.
-      */
-     private const STATS_CHUNK_SIZE = 1000;
-@@ @@
-         $modelDiscovery = $this->getModelDiscovery();
-
-         if (!$modelDiscovery->isValidModel($modelClass)) {
--            $this->showError("Model {$modelClass} must implement " . MustFuzzySearch::class);
-+            $this->showError(sprintf('Model %s must implement ', $modelClass) . MustFuzzySearch::class);
-             return;
-         }
-
--        $this->showInfo("Processing model: {$modelClass}");
-+        $this->showInfo('Processing model: ' . $modelClass);
-
-         if ($shouldForceReindex) {
--            $this->showWarning("Clearing existing index for {$modelClass}...");
-+            $this->showWarning(sprintf('Clearing existing index for %s...', $modelClass));
-             $this->getSearchService()->getIndexManager()->reindexModel($modelClass);
-         } else {
-             $this->performIncrementalIndexing($modelClass, $chunkSize);
-@@ @@
-         $modelDiscovery = $this->getModelDiscovery();
-         $models = $modelDiscovery->getSearchableModels();
-
--        if (empty($models)) {
-+        if ($models === []) {
-             $this->displayNoModelsWarning();
-             return;
-         }
-@@ @@
-      */
-     private function performIncrementalIndexing(string $modelClass, int $chunkSize): void
-     {
--        $this->showInfo("Indexing model: {$modelClass}");
-+        $this->showInfo('Indexing model: ' . $modelClass);
-
-         /** @var Model&MustFuzzySearch $modelClass */
-         $totalRecords = $modelClass::count();
-
-         if ($totalRecords === 0) {
--            $this->showWarning("No records found for {$modelClass}");
-+            $this->showWarning('No records found for ' . $modelClass);
-             return;
-         }
-
-@@ @@
-                 if (get_class($model) === $modelClass && $model->shouldBeIndexed()) {
-                     $this->getSearchService()->getIndexManager()->indexModel($model);
-                 }
-+
-                 $progressBar->advance();
-             }
-         });
-@@ @@
-         $this->showHeader('Discoverable Models');
-         $this->showInfo('Models that implement ' . MustFuzzySearch::class . ':');
-
--        if (empty($models)) {
-+        if ($models === []) {
-             $this->showWarning('No discoverable models found.');
-         } else {
-             foreach ($models as $model) {
--                $this->line("  ✓ {$model}");
-+                $this->line('  ✓ ' . $model);
-             }
-         }
-
-@@ @@
-     {
-         $stats = $this->calculatePreciseModelStatistics($modelClass);
-
--        $this->showSuccess("Indexed {$stats['indexed_entries']} entries for {$modelClass}");
-+        $this->showSuccess(sprintf('Indexed %d entries for %s', $stats['indexed_entries'], $modelClass));
-
-         if ($stats['indexed_models'] > 0) {
-             $coveragePercentage = $stats['total_records'] > 0
-@@ @@
-                 ? round(($stats['indexed_models'] / $stats['total_records']) * self::PERCENTAGE_MULTIPLIER, 1)
-                 : 0;
-
--            $this->line("  Indexed models: {$stats['indexed_models']} out of {$stats['total_records']} total records ({$coveragePercentage}%)");
-+            $this->line(sprintf('  Indexed models: %d out of %d total records (%s%%)', $stats['indexed_models'], $stats['total_records'], $coveragePercentage));
-
-             if ($stats['indexed_models'] < $stats['total_records'] && $stats['skipped_records'] > 0) {
-                 $skippedPercentage = round(($stats['skipped_records'] / $stats['total_records']) * self::PERCENTAGE_MULTIPLIER, 1);
--                $this->line("  Skipped records: {$stats['skipped_records']} ({$skippedPercentage}% - due to shouldBeIndexed())");
-+                $this->line(sprintf('  Skipped records: %d (%s%% - due to shouldBeIndexed())', $stats['skipped_records'], $skippedPercentage));
-             }
-         } else {
-             $this->showWarning("  No models were indexed - check shouldBeIndexed() method");
-@@ @@
-         $skippedRecords = 0;
-
-         /** @var Model&MustFuzzySearch $modelClass */
--        $modelClass::chunk(self::STATS_CHUNK_SIZE, function ($models) use (&$totalRecords, &$indexedModels, &$skippedRecords) {
-+        $modelClass::chunk(self::STATS_CHUNK_SIZE, function ($models) use (&$totalRecords, &$indexedModels, &$skippedRecords): void {
-             $totalRecords += count($models);
-
-             /** @var Model&MustFuzzySearch $model */
-             foreach ($models as $model) {
-                 if ($model->shouldBeIndexed()) {
--                    $indexedModels++;
-+                    ++$indexedModels;
-                 } else {
--                    $skippedRecords++;
-+                    ++$skippedRecords;
-                 }
-             }
-         });
-@@ @@
-         $this->showInfo('Found ' . count($models) . ' searchable model(s):');
-
-         foreach ($models as $model) {
--            $this->line("  - {$model}");
-+            $this->line('  - ' . $model);
-         }
-
-         $this->showNewLine();
-@@ @@
-         $this->showInfo('Total entries: ' . $stats['total_entries']);
-
-         foreach ($stats['models'] as $model => $modelStats) {
--            $this->line("  {$model}: {$modelStats['count']} entries");
-+            $this->line(sprintf('  %s: %s entries', $model, $modelStats['count']));
-         }
-     }
-
-@@ @@
-
-     /**
-      * Get the search service instance from the container.
--     *
--     * @return SearchServiceInterface
-      */
-     private function getSearchService(): SearchServiceInterface
-     {
-@@ @@
-
-     /**
-      * Get the model discovery service from the container.
--     *
--     * @return ModelDiscoveryInterface
-      */
-     private function getModelDiscovery(): ModelDiscoveryInterface
-     {
-    ----------- end diff -----------
-
-Applied rules:
- * SimplifyEmptyCheckOnEmptyArrayRector
- * EncapsedStringsToSprintfRector
- * PostIncDecToPreIncDecRector
- * NewlineAfterStatementRector
- * RemoveUnusedPrivateClassConstantRector
- * RemoveUselessReturnTagRector
- * AddClosureVoidReturnTypeWhereNoReturnRector
-
-
-6) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Commands/StatsIndexCommand.php:39
-
-    ---------- begin diff ----------
-@@ @@
-      *
-      * Retrieves and displays comprehensive statistics about the search index,
-      * including total entries and per-model breakdown with field counts.
--     *
--     * @return void
-      */
-     public function handle(): void
-     {
-@@ @@
-
-     /**
-      * Get the search service from the container.
--     *
--     * @return SearchServiceInterface
-      */
-     private function getSearchService(): SearchServiceInterface
-     {
-@@ @@
-
-     /**
-      * Display the command header.
--     *
--     * @return void
-      */
-     private function displayHeader(): void
-     {
-@@ @@
-      * Display the total number of indexed entries.
-      *
-      * @param int $totalEntries The total number of indexed entries
--     * @return void
-      */
-     private function displayTotalEntries(int $totalEntries): void
-     {
-@@ @@
-      * Shows entry counts and field distributions per model in a tabular format.
-      *
-      * @param array<string, array{count: int, fields: array<string, int>}> $modelsStats
--     * @return void
-      */
-     private function displayModelStatistics(array $modelsStats): void
-     {
-@@ @@
-         $this->showInfo('Per model statistics:');
-         $this->showNewLine();
-
--        if (empty($modelsStats)) {
-+        if ($modelsStats === []) {
-             $this->showWarning('No models indexed yet.');
-             return;
-         }
-@@ @@
-      * Example: ['name' => 100, 'email' => 50] becomes "name: 100, email: 50"
-      *
-      * @param array<string, int> $fieldCounts
--     * @return string
-      */
-     private function formatFieldCounts(array $fieldCounts): string
-     {
--        if (empty($fieldCounts)) {
-+        if ($fieldCounts === []) {
-             return '';
-         }
-
-@@ @@
-         $formattedParts = [];
-
-         foreach ($fieldCounts as $fieldName => $count) {
--            $formattedParts[] = "{$fieldName}: {$count}";
-+            $formattedParts[] = sprintf('%s: %d', $fieldName, $count);
-         }
-
-         return implode(', ', $formattedParts);
-    ----------- end diff -----------
-
-Applied rules:
- * SimplifyEmptyCheckOnEmptyArrayRector
- * EncapsedStringsToSprintfRector
- * RemoveUselessReturnTagRector
-
-
-7) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Config/CoverageBonusConfig.php:57
-
-    ---------- begin diff ----------
-@@ @@
-
-     /**
-      * Get the full coverage threshold value.
--     *
--     * @return float
-      */
-     public function getFullCoverageThreshold(): float
-     {
-@@ @@
-
-     /**
-      * Get the high coverage threshold value.
--     *
--     * @return float
-      */
-     public function getHighCoverageThreshold(): float
-     {
-@@ @@
-
-     /**
-      * Get the full coverage bonus value.
--     *
--     * @return float
-      */
-     public function getFullCoverageBonus(): float
-     {
-@@ @@
-
-     /**
-      * Get the high coverage bonus value.
--     *
--     * @return float
-      */
-     public function getHighCoverageBonus(): float
-     {
-    ----------- end diff -----------
-
-Applied rules:
- * RemoveUselessReturnTagRector
-
-
-8) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Config/LevenshteinAlgorithmConfig.php:36
-
-    ---------- begin diff ----------
-@@ @@
-     public const DEFAULT_CLOSE_MATCH_BONUS = 0.1;
-
-     private int $emptyStringLength;
-+
-     private int $distancePenaltyThreshold;
-+
-     private float $penaltyFactorBase;
-+
-     private float $penaltyReductionPerDistance;
-+
-     private int $closeMatchBonusThreshold;
-+
-     private int $minLengthForBonus;
-+
-     private float $closeMatchBonus;
-+
-     private float $weight;
-
-     private function __construct(
-    ----------- end diff -----------
-
-Applied rules:
- * NewlineBetweenClassLikeStmtsRector
-
-
-9) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Config/LongestCommonSubstringConfig.php:24
-
-    ---------- begin diff ----------
-@@ @@
-     public const DEFAULT_MATCH_INCREMENT = 1;
-
-     private int $baseIndex;
-+
-     private int $matchIncrement;
-+
-     private float $weight;
-
-     private function __construct(
-    ----------- end diff -----------
-
-Applied rules:
- * NewlineBetweenClassLikeStmtsRector
-
-
-10) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Config/PrefixAlgorithmConfig.php:27
-
-    ---------- begin diff ----------
-@@ @@
-     public const DEFAULT_PREFIX_MAX_SCORE = 0.6;
-
-     private int $minPrefixLength;
-+
-     private float $prefixBaseScore;
-+
-     private float $prefixVariableMultiplier;
-+
-     private float $prefixMaxScore;
-+
-     private float $weight;
-
-     private function __construct(
-    ----------- end diff -----------
-
-Applied rules:
- * NewlineBetweenClassLikeStmtsRector
-
-
-11) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Config/SimilarityCalculatorConfig.php:143
-
-    ---------- begin diff ----------
-@@ @@
-     public const DEFAULT_UNMATCHED_LETTER_MULTIPLIER = 1.5;
-
-     private string $regexRemoveSpecialChars;
-+
-     private string $regexCollapseSpaces;
-+
-     private string $regexWordSplitter;
-
-     private function __construct(
-    ----------- end diff -----------
-
-Applied rules:
- * NewlineBetweenClassLikeStmtsRector
-
-
-12) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Config/WordSimilarityComparatorConfig.php:322
-
-    ---------- begin diff ----------
-@@ @@
+@@ Line 322 @@
      {
          return $this->scoreMultiplier;
      }
@@ -755,10 +242,10 @@ Applied rules:
  * NewlineBetweenClassLikeStmtsRector
 
 
-13) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Contracts/CacheManagerInterface.php:34
+2) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Contracts/CacheManagerInterface.php:34
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 34 @@
       *
       * Clears every cache key that was stored through the cache keys tracking
       * system. This is useful after bulk operations like reindexing all models.
@@ -767,7 +254,7 @@ Applied rules:
       */
      public function invalidateAll(): void;
 
-@@ @@
+@@ Line 46 @@
       * results for queries that included this model type.
       *
       * @param string $modelClass Fully qualified model class name
@@ -775,7 +262,7 @@ Applied rules:
       */
      public function invalidateForModel(string $modelClass): void;
 
-@@ @@
+@@ Line 56 @@
       * Clears only the cached statistics data without affecting other cached data.
       * This is useful after index modifications where statistics need to be refreshed
       * but search results cache should remain valid.
@@ -789,10 +276,10 @@ Applied rules:
  * RemoveUselessReturnTagRector
 
 
-14) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Contracts/ConfigInterface.php:15
+3) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Contracts/ConfigInterface.php:15
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 15 @@
  {
      /**
       * Create configuration instance from Laravel config with fallback to defaults.
@@ -814,10 +301,10 @@ Applied rules:
  * RemoveUselessReturnTagRector
 
 
-15) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Contracts/IndexManagerInterface.php:23
+4) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Contracts/IndexManagerInterface.php:23
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 23 @@
       * Should respect the model's `shouldBeIndexed()` method.
       *
       * @param MustFuzzySearch $model The model instance to index
@@ -825,7 +312,7 @@ Applied rules:
       */
      public function indexModel(MustFuzzySearch $model): void;
 
-@@ @@
+@@ Line 34 @@
       * with current data. Useful after model updates.
       *
       * @param MustFuzzySearch $model The model instance to update in the index
@@ -833,7 +320,7 @@ Applied rules:
       */
      public function updateModelIndex(MustFuzzySearch $model): void;
 
-@@ @@
+@@ Line 45 @@
       * Called automatically when a model is deleted.
       *
       * @param MustFuzzySearch $model The model instance to remove from the index
@@ -841,7 +328,7 @@ Applied rules:
       */
      public function removeModel(MustFuzzySearch $model): void;
 
-@@ @@
+@@ Line 54 @@
       *
       * Truncates the entire index and rebuilds it from scratch
       * for all models that implement MustFuzzySearch.
@@ -850,7 +337,7 @@ Applied rules:
       */
      public function reindexAll(): void;
 
-@@ @@
+@@ Line 66 @@
       * by iterating through all instances of that model.
       *
       * @param string $modelClass Fully qualified model class name
@@ -863,10 +350,10 @@ Applied rules:
  * RemoveUselessReturnTagRector
 
 
-16) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Contracts/IndexRepositoryInterface.php:4
+5) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Contracts/IndexRepositoryInterface.php:4
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 4 @@
 
  namespace Fuzzy\Contracts;
 
@@ -874,7 +361,7 @@ Applied rules:
  use Illuminate\Support\Collection;
 
  /**
-@@ @@
+@@ Line 33 @@
       *
       * @param string $modelClass Fully qualified model class name
       * @param array<int> $ids Array of model IDs to retrieve
@@ -883,7 +370,7 @@ Applied rules:
       */
      public function getModelsBatch(string $modelClass, array $ids): Collection;
 
-@@ @@
+@@ Line 43 @@
       * Provides quick lookup of models that have already been loaded
       * to avoid redundant database queries.
       *
@@ -897,322 +384,123 @@ Applied rules:
 Applied rules:
 
 
-17) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Traits/ServiceProviderHelper.php:4
+6) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Contracts/ModelDiscoveryInterface.php:46
 
     ---------- begin diff ----------
-@@ @@
-
- namespace Fuzzy\Traits;
-
-+use ReflectionClass;
- use Illuminate\Support\ServiceProvider;
-
- /**
-@@ @@
+@@ Line 46 @@
+      *
+      * @param string $modelClass Fully qualified model class name to validate
+      * @throws ModelNotSearchableException When the model does not implement MustFuzzySearch
+-     * @return void
       */
-     protected function mergeConfigFrom(string $path, string $key): void
-     {
--        $reflection = new \ReflectionClass($this->provider);
-+        $reflection = new ReflectionClass($this->provider);
-         $method = $reflection->getMethod('mergeConfigFrom');
-         $method->setAccessible(true);
-         $method->invoke($this->provider, $path, $key);
-@@ @@
-      */
-     protected function publishes(array $paths, string $group = null): void
-     {
--        $reflection = new \ReflectionClass($this->provider);
-+        $reflection = new ReflectionClass($this->provider);
-         $method = $reflection->getMethod('publishes');
-         $method->setAccessible(true);
-
-@@ @@
-      */
-     protected function commands(array $commands): void
-     {
--        $reflection = new \ReflectionClass($this->provider);
-+        $reflection = new ReflectionClass($this->provider);
-         $method = $reflection->getMethod('commands');
-         $method->setAccessible(true);
-         $method->invoke($this->provider, $commands);
+     public function validateModel(string $modelClass): void;
+ }
     ----------- end diff -----------
 
 Applied rules:
-
-
-18) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Feature/ConfigurationTest.php:4
-
-    ---------- begin diff ----------
-@@ @@
-
- namespace Fuzzy\Tests\Feature;
-
-+use ReflectionClass;
- use Fuzzy\Contracts\ModelDiscoveryInterface;
- use Fuzzy\Contracts\SearchServiceInterface;
- use Fuzzy\Services\IndexBuilder;
-@@ @@
-     public function test_auto_discovery_always_enabled(): void
-     {
-         // Arrange: Ensure no configuration is set
--        Config::set('fuzzy.searchable_models', null);
-+        Config::set('fuzzy.searchable_models');
-
-         // Act: Retrieve searchable models without explicit configuration
-         $modelDiscovery = app(ModelDiscoveryInterface::class);
-@@ @@
-      */
-     private function getFieldWeightFromIndexBuilder(IndexBuilder $indexBuilder, string $field): float
-     {
--        $reflection = new \ReflectionClass($indexBuilder);
-+        $reflection = new ReflectionClass($indexBuilder);
-         $calculateWeightMethod = $reflection->getMethod('calculateFieldWeight');
-         $calculateWeightMethod->setAccessible(true);
-
-@@ @@
-     public function test_coverage_bonus_defaults_when_configuration_missing(): void
-     {
-         // Arrange: Remove coverage bonus configuration entirely
--        Config::set('fuzzy.scoring.coverage_bonus', null);
-+        Config::set('fuzzy.scoring.coverage_bonus');
-         Config::offsetUnset('fuzzy.scoring.coverage_bonus');
-
-         // Act: Retrieve coverage bonus configuration with defaults
-    ----------- end diff -----------
-
-Applied rules:
- * RemoveNullArgOnNullDefaultParamRector
-
-
-19) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Feature/FacadeTest.php:24
-
-    ---------- begin diff ----------
-@@ @@
- final class FacadeTest extends TestCase
- {
-     private SearchServiceInterface $searchService;
-+
-     private StringNormalizer $normalizer;
-
-     /**
-@@ @@
-         $normalized = $this->normalizer->normalize($inputString);
-
-         // Assert: Verify normalization removes accents and special chars
--        $this->assertEquals($expectedOutput, $normalized);
-+        $this->assertSame($expectedOutput, $normalized);
-     }
-
-     /**
-@@ @@
-         $words = $this->normalizer->splitIntoWords($inputString);
-
-         // Assert: Verify correct word splitting
--        $this->assertEquals($expectedWords, $words);
-+        $this->assertSame($expectedWords, $words);
-     }
-
-     /**
-    ----------- end diff -----------
-
-Applied rules:
- * NewlineBetweenClassLikeStmtsRector
- * AssertEqualsToSameRector
-
-
-20) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Feature/IntegrationTest.php:13
-
-    ---------- begin diff ----------
-@@ @@
- use Fuzzy\Services\FuzzySearchService;
- use Illuminate\Support\Collection;
- use Fuzzy\Data\SearchResultData;
--use Illuminate\Support\Facades\Cache;
-
- /**
-  * Integration tests for the complete fuzzy search system.
-@@ @@
- {
-     /**
-      * Set up test environment.
--     *
--     * @return void
-      */
-     protected function setUp(): void
-     {
-@@ @@
-      * - Searches return expected results
-      * - Cache invalidation works correctly
-      * - Statistics are accurate
--     *
--     * @return void
-      */
-     public function test_complete_search_workflow(): void
-     {
-@@ @@
-             'type' => 'user',
-         ]);
-
--        $product1 = Product::create([
-+        Product::create([
-             'name' => 'MacBook Pro',
-             'description' => 'Apple laptop with M1 chip',
-             'price' => 1999.99,
-         ]);
-
--        $product2 = Product::create([
-+        Product::create([
-             'name' => 'Wireless Mouse',
-             'description' => 'Ergonomic mouse with Bluetooth',
-             'price' => 59.99,
-@@ @@
-         $exactMatch = $exactResults->first(function ($result): bool {
-             return $result->item->name === 'John Smith';
-         });
--        $this->assertNotNull($exactMatch, 'Should find John Smith in exact search');
-+        $this->assertInstanceOf(SearchResultData::class, $exactMatch, 'Should find John Smith in exact search');
-         $this->assertGreaterThan(0.9, $exactMatch->score, 'Exact match should have high score');
-
-         // === ACT: Multi-word search ===
-@@ @@
-      * Test automatic indexing via FuzzySearchable trait.
-      *
-      * Verifies that model events automatically trigger index updates.
--     *
--     * @return void
-      */
-     public function test_model_auto_indexing_via_trait(): void
-     {
-@@ @@
-      * Test custom shouldBeIndexed logic.
-      *
-      * Verifies that the shouldBeIndexed method controls which models are indexed.
--     *
--     * @return void
-      */
-     public function test_should_be_indexed_logic(): void
-     {
-@@ @@
-      * Test custom formatting in search results.
-      *
-      * Verifies that custom formatters are applied to search results.
--     *
--     * @return void
-      */
-     public function test_custom_formatting(): void
-     {
-@@ @@
-      * Test performance with large datasets.
-      *
-      * Verifies that indexing and search operations perform within acceptable limits.
--     *
--     * @return void
-      */
-     public function test_performance_with_large_dataset(): void
-     {
-@@ @@
-      * Test cache integration.
-      *
-      * Verifies that caching works correctly and is properly invalidated.
--     *
--     * @return void
-      */
-     public function test_cache_integration(): void
-     {
-@@ @@
-      * Test error handling scenarios.
-      *
-      * Verifies that the system handles edge cases gracefully.
--     *
--     * @return void
-      */
-     public function test_error_handling(): void
-     {
-    ----------- end diff -----------
-
-Applied rules:
- * RemoveUnusedVariableAssignRector
  * RemoveUselessReturnTagRector
- * AssertEmptyNullableObjectToAssertInstanceofRector
 
 
-21) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Feature/ShouldBeIndexedTest.php:443
+7) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Contracts/SearchContextInterface.php:120
 
     ---------- begin diff ----------
-@@ @@
-     public function test_should_be_indexed_has_higher_priority_than_indexation_level(): void
-     {
-         // Scenario 1: ALL level + shouldBeIndexed() = false -> NO indexing
--        $adminUser = NonIndexableUser::create([
-+        NonIndexableUser::create([
-             'name' => 'Admin',
-             'email' => 'admin@example.com',
-             'type' => 'admin',
-@@ @@
-         $this->assertEquals(2, FuzzyIndex::where('indexable_type', NoneUser::class)->count());
-
-         // Scenario 3: CREATE_ONLY level + shouldBeIndexed() = false -> NO auto-indexing
--        $createOnlyAdmin = NonIndexableCreateOnlyUser::create([
-+        NonIndexableCreateOnlyUser::create([
-             'name' => 'Create Only Admin',
-             'email' => 'createonlyadmin@example.com',
-             'type' => 'admin',
+@@ Line 120 @@
+      * before being processed by the ScoringStage.
+      *
+      * @param array<string, mixed> $match Raw match data containing index entry information
+-     * @return void
+      */
+     public function addPotentialMatch(array $match): void;
     ----------- end diff -----------
 
 Applied rules:
- * RemoveUnusedVariableAssignRector
+ * RemoveUselessReturnTagRector
 
 
-22) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Fixtures/CreateAndUpdateUser.php:4
+8) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Contracts/SearchServiceInterface.php:4
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 4 @@
 
- namespace Fuzzy\Tests\Fixtures;
+ namespace Fuzzy\Contracts;
 
-+use Fuzzy\Contracts\MustFuzzySearch;
-+use Fuzzy\Traits\FuzzySearchable;
- use Fuzzy\Enums\IndexationLevel;
- use Illuminate\Database\Eloquent\Model;
++use Fuzzy\Data\SearchResultData;
+ use Illuminate\Support\Collection;
 
--class CreateAndUpdateUser extends Model implements \Fuzzy\Contracts\MustFuzzySearch
-+class CreateAndUpdateUser extends Model implements MustFuzzySearch
- {
--    use \Fuzzy\Traits\FuzzySearchable;
-+    use FuzzySearchable;
+ /**
+@@ Line 23 @@
+      * Get the cache manager instance.
+      *
+      * Provides access to cache operations for advanced cache management.
+-     *
+-     * @return CacheManagerInterface
+      */
+     public function getCacheManager(): CacheManagerInterface;
 
-     protected $table = 'create_and_update_users';
+@@ Line 32 @@
+      * Get the model discovery instance.
+      *
+      * Provides access to model discovery for advanced model operations.
+-     *
+-     * @return ModelDiscoveryInterface
+      */
+     public function getModelDiscovery(): ModelDiscoveryInterface;
 
-@@ @@
-         return IndexationLevel::CREATE_AND_UPDATE;
-     }
+@@ Line 41 @@
+      * Get the index manager instance.
+      *
+      * Provides access to index operations for advanced index management.
+-     *
+-     * @return IndexManagerInterface
+      */
+     public function getIndexManager(): IndexManagerInterface;
 
-+    /**
-+     * @return array<int, string>
-+     */
-     public function getSearchableFields(): array
-     {
-         return ['name', 'email'];
-@@ @@
-         return $this->type === 'user';
-     }
+@@ Line 50 @@
+      * Get the search processor instance.
+      *
+      * Provides access to search processor for advanced search operations.
+-     *
+-     * @return SearchProcessorInterface
+      */
+     public function getSearchProcessor(): SearchProcessorInterface;
 
-+    /**
-+     * @return array<int, string>
-+     */
-     public function getProtectedFields(): array
-     {
-         return ['name', 'email'];
+@@ Line 60 @@
+      *
+      * @param string $query The search query string
+      * @param array<string, mixed> $options Search options
+-     * @return Collection<int, \Fuzzy\Data\SearchResultData> Collection of search results
++     * @return Collection<int, SearchResultData> Collection of search results
+      */
+     public function search(string $query, array $options = []): Collection;
+
+@@ Line 70 @@
+      * @param string $modelClass The fully qualified model class name
+      * @param string $query The search query string
+      * @param array<string, mixed> $options Search options
+-     * @return Collection<int, \Fuzzy\Data\SearchResultData> Collection of search results
++     * @return Collection<int, SearchResultData> Collection of search results
+      */
+     public function searchInModel(string $modelClass, string $query, array $options = []): Collection;
+
+@@ Line 80 @@
+      * @param array<int, string> $modelClasses Array of fully qualified model class names
+      * @param string $query The search query string
+      * @param array<string, mixed> $options Search options
+-     * @return Collection<int, \Fuzzy\Data\SearchResultData> Collection of search results
++     * @return Collection<int, SearchResultData> Collection of search results
+      */
+     public function searchInModels(array $modelClasses, string $query, array $options = []): Collection;
+ }
     ----------- end diff -----------
 
 Applied rules:
- * DocblockReturnArrayFromDirectArrayInstanceRector
+ * RemoveUselessReturnTagRector
 
 
-23) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Fixtures/CreateOnlyUser.php:4
+9) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Fixtures/CreateOnlyUser.php:4
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 4 @@
 
  namespace Fuzzy\Tests\Fixtures;
 
@@ -1228,37 +516,15 @@ Applied rules:
 +    use FuzzySearchable;
 
      protected $table = 'create_only_users';
-
-@@ @@
-         return IndexationLevel::CREATE_ONLY;
-     }
-
-+    /**
-+     * @return array<int, string>
-+     */
-     public function getSearchableFields(): array
-     {
-         return ['name', 'email'];
-@@ @@
-         return $this->type === 'user';
-     }
-
-+    /**
-+     * @return array<int, string>
-+     */
-     public function getProtectedFields(): array
-     {
-         return ['name', 'email'];
     ----------- end diff -----------
 
 Applied rules:
- * DocblockReturnArrayFromDirectArrayInstanceRector
 
 
-24) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Fixtures/CustomStage.php:76
+10) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Fixtures/CustomStage.php:76
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 76 @@
      {
          // Custom processing logic here
          // Example: Add a marker that this stage was executed
@@ -1272,10 +538,10 @@ Applied rules:
  * IssetOnPropertyObjectToPropertyExistsRector
 
 
-25) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Fixtures/CustomStage2.php:28
+11) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Fixtures/CustomStage2.php:28
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 28 @@
 
      public function handle(SearchContextInterface $context, Closure $next): mixed
      {
@@ -1289,10 +555,10 @@ Applied rules:
  * IssetOnPropertyObjectToPropertyExistsRector
 
 
-26) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Fixtures/DeleteOnlyUser.php:4
+12) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Fixtures/DeleteOnlyUser.php:4
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 4 @@
 
  namespace Fuzzy\Tests\Fixtures;
 
@@ -1308,37 +574,15 @@ Applied rules:
 +    use FuzzySearchable;
 
      protected $table = 'delete_only_users';
-
-@@ @@
-         return IndexationLevel::DELETE_ONLY;
-     }
-
-+    /**
-+     * @return array<int, string>
-+     */
-     public function getSearchableFields(): array
-     {
-         return ['name', 'email'];
-@@ @@
-         return $this->type === 'user';
-     }
-
-+    /**
-+     * @return array<int, string>
-+     */
-     public function getProtectedFields(): array
-     {
-         return ['name', 'email'];
     ----------- end diff -----------
 
 Applied rules:
- * DocblockReturnArrayFromDirectArrayInstanceRector
 
 
-27) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Fixtures/NonIndexableCreateOnlyUser.php:4
+13) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Fixtures/NonIndexableCreateOnlyUser.php:4
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 4 @@
 
  namespace Fuzzy\Tests\Fixtures;
 
@@ -1347,7 +591,7 @@ Applied rules:
  use Fuzzy\Enums\IndexationLevel;
  use Illuminate\Database\Eloquent\Model;
 
-@@ @@
+@@ Line 14 @@
   * but shouldBeIndexed() returns false to prevent any indexing.
   * Used to test the priority relationship between IndexationLevel and shouldBeIndexed().
   */
@@ -1358,37 +602,15 @@ Applied rules:
 +    use FuzzySearchable;
 
      protected $table = 'non_indexable_create_only_users';
-
-@@ @@
-         return IndexationLevel::CREATE_ONLY;
-     }
-
-+    /**
-+     * @return array<int, string>
-+     */
-     public function getSearchableFields(): array
-     {
-         return ['name', 'email'];
-@@ @@
-         return false;
-     }
-
-+    /**
-+     * @return array<int, string>
-+     */
-     public function getProtectedFields(): array
-     {
-         return ['name', 'email'];
     ----------- end diff -----------
 
 Applied rules:
- * DocblockReturnArrayFromDirectArrayInstanceRector
 
 
-28) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Fixtures/NonIndexableUpdateOnlyUser.php:4
+14) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Fixtures/NonIndexableUpdateOnlyUser.php:4
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 4 @@
 
  namespace Fuzzy\Tests\Fixtures;
 
@@ -1397,7 +619,7 @@ Applied rules:
  use Fuzzy\Enums\IndexationLevel;
  use Illuminate\Database\Eloquent\Model;
 
-@@ @@
+@@ Line 14 @@
   * but shouldBeIndexed() returns false to prevent any indexing.
   * Used to test the priority relationship between IndexationLevel and shouldBeIndexed().
   */
@@ -1408,37 +630,15 @@ Applied rules:
 +    use FuzzySearchable;
 
      protected $table = 'non_indexable_update_only_users';
-
-@@ @@
-         return IndexationLevel::UPDATE_ONLY;
-     }
-
-+    /**
-+     * @return array<int, string>
-+     */
-     public function getSearchableFields(): array
-     {
-         return ['name', 'email'];
-@@ @@
-         return false;
-     }
-
-+    /**
-+     * @return array<int, string>
-+     */
-     public function getProtectedFields(): array
-     {
-         return ['name', 'email'];
     ----------- end diff -----------
 
 Applied rules:
- * DocblockReturnArrayFromDirectArrayInstanceRector
 
 
-29) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Fixtures/NonSearchableModel.php:4
+15) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Fixtures/NonSearchableModel.php:4
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 4 @@
 
  namespace Fuzzy\Tests\Fixtures;
 
@@ -1451,10 +651,10 @@ Applied rules:
 Applied rules:
 
 
-30) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Fixtures/NoneUser.php:4
+16) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Fixtures/NoneUser.php:4
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 4 @@
 
  namespace Fuzzy\Tests\Fixtures;
 
@@ -1470,37 +670,15 @@ Applied rules:
 +    use FuzzySearchable;
 
      protected $table = 'none_users';
-
-@@ @@
-         return IndexationLevel::NONE;
-     }
-
-+    /**
-+     * @return array<int, string>
-+     */
-     public function getSearchableFields(): array
-     {
-         return ['name', 'email'];
-@@ @@
-         return $this->type === 'user';
-     }
-
-+    /**
-+     * @return array<int, string>
-+     */
-     public function getProtectedFields(): array
-     {
-         return ['name', 'email'];
     ----------- end diff -----------
 
 Applied rules:
- * DocblockReturnArrayFromDirectArrayInstanceRector
 
 
-31) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Fixtures/Product.php:46
+17) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Fixtures/Product.php:46
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 46 @@
 
      /**
       * Determine if the model should be indexed for search.
@@ -1515,10 +693,10 @@ Applied rules:
  * RemoveUselessReturnTagRector
 
 
-32) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Fixtures/UpdateOnlyUser.php:4
+18) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Fixtures/UpdateOnlyUser.php:4
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 4 @@
 
  namespace Fuzzy\Tests\Fixtures;
 
@@ -1534,150 +712,240 @@ Applied rules:
 +    use FuzzySearchable;
 
      protected $table = 'update_only_users';
+    ----------- end diff -----------
 
-@@ @@
-         return IndexationLevel::UPDATE_ONLY;
+Applied rules:
+
+
+19) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Fixtures/User.php:53
+
+    ---------- begin diff ----------
+@@ Line 53 @@
+
+     /**
+      * Determine if the model should be indexed for search.
+-     *
+-     * @return bool
+      */
+     public function shouldBeIndexed(): bool
+     {
+    ----------- end diff -----------
+
+Applied rules:
+ * RemoveUselessReturnTagRector
+
+
+20) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Fixtures/UserSearchData.php:19
+
+    ---------- begin diff ----------
+@@ Line 19 @@
+      * Create a search data instance from a User model.
+      *
+      * @param Model $user The User model instance
+-     * @return self
+      */
+     public static function fromModel(Model $user): self
+     {
+    ----------- end diff -----------
+
+Applied rules:
+ * RemoveUselessReturnTagRector
+
+
+21) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/TestCase.php:4
+
+    ---------- begin diff ----------
+@@ Line 4 @@
+
+ namespace Fuzzy\Tests;
+
+-use Fuzzy\Tests\Fixtures\User;
+-use Fuzzy\Tests\Fixtures\Product;
+ use Illuminate\Foundation\Application;
+ use Illuminate\Support\Facades\Config;
+ use Orchestra\Testbench\TestCase as Orchestra;
+    ----------- end diff -----------
+
+Applied rules:
+
+
+22) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Cache/LaravelCacheStoreTest.php:113
+
+    ---------- begin diff ----------
+@@ Line 113 @@
+         $executed = false;
+
+         // Act: Remember value (cache miss)
+-        $value = $this->cacheStore->remember('miss_key', 60, function () use (&$executed) {
++        $value = $this->cacheStore->remember('miss_key', 60, function () use (&$executed): string {
+             $executed = true;
+             return 'computed_value';
+         });
+@@ Line 135 @@
+         $executed = false;
+
+         // Act: Remember value (cache hit)
+-        $value = $this->cacheStore->remember('hit_key', 60, function () use (&$executed) {
++        $value = $this->cacheStore->remember('hit_key', 60, function () use (&$executed): string {
+             $executed = true;
+             return 'computed_value';
+         });
+@@ Line 184 @@
+         $newValue = $this->cacheStore->increment('counter', 5);
+
+         // Assert: Should return new value
+-        $this->assertEquals(15, $newValue);
++        $this->assertSame(15, $newValue);
+         $this->assertEquals(15, $this->cacheStore->get('counter'));
      }
 
-+    /**
-+     * @return array<int, string>
-+     */
-     public function getSearchableFields(): array
-     {
-         return ['name', 'email'];
-@@ @@
-         return $this->type === 'user';
+@@ Line 197 @@
+         $newValue = $this->cacheStore->increment('new_counter', 5);
+
+         // Assert: Should create and increment from 0
+-        $this->assertEquals(5, $newValue);
++        $this->assertSame(5, $newValue);
+         $this->assertEquals(5, $this->cacheStore->get('new_counter'));
      }
 
-+    /**
-+     * @return array<int, string>
-+     */
-     public function getProtectedFields(): array
+@@ Line 213 @@
+         $newValue = $this->cacheStore->decrement('counter', 7);
+
+         // Assert: Should return new value
+-        $this->assertEquals(13, $newValue);
++        $this->assertSame(13, $newValue);
+         $this->assertEquals(13, $this->cacheStore->get('counter'));
+     }
+
+@@ Line 226 @@
+         $newValue = $this->cacheStore->decrement('new_counter', 5);
+
+         // Assert: Should create and decrement from 0
+-        $this->assertEquals(-5, $newValue);
++        $this->assertSame(-5, $newValue);
+         $this->assertEquals(-5, $this->cacheStore->get('new_counter'));
+     }
+
+@@ Line 276 @@
+     public function test_remember_with_zero_ttl_works(): void
      {
-         return ['name', 'email'];
+         // Act: Remember with TTL 0
+-        $value = $this->cacheStore->remember('zero_ttl_key', 0, function () {
++        $value = $this->cacheStore->remember('zero_ttl_key', 0, function (): string {
+             return 'zero_ttl_value';
+         });
     ----------- end diff -----------
 
 Applied rules:
- * DocblockReturnArrayFromDirectArrayInstanceRector
+ * AssertEqualsToSameRector
+ * ClosureReturnTypeRector
 
 
-33) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Contracts/ModelDiscoveryInterface.php:46
+23) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Commands/ClearCacheCommandTest.php:4
 
     ---------- begin diff ----------
-@@ @@
-      *
-      * @param string $modelClass Fully qualified model class name to validate
-      * @throws ModelNotSearchableException When the model does not implement MustFuzzySearch
--     * @return void
-      */
-     public function validateModel(string $modelClass): void;
- }
+@@ Line 4 @@
+
+ namespace Fuzzy\Tests\Unit\Commands;
+
+-use Fuzzy\Commands\ClearCacheCommand;
++use Fuzzy\Tests\Fixtures\User;
+ use Fuzzy\Contracts\CacheManagerInterface;
+ use Fuzzy\Contracts\SearchServiceInterface;
+ use Fuzzy\Tests\TestCase;
+@@ Line 13 @@
+
+ final class ClearCacheCommandTest extends TestCase
+ {
+-    private $searchService;
+     private $cacheManager;
+
+     protected function setUp(): void
+@@ Line 21 @@
+         parent::setUp();
+
+         $this->cacheManager = Mockery::mock(CacheManagerInterface::class);
+-        $this->searchService = Mockery::mock(SearchServiceInterface::class);
++        $searchService = Mockery::mock(SearchServiceInterface::class);
+
+         // Configure le mock pour retourner le cacheManager via getCacheManager()
+-        $this->searchService->shouldReceive('getCacheManager')
++        $searchService->shouldReceive('getCacheManager')
+             ->zeroOrMoreTimes()
+             ->andReturn($this->cacheManager);
+
+         // Bind the search service in the container
+-        $this->app->instance(SearchServiceInterface::class, $this->searchService);
++        $this->app->instance(SearchServiceInterface::class, $searchService);
+
+         config(['fuzzy.cache.prefix' => 'fuzzy_test:']);
+     }
+@@ Line 76 @@
+
+     public function test_clear_cache_for_specific_model(): void
+     {
+-        $modelClass = 'Fuzzy\\Tests\\Fixtures\\User';
++        $modelClass = User::class;
+
+         $this->cacheManager->shouldReceive('invalidateForModel')
+             ->once()
+@@ Line 90 @@
+         $output = Artisan::output();
+
+         $this->assertEquals(0, $exitCode);
+-        $this->assertStringContainsString("Cache cleared for model: {$modelClass}", $output);
++        $this->assertStringContainsString('Cache cleared for model: ' . $modelClass, $output);
+     }
+
+     public function test_clear_stats_cache_only(): void
     ----------- end diff -----------
 
 Applied rules:
- * RemoveUselessReturnTagRector
+ * EncapsedStringsToSprintfRector
+ * NarrowUnusedSetUpDefinedPropertyRector
+ * StringClassNameToClassConstantRector
 
 
-34) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Contracts/SearchContextInterface.php:120
+24) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/database/migrations/2024_01_01_000000_create_non_indexable_users_table.php:17
 
     ---------- begin diff ----------
-@@ @@
-      * before being processed by the ScoringStage.
-      *
-      * @param array<string, mixed> $match Raw match data containing index entry information
--     * @return void
+@@ Line 17 @@
       */
-     public function addPotentialMatch(array $match): void;
+     public function up(): void
+     {
+-        Schema::create('non_indexable_users', function (Blueprint $table) {
++        Schema::create('non_indexable_users', function (Blueprint $table): void {
+             $table->id();
+             $table->string('name');
+             $table->string('email')->unique();
     ----------- end diff -----------
 
 Applied rules:
- * RemoveUselessReturnTagRector
+ * AddClosureVoidReturnTypeWhereNoReturnRector
 
 
-35) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Contracts/SearchServiceInterface.php:4
+25) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/database/migrations/2024_01_01_000000_create_non_searchable_models_table.php:17
 
     ---------- begin diff ----------
-@@ @@
-
- namespace Fuzzy\Contracts;
-
-+use Fuzzy\Data\SearchResultData;
- use Illuminate\Support\Collection;
-
- /**
-@@ @@
-      * Get the cache manager instance.
-      *
-      * Provides access to cache operations for advanced cache management.
--     *
--     * @return CacheManagerInterface
+@@ Line 17 @@
       */
-     public function getCacheManager(): CacheManagerInterface;
-
-@@ @@
-      * Get the model discovery instance.
-      *
-      * Provides access to model discovery for advanced model operations.
--     *
--     * @return ModelDiscoveryInterface
-      */
-     public function getModelDiscovery(): ModelDiscoveryInterface;
-
-@@ @@
-      * Get the index manager instance.
-      *
-      * Provides access to index operations for advanced index management.
--     *
--     * @return IndexManagerInterface
-      */
-     public function getIndexManager(): IndexManagerInterface;
-
-@@ @@
-      * Get the search processor instance.
-      *
-      * Provides access to search processor for advanced search operations.
--     *
--     * @return SearchProcessorInterface
-      */
-     public function getSearchProcessor(): SearchProcessorInterface;
-
-@@ @@
-      *
-      * @param string $query The search query string
-      * @param array<string, mixed> $options Search options
--     * @return Collection<int, \Fuzzy\Data\SearchResultData> Collection of search results
-+     * @return Collection<int, SearchResultData> Collection of search results
-      */
-     public function search(string $query, array $options = []): Collection;
-
-@@ @@
-      * @param string $modelClass The fully qualified model class name
-      * @param string $query The search query string
-      * @param array<string, mixed> $options Search options
--     * @return Collection<int, \Fuzzy\Data\SearchResultData> Collection of search results
-+     * @return Collection<int, SearchResultData> Collection of search results
-      */
-     public function searchInModel(string $modelClass, string $query, array $options = []): Collection;
-
-@@ @@
-      * @param array<int, string> $modelClasses Array of fully qualified model class names
-      * @param string $query The search query string
-      * @param array<string, mixed> $options Search options
--     * @return Collection<int, \Fuzzy\Data\SearchResultData> Collection of search results
-+     * @return Collection<int, SearchResultData> Collection of search results
-      */
-     public function searchInModels(array $modelClasses, string $query, array $options = []): Collection;
- }
+     public function up(): void
+     {
+-        Schema::create('non_searchable_models', function (Blueprint $table) {
++        Schema::create('non_searchable_models', function (Blueprint $table): void {
+             $table->id();
+             $table->string('name');
+             $table->string('email')->unique();
     ----------- end diff -----------
 
 Applied rules:
- * RemoveUselessReturnTagRector
+ * AddClosureVoidReturnTypeWhereNoReturnRector
 
 
-36) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/FuzzySearch.php:6
+26) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/FuzzySearch.php:6
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 6 @@
 
  use Illuminate\Support\Facades\Facade;
  use Illuminate\Support\Collection;
@@ -1690,10 +958,10 @@ Applied rules:
 Applied rules:
 
 
-37) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/FuzzySearchServiceProvider.php:4
+27) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/FuzzySearchServiceProvider.php:4
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 4 @@
 
  namespace Fuzzy;
 
@@ -1711,7 +979,7 @@ Applied rules:
  use Fuzzy\Services\ServiceRegistrar;
  use Illuminate\Support\ServiceProvider;
 
-@@ @@
+@@ Line 59 @@
      public function provides(): array
      {
          return [
@@ -1745,10 +1013,10 @@ Applied rules:
 Applied rules:
 
 
-38) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Repositories/IndexRepository.php:98
+28) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Repositories/IndexRepository.php:98
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 98 @@
 
      /**
       * {@inheritDoc}
@@ -1756,25 +1024,905 @@ Applied rules:
       */
      public function getPreloadedModelsMap(): array
      {
-@@ @@
-
-     /**
-      * {@inheritDoc}
-+     * @return array<string, mixed>
-      */
-     public function getStats(): array
-     {
     ----------- end diff -----------
 
 Applied rules:
  * DocblockGetterReturnArrayFromPropertyDocblockVarRector
- * DocblockReturnArrayFromDirectArrayInstanceRector
 
 
-39) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/SearchContext.php:102
+29) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Stages/ScoringStage.php:4
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 4 @@
+
+ namespace Fuzzy\Stages;
+
++use InvalidArgumentException;
+ use Fuzzy\Contracts\SearchContextInterface;
+ use Fuzzy\Contracts\StageInterface;
+ use Fuzzy\Enums\StageType;
+@@ Line 108 @@
+      *
+      * @param array<int, array> $matches Array of matches with field and value information
+      * @return array{indexable_type: string, field: string, original_value: string} Match details
+-     * @throws \InvalidArgumentException If matches array is empty
++     * @throws InvalidArgumentException If matches array is empty
+      */
+     private function extractBestMatchDetails(array $matches): array
+     {
+         if ($matches === []) {
+-            throw new \InvalidArgumentException('Matches array cannot be empty');
++            throw new InvalidArgumentException('Matches array cannot be empty');
+         }
+
+         return $matches[0];
+    ----------- end diff -----------
+
+Applied rules:
+
+
+30) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Traits/CommandHelpers.php:20
+
+    ---------- begin diff ----------
+@@ Line 20 @@
+ {
+     /**
+      * Get the fuzzy search service from the container.
+-     *
+-     * @return FuzzySearchService
+      */
+     protected function getSearchService(): FuzzySearchService
+     {
+@@ Line 66 @@
+      * Display a success message with a checkmark prefix.
+      *
+      * @param string $message The success message to display
+-     * @return void
+      */
+     protected function showSuccess(string $message): void
+     {
+-        $this->info("✓ {$message}");
++        $this->info('✓ ' . $message);
+     }
+
+     /**
+@@ Line 77 @@
+      * Display a warning message.
+      *
+      * @param string $message The warning message to display
+-     * @return void
+      */
+     protected function showWarning(string $message): void
+     {
+@@ Line 88 @@
+      * Display an error message.
+      *
+      * @param string $message The error message to display
+-     * @return void
+      */
+     protected function showError(string $message): void
+     {
+@@ Line 99 @@
+      * Display an info message.
+      *
+      * @param string $message The info message to display
+-     * @return void
+      */
+     protected function showInfo(string $message): void
+     {
+@@ Line 110 @@
+      * Display a section header with equals signs.
+      *
+      * @param string $title The section title
+-     * @return void
+      */
+     protected function showHeader(string $title): void
+     {
+-        $this->info("=== {$title} ===");
++        $this->info(sprintf('=== %s ===', $title));
+     }
+
+     /**
+      * Display a blank line.
+-     *
+-     * @return void
+      */
+     protected function showNewLine(): void
+     {
+    ----------- end diff -----------
+
+Applied rules:
+ * EncapsedStringsToSprintfRector
+ * RemoveUselessReturnTagRector
+
+
+31) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Traits/FuzzySearchable.php:4
+
+    ---------- begin diff ----------
+@@ Line 4 @@
+
+ namespace Fuzzy\Traits;
+
++use Fuzzy\Contracts\MustFuzzySearch;
+ use Fuzzy\Enums\IndexationLevel;
+ use Illuminate\Support\Collection;
+ use Fuzzy\Services\FuzzySearchService;
+@@ Line 29 @@
+      * Registers model event listeners to automatically manage search index
+      * during create, update, and delete operations. The events that are
+      * actually registered depend on the model's getIndexationLevel() method.
+-     *
+-     * @return void
+      */
+     protected static function bootFuzzySearchable(): void
+     {
+@@ Line 53 @@
+         }
+
+         if ($indexationLevel->hasEvent('delete')) {
+-            static::deleted(static function ($model): void {
++            static::deleted(static function (MustFuzzySearch $model): void {
+                 app(FuzzySearchService::class)->getIndexManager()->removeModel($model);
+             });
+         }
+    ----------- end diff -----------
+
+Applied rules:
+ * RemoveUselessReturnTagRector
+ * ParamTypeByMethodCallTypeRector
+
+
+32) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Traits/ServiceProviderHelper.php:4
+
+    ---------- begin diff ----------
+@@ Line 4 @@
+
+ namespace Fuzzy\Traits;
+
++use ReflectionClass;
+ use Illuminate\Support\ServiceProvider;
+
+ /**
+@@ Line 19 @@
+      */
+     protected function mergeConfigFrom(string $path, string $key): void
+     {
+-        $reflection = new \ReflectionClass($this->provider);
++        $reflection = new ReflectionClass($this->provider);
+         $method = $reflection->getMethod('mergeConfigFrom');
+         $method->setAccessible(true);
+         $method->invoke($this->provider, $path, $key);
+@@ Line 30 @@
+      */
+     protected function publishes(array $paths, string $group = null): void
+     {
+-        $reflection = new \ReflectionClass($this->provider);
++        $reflection = new ReflectionClass($this->provider);
+         $method = $reflection->getMethod('publishes');
+         $method->setAccessible(true);
+
+@@ Line 46 @@
+      */
+     protected function commands(array $commands): void
+     {
+-        $reflection = new \ReflectionClass($this->provider);
++        $reflection = new ReflectionClass($this->provider);
+         $method = $reflection->getMethod('commands');
+         $method->setAccessible(true);
+         $method->invoke($this->provider, $commands);
+    ----------- end diff -----------
+
+Applied rules:
+
+
+33) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Feature/ConfigurationTest.php:4
+
+    ---------- begin diff ----------
+@@ Line 4 @@
+
+ namespace Fuzzy\Tests\Feature;
+
++use ReflectionClass;
+ use Fuzzy\Contracts\ModelDiscoveryInterface;
+ use Fuzzy\Contracts\SearchServiceInterface;
+ use Fuzzy\Services\IndexBuilder;
+@@ Line 114 @@
+      */
+     private function getFieldWeightFromIndexBuilder(IndexBuilder $indexBuilder, string $field): float
+     {
+-        $reflection = new \ReflectionClass($indexBuilder);
++        $reflection = new ReflectionClass($indexBuilder);
+         $calculateWeightMethod = $reflection->getMethod('calculateFieldWeight');
+         $calculateWeightMethod->setAccessible(true);
+    ----------- end diff -----------
+
+Applied rules:
+
+
+34) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Feature/FacadeTest.php:24
+
+    ---------- begin diff ----------
+@@ Line 24 @@
+ final class FacadeTest extends TestCase
+ {
+     private SearchServiceInterface $searchService;
++
+     private StringNormalizer $normalizer;
+
+     /**
+@@ Line 330 @@
+         $normalized = $this->normalizer->normalize($inputString);
+
+         // Assert: Verify normalization removes accents and special chars
+-        $this->assertEquals($expectedOutput, $normalized);
++        $this->assertSame($expectedOutput, $normalized);
+     }
+
+     /**
+@@ Line 347 @@
+         $words = $this->normalizer->splitIntoWords($inputString);
+
+         // Assert: Verify correct word splitting
+-        $this->assertEquals($expectedWords, $words);
++        $this->assertSame($expectedWords, $words);
+     }
+
+     /**
+    ----------- end diff -----------
+
+Applied rules:
+ * NewlineBetweenClassLikeStmtsRector
+ * AssertEqualsToSameRector
+
+
+35) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Feature/IntegrationTest.php:13
+
+    ---------- begin diff ----------
+@@ Line 13 @@
+ use Fuzzy\Services\FuzzySearchService;
+ use Illuminate\Support\Collection;
+ use Fuzzy\Data\SearchResultData;
+-use Illuminate\Support\Facades\Cache;
+
+ /**
+  * Integration tests for the complete fuzzy search system.
+@@ Line 25 @@
+ {
+     /**
+      * Set up test environment.
+-     *
+-     * @return void
+      */
+     protected function setUp(): void
+     {
+@@ Line 50 @@
+      * - Searches return expected results
+      * - Cache invalidation works correctly
+      * - Statistics are accurate
+-     *
+-     * @return void
+      */
+     public function test_complete_search_workflow(): void
+     {
+@@ Line 68 @@
+             'type' => 'user',
+         ]);
+
+-        $product1 = Product::create([
++        Product::create([
+             'name' => 'MacBook Pro',
+             'description' => 'Apple laptop with M1 chip',
+             'price' => 1999.99,
+         ]);
+
+-        $product2 = Product::create([
++        Product::create([
+             'name' => 'Wireless Mouse',
+             'description' => 'Ergonomic mouse with Bluetooth',
+             'price' => 59.99,
+@@ Line 122 @@
+         $exactMatch = $exactResults->first(function ($result): bool {
+             return $result->item->name === 'John Smith';
+         });
+-        $this->assertNotNull($exactMatch, 'Should find John Smith in exact search');
++        $this->assertInstanceOf(SearchResultData::class, $exactMatch, 'Should find John Smith in exact search');
+         $this->assertGreaterThan(0.9, $exactMatch->score, 'Exact match should have high score');
+
+         // === ACT: Multi-word search ===
+@@ Line 180 @@
+      * Test automatic indexing via FuzzySearchable trait.
+      *
+      * Verifies that model events automatically trigger index updates.
+-     *
+-     * @return void
+      */
+     public function test_model_auto_indexing_via_trait(): void
+     {
+@@ Line 235 @@
+      * Test custom shouldBeIndexed logic.
+      *
+      * Verifies that the shouldBeIndexed method controls which models are indexed.
+-     *
+-     * @return void
+      */
+     public function test_should_be_indexed_logic(): void
+     {
+@@ Line 276 @@
+      * Test custom formatting in search results.
+      *
+      * Verifies that custom formatters are applied to search results.
+-     *
+-     * @return void
+      */
+     public function test_custom_formatting(): void
+     {
+@@ Line 305 @@
+      * Test performance with large datasets.
+      *
+      * Verifies that indexing and search operations perform within acceptable limits.
+-     *
+-     * @return void
+      */
+     public function test_performance_with_large_dataset(): void
+     {
+@@ Line 351 @@
+      * Test cache integration.
+      *
+      * Verifies that caching works correctly and is properly invalidated.
+-     *
+-     * @return void
+      */
+     public function test_cache_integration(): void
+     {
+@@ Line 400 @@
+      * Test error handling scenarios.
+      *
+      * Verifies that the system handles edge cases gracefully.
+-     *
+-     * @return void
+      */
+     public function test_error_handling(): void
+     {
+    ----------- end diff -----------
+
+Applied rules:
+ * RemoveUnusedVariableAssignRector
+ * RemoveUselessReturnTagRector
+ * AssertEmptyNullableObjectToAssertInstanceofRector
+
+
+36) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Feature/ShouldBeIndexedTest.php:443
+
+    ---------- begin diff ----------
+@@ Line 443 @@
+     public function test_should_be_indexed_has_higher_priority_than_indexation_level(): void
+     {
+         // Scenario 1: ALL level + shouldBeIndexed() = false -> NO indexing
+-        $adminUser = NonIndexableUser::create([
++        NonIndexableUser::create([
+             'name' => 'Admin',
+             'email' => 'admin@example.com',
+             'type' => 'admin',
+@@ Line 461 @@
+         $this->assertEquals(2, FuzzyIndex::where('indexable_type', NoneUser::class)->count());
+
+         // Scenario 3: CREATE_ONLY level + shouldBeIndexed() = false -> NO auto-indexing
+-        $createOnlyAdmin = NonIndexableCreateOnlyUser::create([
++        NonIndexableCreateOnlyUser::create([
+             'name' => 'Create Only Admin',
+             'email' => 'createonlyadmin@example.com',
+             'type' => 'admin',
+    ----------- end diff -----------
+
+Applied rules:
+ * RemoveUnusedVariableAssignRector
+
+
+37) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Fixtures/CreateAndUpdateUser.php:4
+
+    ---------- begin diff ----------
+@@ Line 4 @@
+
+ namespace Fuzzy\Tests\Fixtures;
+
++use Fuzzy\Contracts\MustFuzzySearch;
++use Fuzzy\Traits\FuzzySearchable;
+ use Fuzzy\Enums\IndexationLevel;
+ use Illuminate\Database\Eloquent\Model;
+
+-class CreateAndUpdateUser extends Model implements \Fuzzy\Contracts\MustFuzzySearch
++class CreateAndUpdateUser extends Model implements MustFuzzySearch
+ {
+-    use \Fuzzy\Traits\FuzzySearchable;
++    use FuzzySearchable;
+
+     protected $table = 'create_and_update_users';
+    ----------- end diff -----------
+
+Applied rules:
+
+
+38) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Commands/ClearCacheCommand.php:39
+
+    ---------- begin diff ----------
+@@ Line 39 @@
+
+     /**
+      * Execute the console command.
+-     *
+-     * @return void
+      */
+     public function handle(): void
+     {
+@@ Line 64 @@
+
+     /**
+      * Clear only statistics cache.
+-     *
+-     * @return void
+      */
+     private function clearStatisticsCache(): void
+     {
+@@ Line 77 @@
+      * Clear cache for a specific model.
+      *
+      * @param string $modelClass The model class to clear cache for
+-     * @return void
+      */
+     private function clearCacheForSpecificModel(string $modelClass): void
+     {
+@@ Line 87 @@
+
+     /**
+      * Clear entire fuzzy search cache.
+-     *
+-     * @return void
+      */
+     private function clearEntireCache(): void
+     {
+@@ Line 98 @@
+
+     /**
+      * Get the search service instance from the container.
+-     *
+-     * @return SearchServiceInterface
+      */
+     private function getSearchService(): SearchServiceInterface
+     {
+    ----------- end diff -----------
+
+Applied rules:
+ * RemoveUselessReturnTagRector
+
+
+39) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Commands/ClearIndexCommand.php:41
+
+    ---------- begin diff ----------
+@@ Line 41 @@
+      *
+      * Routes to either clear a specific model's index or all indexes
+      * based on provided arguments.
+-     *
+-     * @return void
+      */
+     public function handle(): void
+     {
+@@ Line 61 @@
+      *
+      * @param string $modelClass The fully qualified model class name
+      * @param bool $shouldSkipConfirmation Whether to bypass user confirmation
+-     * @return void
+      */
+     protected function clearModelIndex(string $modelClass, bool $shouldSkipConfirmation): void
+     {
+@@ Line 78 @@
+      * Clear all search index entries from the database.
+      *
+      * @param bool $shouldSkipConfirmation Whether to bypass user confirmation
+-     * @return void
+      */
+     protected function clearAllIndexes(bool $shouldSkipConfirmation): void
+     {
+    ----------- end diff -----------
+
+Applied rules:
+ * RemoveUselessReturnTagRector
+
+
+40) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Commands/IndexSearchCommand.php:23
+
+    ---------- begin diff ----------
+@@ Line 23 @@
+     use CommandHelpers;
+
+     /**
+-     * Default chunk size for batch processing when not specified in options.
+-     */
+-    private const DEFAULT_CHUNK_SIZE = 100;
+-
+-    /**
+      * Chunk size used for statistics calculation to avoid memory issues.
+      */
+     private const STATS_CHUNK_SIZE = 1000;
+@@ Line 99 @@
+         $modelDiscovery = $this->getModelDiscovery();
+
+         if (!$modelDiscovery->isValidModel($modelClass)) {
+-            $this->showError("Model {$modelClass} must implement " . MustFuzzySearch::class);
++            $this->showError(sprintf('Model %s must implement ', $modelClass) . MustFuzzySearch::class);
+             return;
+         }
+
+-        $this->showInfo("Processing model: {$modelClass}");
++        $this->showInfo('Processing model: ' . $modelClass);
+
+         if ($shouldForceReindex) {
+-            $this->showWarning("Clearing existing index for {$modelClass}...");
++            $this->showWarning(sprintf('Clearing existing index for %s...', $modelClass));
+             $this->getSearchService()->getIndexManager()->reindexModel($modelClass);
+         } else {
+             $this->performIncrementalIndexing($modelClass, $chunkSize);
+@@ Line 128 @@
+         $modelDiscovery = $this->getModelDiscovery();
+         $models = $modelDiscovery->getSearchableModels();
+
+-        if (empty($models)) {
++        if ($models === []) {
+             $this->displayNoModelsWarning();
+             return;
+         }
+@@ Line 158 @@
+      */
+     private function performIncrementalIndexing(string $modelClass, int $chunkSize): void
+     {
+-        $this->showInfo("Indexing model: {$modelClass}");
++        $this->showInfo('Indexing model: ' . $modelClass);
+
+         /** @var Model&MustFuzzySearch $modelClass */
+         $totalRecords = $modelClass::count();
+
+         if ($totalRecords === 0) {
+-            $this->showWarning("No records found for {$modelClass}");
++            $this->showWarning('No records found for ' . $modelClass);
+             return;
+         }
+
+@@ Line 177 @@
+                 if (get_class($model) === $modelClass && $model->shouldBeIndexed()) {
+                     $this->getSearchService()->getIndexManager()->indexModel($model);
+                 }
++
+                 $progressBar->advance();
+             }
+         });
+@@ Line 196 @@
+         $this->showHeader('Discoverable Models');
+         $this->showInfo('Models that implement ' . MustFuzzySearch::class . ':');
+
+-        if (empty($models)) {
++        if ($models === []) {
+             $this->showWarning('No discoverable models found.');
+         } else {
+             foreach ($models as $model) {
+-                $this->line("  ✓ {$model}");
++                $this->line('  ✓ ' . $model);
+             }
+         }
+
+@@ Line 216 @@
+     {
+         $stats = $this->calculatePreciseModelStatistics($modelClass);
+
+-        $this->showSuccess("Indexed {$stats['indexed_entries']} entries for {$modelClass}");
++        $this->showSuccess(sprintf('Indexed %d entries for %s', $stats['indexed_entries'], $modelClass));
+
+         if ($stats['indexed_models'] > 0) {
+             $coveragePercentage = $stats['total_records'] > 0
+@@ Line 223 @@
+                 ? round(($stats['indexed_models'] / $stats['total_records']) * self::PERCENTAGE_MULTIPLIER, 1)
+                 : 0;
+
+-            $this->line("  Indexed models: {$stats['indexed_models']} out of {$stats['total_records']} total records ({$coveragePercentage}%)");
++            $this->line(sprintf('  Indexed models: %d out of %d total records (%s%%)', $stats['indexed_models'], $stats['total_records'], $coveragePercentage));
+
+             if ($stats['indexed_models'] < $stats['total_records'] && $stats['skipped_records'] > 0) {
+                 $skippedPercentage = round(($stats['skipped_records'] / $stats['total_records']) * self::PERCENTAGE_MULTIPLIER, 1);
+-                $this->line("  Skipped records: {$stats['skipped_records']} ({$skippedPercentage}% - due to shouldBeIndexed())");
++                $this->line(sprintf('  Skipped records: %d (%s%% - due to shouldBeIndexed())', $stats['skipped_records'], $skippedPercentage));
+             }
+         } else {
+             $this->showWarning("  No models were indexed - check shouldBeIndexed() method");
+@@ Line 261 @@
+         $skippedRecords = 0;
+
+         /** @var Model&MustFuzzySearch $modelClass */
+-        $modelClass::chunk(self::STATS_CHUNK_SIZE, function ($models) use (&$totalRecords, &$indexedModels, &$skippedRecords) {
++        $modelClass::chunk(self::STATS_CHUNK_SIZE, function ($models) use (&$totalRecords, &$indexedModels, &$skippedRecords): void {
+             $totalRecords += count($models);
+
+             /** @var Model&MustFuzzySearch $model */
+             foreach ($models as $model) {
+                 if ($model->shouldBeIndexed()) {
+-                    $indexedModels++;
++                    ++$indexedModels;
+                 } else {
+-                    $skippedRecords++;
++                    ++$skippedRecords;
+                 }
+             }
+         });
+@@ Line 300 @@
+         $this->showInfo('Found ' . count($models) . ' searchable model(s):');
+
+         foreach ($models as $model) {
+-            $this->line("  - {$model}");
++            $this->line('  - ' . $model);
+         }
+
+         $this->showNewLine();
+@@ Line 328 @@
+         $this->showInfo('Total entries: ' . $stats['total_entries']);
+
+         foreach ($stats['models'] as $model => $modelStats) {
+-            $this->line("  {$model}: {$modelStats['count']} entries");
++            $this->line(sprintf('  %s: %s entries', $model, $modelStats['count']));
+         }
+     }
+
+@@ Line 347 @@
+
+     /**
+      * Get the search service instance from the container.
+-     *
+-     * @return SearchServiceInterface
+      */
+     private function getSearchService(): SearchServiceInterface
+     {
+@@ Line 357 @@
+
+     /**
+      * Get the model discovery service from the container.
+-     *
+-     * @return ModelDiscoveryInterface
+      */
+     private function getModelDiscovery(): ModelDiscoveryInterface
+     {
+    ----------- end diff -----------
+
+Applied rules:
+ * SimplifyEmptyCheckOnEmptyArrayRector
+ * EncapsedStringsToSprintfRector
+ * PostIncDecToPreIncDecRector
+ * NewlineAfterStatementRector
+ * RemoveUnusedPrivateClassConstantRector
+ * RemoveUselessReturnTagRector
+ * AddClosureVoidReturnTypeWhereNoReturnRector
+
+
+41) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Commands/StatsIndexCommand.php:39
+
+    ---------- begin diff ----------
+@@ Line 39 @@
+      *
+      * Retrieves and displays comprehensive statistics about the search index,
+      * including total entries and per-model breakdown with field counts.
+-     *
+-     * @return void
+      */
+     public function handle(): void
+     {
+@@ Line 54 @@
+
+     /**
+      * Get the search service from the container.
+-     *
+-     * @return SearchServiceInterface
+      */
+     private function getSearchService(): SearchServiceInterface
+     {
+@@ Line 64 @@
+
+     /**
+      * Display the command header.
+-     *
+-     * @return void
+      */
+     private function displayHeader(): void
+     {
+@@ Line 76 @@
+      * Display the total number of indexed entries.
+      *
+      * @param int $totalEntries The total number of indexed entries
+-     * @return void
+      */
+     private function displayTotalEntries(int $totalEntries): void
+     {
+@@ Line 90 @@
+      * Shows entry counts and field distributions per model in a tabular format.
+      *
+      * @param array<string, array{count: int, fields: array<string, int>}> $modelsStats
+-     * @return void
+      */
+     private function displayModelStatistics(array $modelsStats): void
+     {
+@@ Line 97 @@
+         $this->showInfo('Per model statistics:');
+         $this->showNewLine();
+
+-        if (empty($modelsStats)) {
++        if ($modelsStats === []) {
+             $this->showWarning('No models indexed yet.');
+             return;
+         }
+@@ Line 138 @@
+      * Example: ['name' => 100, 'email' => 50] becomes "name: 100, email: 50"
+      *
+      * @param array<string, int> $fieldCounts
+-     * @return string
+      */
+     private function formatFieldCounts(array $fieldCounts): string
+     {
+-        if (empty($fieldCounts)) {
++        if ($fieldCounts === []) {
+             return '';
+         }
+
+@@ Line 149 @@
+         $formattedParts = [];
+
+         foreach ($fieldCounts as $fieldName => $count) {
+-            $formattedParts[] = "{$fieldName}: {$count}";
++            $formattedParts[] = sprintf('%s: %d', $fieldName, $count);
+         }
+
+         return implode(', ', $formattedParts);
+    ----------- end diff -----------
+
+Applied rules:
+ * SimplifyEmptyCheckOnEmptyArrayRector
+ * EncapsedStringsToSprintfRector
+ * RemoveUselessReturnTagRector
+
+
+42) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Config/CoverageBonusConfig.php:57
+
+    ---------- begin diff ----------
+@@ Line 57 @@
+
+     /**
+      * Get the full coverage threshold value.
+-     *
+-     * @return float
+      */
+     public function getFullCoverageThreshold(): float
+     {
+@@ Line 67 @@
+
+     /**
+      * Get the high coverage threshold value.
+-     *
+-     * @return float
+      */
+     public function getHighCoverageThreshold(): float
+     {
+@@ Line 77 @@
+
+     /**
+      * Get the full coverage bonus value.
+-     *
+-     * @return float
+      */
+     public function getFullCoverageBonus(): float
+     {
+@@ Line 87 @@
+
+     /**
+      * Get the high coverage bonus value.
+-     *
+-     * @return float
+      */
+     public function getHighCoverageBonus(): float
+     {
+    ----------- end diff -----------
+
+Applied rules:
+ * RemoveUselessReturnTagRector
+
+
+43) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Config/LevenshteinAlgorithmConfig.php:36
+
+    ---------- begin diff ----------
+@@ Line 36 @@
+     public const DEFAULT_CLOSE_MATCH_BONUS = 0.1;
+
+     private int $emptyStringLength;
++
+     private int $distancePenaltyThreshold;
++
+     private float $penaltyFactorBase;
++
+     private float $penaltyReductionPerDistance;
++
+     private int $closeMatchBonusThreshold;
++
+     private int $minLengthForBonus;
++
+     private float $closeMatchBonus;
++
+     private float $weight;
+
+     private function __construct(
+    ----------- end diff -----------
+
+Applied rules:
+ * NewlineBetweenClassLikeStmtsRector
+
+
+44) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Config/LongestCommonSubstringConfig.php:24
+
+    ---------- begin diff ----------
+@@ Line 24 @@
+     public const DEFAULT_MATCH_INCREMENT = 1;
+
+     private int $baseIndex;
++
+     private int $matchIncrement;
++
+     private float $weight;
+
+     private function __construct(
+    ----------- end diff -----------
+
+Applied rules:
+ * NewlineBetweenClassLikeStmtsRector
+
+
+45) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Config/PrefixAlgorithmConfig.php:27
+
+    ---------- begin diff ----------
+@@ Line 27 @@
+     public const DEFAULT_PREFIX_MAX_SCORE = 0.6;
+
+     private int $minPrefixLength;
++
+     private float $prefixBaseScore;
++
+     private float $prefixVariableMultiplier;
++
+     private float $prefixMaxScore;
++
+     private float $weight;
+
+     private function __construct(
+    ----------- end diff -----------
+
+Applied rules:
+ * NewlineBetweenClassLikeStmtsRector
+
+
+46) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Config/SimilarityCalculatorConfig.php:143
+
+    ---------- begin diff ----------
+@@ Line 143 @@
+     public const DEFAULT_UNMATCHED_LETTER_MULTIPLIER = 1.5;
+
+     private string $regexRemoveSpecialChars;
++
+     private string $regexCollapseSpaces;
++
+     private string $regexWordSplitter;
+
+     private function __construct(
+    ----------- end diff -----------
+
+Applied rules:
+ * NewlineBetweenClassLikeStmtsRector
+
+
+47) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/SearchContext.php:102
+
+    ---------- begin diff ----------
+@@ Line 102 @@
 
      /**
       * Preload all required models for efficient access.
@@ -1783,7 +1931,7 @@ Applied rules:
       */
      private function preloadModels(): void
      {
-@@ @@
+@@ Line 232 @@
 
      /**
       * {@inheritDoc}
@@ -1798,10 +1946,10 @@ Applied rules:
  * DocblockGetterReturnArrayFromPropertyDocblockVarRector
 
 
-40) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/Algorithms/LevenshteinSimilarityAlgorithm.php:138
+48) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/Algorithms/LevenshteinSimilarityAlgorithm.php:138
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 138 @@
          $closeMatchBonus = $this->config->getCloseMatchBonus();
 
          if ($levenshteinDistance <= $closeMatchThreshold && $longestLength >= $minimumLengthForBonus) {
@@ -1817,10 +1965,10 @@ Applied rules:
  * ReturnEarlyIfVariableRector
 
 
-41) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/Algorithms/WordSimilarity/LetterDistanceCalculator.php:71
+49) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/Algorithms/WordSimilarity/LetterDistanceCalculator.php:71
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 71 @@
 
      /**
       * Find matching letters between two sets with position windows.
@@ -1829,7 +1977,7 @@ Applied rules:
       */
      private function findLetterMatches(array $lettersA, array $lettersB): array
      {
-@@ @@
+@@ Line 98 @@
 
      /**
       * Find the best matching letter in the target string.
@@ -1837,7 +1985,7 @@ Applied rules:
       */
      private function findBestLetterMatch(
          string $targetLetter,
-@@ @@
+@@ Line 114 @@
          $startSearch = max($startIndex, $currentPosition - $searchWindow);
          $endSearch = min(count($searchLetters), $currentPosition + $searchWindow + $baseIncrement);
 
@@ -1846,7 +1994,7 @@ Applied rules:
              if (in_array($searchPosition, $usedPositions, true)) {
                  continue;
              }
-@@ @@
+@@ Line 138 @@
 
      /**
       * Calculate total distance from matched letter pairs.
@@ -1855,7 +2003,7 @@ Applied rules:
       */
      private function calculateTotalMatchedDistance(array $matchedPairs, array $lettersA, array $lettersB): float
      {
-@@ @@
+@@ Line 164 @@
              );
 
              if (!$pair['isExact']) {
@@ -1864,7 +2012,7 @@ Applied rules:
              }
          }
 
-@@ @@
+@@ Line 174 @@
          $unmatchedMultiplier = $this->config->getUnmatchedLetterMultiplier();
          $totalDistance += ($unmatchedCountA + $unmatchedCountB) * $unmatchedPenaltyBase * $unmatchedMultiplier;
 
@@ -1875,7 +2023,7 @@ Applied rules:
      }
 
      /**
-@@ @@
+@@ Line 261 @@
 
      /**
       * Count common letters between two letter sets.
@@ -1884,7 +2032,7 @@ Applied rules:
       */
      private function countCommonLetters(array $lettersA, array $lettersB): int
      {
-@@ @@
+@@ Line 269 @@
 
          foreach ($lettersA as $letterA) {
              if (in_array($letterA, $lettersB, true)) {
@@ -1901,10 +2049,10 @@ Applied rules:
  * ClassMethodArrayDocblockParamFromLocalCallsRector
 
 
-42) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/Algorithms/WordSimilarity/WordMatchScorer.php:12
+50) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/Algorithms/WordSimilarity/WordMatchScorer.php:12
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 12 @@
  class WordMatchScorer
  {
      private WordSimilarityComparatorConfig $config;
@@ -1912,7 +2060,7 @@ Applied rules:
      private WordSimilarityCalculator $wordSimilarityCalculator;
 
      public function __construct(WordSimilarityComparatorConfig $config)
-@@ @@
+@@ Line 33 @@
          $emptyTextPenalty = $this->calculateEmptyTextPenalty($queryWords);
          $baseIncrement = $this->config->getBaseIncrement();
 
@@ -1928,7 +2076,7 @@ Applied rules:
              return $emptyTextPenalty * $sigma;
          }
 
-@@ @@
+@@ Line 187 @@
 
          foreach ($scores as $score) {
              if ($score > $threshold) {
@@ -1937,7 +2085,7 @@ Applied rules:
              }
          }
 
-@@ @@
+@@ Line 194 @@
          return $badMatchCount;
      }
 
@@ -1956,10 +2104,10 @@ Applied rules:
  * ClassMethodArrayDocblockParamFromLocalCallsRector
 
 
-43) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/Algorithms/WordSimilarity/WordSimilarityCalculator.php:12
+51) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/Algorithms/WordSimilarity/WordSimilarityCalculator.php:12
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 12 @@
  class WordSimilarityCalculator
  {
      private WordSimilarityComparatorConfig $config;
@@ -1967,7 +2115,7 @@ Applied rules:
      private LetterDistanceCalculator $letterDistanceCalculator;
 
      public function __construct(WordSimilarityComparatorConfig $config)
-@@ @@
+@@ Line 167 @@
 
      /**
       * Count common letters between two letter sets.
@@ -1976,7 +2124,7 @@ Applied rules:
       */
      private function countCommonLetters(array $lettersA, array $lettersB): int
      {
-@@ @@
+@@ Line 175 @@
 
          foreach ($lettersA as $letterA) {
              if (in_array($letterA, $lettersB, true)) {
@@ -1992,10 +2140,10 @@ Applied rules:
  * ClassMethodArrayDocblockParamFromLocalCallsRector
 
 
-44) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/Algorithms/WordSimilarityComparator.php:7
+52) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/Algorithms/WordSimilarityComparator.php:7
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 7 @@
  use Fuzzy\Contracts\StringNormalizerInterface;
  use Fuzzy\Config\WordSimilarityComparatorConfig;
  use Fuzzy\Services\Algorithms\WordSimilarity\WordMatchScorer;
@@ -2003,7 +2151,7 @@ Applied rules:
 
  /**
   * Advanced lexical similarity comparator for strings.
-@@ @@
+@@ Line 27 @@
  class WordSimilarityComparator
  {
      private StringNormalizerInterface $normalizer;
@@ -2015,7 +2163,7 @@ Applied rules:
 
      /**
       * Constructor for WordSimilarityComparator.
-@@ @@
+@@ Line 44 @@
          $this->normalizer = $normalizer;
          $this->config = $config ?? WordSimilarityComparatorConfig::createDefault();
          $this->wordMatchScorer = new WordMatchScorer($this->config);
@@ -2023,7 +2171,7 @@ Applied rules:
      }
 
      /**
-@@ @@
+@@ Line 73 @@
          }
 
          // Empty query handling
@@ -2038,7 +2186,7 @@ Applied rules:
              $emptyTextPenalty = $this->calculateEmptyTextPenalty($queryWords);
              return min($this->config->getMaxScoreCap(), $emptyTextPenalty);
          }
-@@ @@
+@@ Line 85 @@
 
          $filteredQueryWords = $this->filterShortWords($queryWords);
 
@@ -2054,10 +2202,10 @@ Applied rules:
  * RemoveUnusedPrivatePropertyRector
 
 
-45) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/CacheManagerService.php:4
+53) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/CacheManagerService.php:4
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 4 @@
 
  namespace Fuzzy\Services;
 
@@ -2065,7 +2213,7 @@ Applied rules:
  use Fuzzy\Contracts\CacheManagerInterface;
  use Fuzzy\Contracts\CacheStoreInterface;
  use Fuzzy\Config\CacheConfig;
-@@ @@
+@@ Line 11 @@
  class CacheManagerService implements CacheManagerInterface
  {
      private const MIN_CACHE_KEY_LENGTH_FOR_HASH = 250;
@@ -2077,7 +2225,7 @@ Applied rules:
      private CacheStoreInterface $cache;
 
      public function __construct(CacheStoreInterface $cache, ?CacheConfig $config = null)
-@@ @@
+@@ Line 94 @@
          return $key;
      }
 
@@ -2087,7 +2235,7 @@ Applied rules:
      private function extractModelClassFromParameters(array $parameters): ?string
      {
          if (isset($parameters[0]) && is_string($parameters[0]) && class_exists($parameters[0])) {
-@@ @@
+@@ Line 100 @@
              return $parameters[0];
          }
 
@@ -2098,7 +2246,7 @@ Applied rules:
          return null;
      }
 
-@@ @@
+@@ Line 120 @@
 
          $keyData = [
              'key' => $key,
@@ -2108,7 +2256,7 @@ Applied rules:
          ];
 
          if ($modelClass !== null) {
-@@ @@
+@@ Line 133 @@
                  $keyExists = true;
                  break;
              }
@@ -2116,7 +2264,7 @@ Applied rules:
              if (is_string($existingKeyData) && $existingKeyData === $key) {
                  $keyExists = true;
                  break;
-@@ @@
+@@ Line 200 @@
                  $keyRemoved = true;
                  continue;
              }
@@ -2133,10 +2281,10 @@ Applied rules:
  * AddParamArrayDocblockFromDimFetchAccessRector
 
 
-46) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/FuzzySearchService.php:4
+54) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/FuzzySearchService.php:4
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 4 @@
 
  namespace Fuzzy\Services;
 
@@ -2144,7 +2292,7 @@ Applied rules:
  use Fuzzy\Contracts\CacheManagerInterface;
  use Fuzzy\Contracts\IndexManagerInterface;
  use Fuzzy\Contracts\ModelDiscoveryInterface;
-@@ @@
+@@ Line 76 @@
      {
          return $this->cacheManager->remember(
              type: 'search',
@@ -2153,7 +2301,7 @@ Applied rules:
              parameters: [$query, $options]
          );
      }
-@@ @@
+@@ Line 86 @@
       *
       * @param string $query The search query string
       * @param array<string, mixed> $options Search options
@@ -2162,7 +2310,7 @@ Applied rules:
       */
      private function executeSearch(string $query, array $options = []): Collection
      {
-@@ @@
+@@ Line 101 @@
      {
          return $this->cacheManager->remember(
              type: 'search_in_model',
@@ -2171,7 +2319,7 @@ Applied rules:
              parameters: [$modelClass, $query, $options]
          );
      }
-@@ @@
+@@ Line 113 @@
      {
          return $this->cacheManager->remember(
              type: 'search_in_models',
@@ -2186,10 +2334,10 @@ Applied rules:
  * AddArrowFunctionReturnTypeRector
 
 
-47) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/IndexBuilder.php:4
+55) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/IndexBuilder.php:4
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 4 @@
 
  namespace Fuzzy\Services;
 
@@ -2197,7 +2345,7 @@ Applied rules:
  use Fuzzy\Contracts\ContextualNormalizerInterface;
  use Fuzzy\Contracts\MustFuzzySearch;
  use Fuzzy\Models\FuzzyIndex;
-@@ @@
+@@ Line 43 @@
       * from the model to preserve stop words where appropriate.
       *
       * @param MustFuzzySearch $model The searchable model instance to index
@@ -2205,7 +2353,7 @@ Applied rules:
       */
      public function indexModel(MustFuzzySearch $model): void
      {
-@@ @@
+@@ Line 86 @@
      {
          // Try Eloquent's getAttribute method
          if (method_exists($model, 'getAttribute')) {
@@ -2214,7 +2362,7 @@ Applied rules:
              return $model->getAttribute($field);
          }
 
-@@ @@
+@@ Line 109 @@
          }
 
          // Try array access if model implements ArrayAccess
@@ -2223,7 +2371,7 @@ Applied rules:
              return $model[$field];
          }
 
-@@ @@
+@@ Line 127 @@
       * @param mixed $modelId The model's primary key value
       * @param string $field The field name being indexed
       * @param string $value The field value to index
@@ -2231,7 +2379,7 @@ Applied rules:
       */
      public function indexField(string $modelType, mixed $modelId, string $field, string $value): void
      {
-@@ @@
+@@ Line 140 @@
 
          $words = $this->normalizer->splitIntoWords($normalizedValue);
 
@@ -2240,7 +2388,7 @@ Applied rules:
              return;
          }
 
-@@ @@
+@@ Line 190 @@
       * Efficiently indexes an array of models in a single operation.
       *
       * @param array<MustFuzzySearch|Model> $models Array of models to index
@@ -2255,10 +2403,10 @@ Applied rules:
  * RemoveUselessReturnTagRector
 
 
-48) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/IndexManagerService.php:303
+56) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/IndexManagerService.php:303
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 303 @@
 
              foreach ($models as $model) {
                  if ($model instanceof MustFuzzySearch && $model->shouldBeIndexed()) {
@@ -2273,10 +2421,10 @@ Applied rules:
  * PostIncDecToPreIncDecRector
 
 
-49) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/ModelDiscoveryService.php:21
+57) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/ModelDiscoveryService.php:21
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 21 @@
  class ModelDiscoveryService implements ModelDiscoveryInterface
  {
      private const EXTRACT_NAMESPACE_REGEX = '/namespace\s+(.+?);/s';
@@ -2290,10 +2438,10 @@ Applied rules:
  * NewlineBetweenClassLikeStmtsRector
 
 
-50) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/PipelineStageManager.php:40
+58) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/PipelineStageManager.php:40
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 40 @@
          $customStages = config('fuzzy.pipeline', []);
 
          // Validate each custom stage
@@ -2302,7 +2450,7 @@ Applied rules:
              $this->validateStage($stage);
          }
 
-@@ @@
+@@ Line 99 @@
              if (in_array($stage, $seen, true)) {
                  throw DuplicateStageException::duplicate($stage, $index + 1);
              }
@@ -2317,36 +2465,10 @@ Applied rules:
  * RemoveUnusedForeachKeyRector
 
 
-51) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/ResultFilterService.php:4
+59) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/Scoring/ScoringEngine.php:113
 
     ---------- begin diff ----------
-@@ @@
-
- namespace Fuzzy\Services;
-
-+use Fuzzy\Data\SearchResultData;
- use Fuzzy\Contracts\ResultFilterInterface;
- use Illuminate\Support\Collection;
-
-@@ @@
-     public function filterAndSort(Collection $results, float $minScore): Collection
-     {
-         return $results
--            ->filter(fn($result): bool => $result !== null && $result->score >= $minScore)
-+            ->filter(fn($result): bool => $result instanceof SearchResultData && $result->score >= $minScore)
-             ->sortByDesc('score')
-             ->values();
-     }
-    ----------- end diff -----------
-
-Applied rules:
- * FlipTypeControlToUseExclusiveTypeRector
-
-
-52) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/Scoring/ScoringEngine.php:113
-
-    ---------- begin diff ----------
-@@ @@
+@@ Line 113 @@
 
      /**
       * Check if the score has reached the maximum possible value.
@@ -2356,7 +2478,7 @@ Applied rules:
       */
      private function isPerfectScore(float $score): bool
      {
-@@ @@
+@@ Line 124 @@
 
      /**
       * Check if no scoring strategy matched the index entry.
@@ -2366,7 +2488,7 @@ Applied rules:
       */
      private function hasNoMatch(float $score): bool
      {
-@@ @@
+@@ Line 137 @@
       * Check if multi-word scoring can be performed.
       *
       * @param array<int, array<string, mixed>> $indexEntries
@@ -2375,7 +2497,7 @@ Applied rules:
       */
      private function cannotCalculateMultiWordScore(array $indexEntries, SearchContextInterface $context): bool
      {
-@@ @@
+@@ Line 149 @@
       * Find the best similarity score for each query word against all index entries.
       *
       * @param array<int, array<string, mixed>> $indexEntries
@@ -2383,7 +2505,7 @@ Applied rules:
       * @param array<int, string> $queryWords
       * @return array<int, float>
       */
-@@ @@
+@@ Line 172 @@
       * Find the best similarity score for a single query word against all index entries.
       *
       * @param array<int, array<string, mixed>> $indexEntries
@@ -2393,7 +2515,7 @@ Applied rules:
       */
      private function findBestMatchingScoreForWord(array $indexEntries, SearchContextInterface $context, string $queryWord): float
      {
-@@ @@
+@@ Line 200 @@
 
      /**
       * Check if a similarity score meets or exceeds the configured threshold.
@@ -2404,7 +2526,7 @@ Applied rules:
       */
      private function isScoreAboveThreshold(float $similarity, SearchContextInterface $context): bool
      {
-@@ @@
+@@ Line 212 @@
 
      /**
       * Check if a word was successfully matched (score > minimum).
@@ -2414,7 +2536,7 @@ Applied rules:
       */
      private function isWordMatched(float $score): bool
      {
-@@ @@
+@@ Line 225 @@
       * Check if no query words were matched against any index entry.
       *
       * @param array<int, float> $matchedScores
@@ -2422,7 +2544,7 @@ Applied rules:
       */
      private function noWordsMatched(array $matchedScores): bool
      {
-@@ @@
+@@ Line 236 @@
       * Calculate the average score of all matched query words.
       *
       * @param array<int, float> $matchedScores
@@ -2430,7 +2552,7 @@ Applied rules:
       */
      private function calculateAverageScore(array $matchedScores): float
      {
-@@ @@
+@@ Line 248 @@
       *
       * @param array<int, float> $matchedScores
       * @param array<int, string> $queryWords
@@ -2438,7 +2560,7 @@ Applied rules:
       */
      private function calculateCoverageRatio(array $matchedScores, array $queryWords): float
      {
-@@ @@
+@@ Line 259 @@
       * Get coverage bonus based on the coverage ratio using configured thresholds.
       *
       * @param float $coverageRatio Value between 0 and 1
@@ -2446,7 +2568,7 @@ Applied rules:
       */
      private function getCoverageBonus(float $coverageRatio): float
      {
-@@ @@
+@@ Line 278 @@
 
      /**
       * Compute the final weighted score using average, coverage, and bonus.
@@ -2458,7 +2580,7 @@ Applied rules:
       */
      private function computeWeightedScore(float $averageScore, float $coverageRatio, float $coverageBonus): float
      {
-@@ @@
+@@ Line 292 @@
      /**
       * Calculate fallback score when no strategy matches the index entry.
       *
@@ -2468,7 +2590,7 @@ Applied rules:
       */
      private function calculateFallbackScore(SearchContextInterface $context, array $indexEntry): float
      {
-@@ @@
+@@ Line 311 @@
      /**
       * Apply field-specific weighting to the calculated score.
       *
@@ -2478,7 +2600,7 @@ Applied rules:
       */
      private function applyFieldWeighting(float $score, array $match): float
      {
-@@ @@
+@@ Line 344 @@
 
      /**
       * Normalize score to ensure it stays within allowed bounds.
@@ -2495,10 +2617,10 @@ Applied rules:
  * RemoveUselessReturnTagRector
 
 
-53) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/SearchProcessorService.php:4
+60) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/SearchProcessorService.php:4
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 4 @@
 
  namespace Fuzzy\Services;
 
@@ -2510,7 +2632,7 @@ Applied rules:
  use Fuzzy\Contracts\IndexRepositoryInterface;
  use Fuzzy\Contracts\ModelDiscoveryInterface;
  use Fuzzy\Contracts\ResultFilterInterface;
-@@ @@
+@@ Line 66 @@
 
      /**
       * {@inheritDoc}
@@ -2518,7 +2640,7 @@ Applied rules:
       */
      public function searchInModel(string $modelClass, string $query, array $options = []): Collection
      {
-@@ @@
+@@ Line 152 @@
      private function getPipelineStages(): array
      {
          return config('fuzzy.pipeline.stages', [
@@ -2541,10 +2663,10 @@ Applied rules:
  * ClassMethodArrayDocblockParamFromLocalCallsRector
 
 
-54) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/ServiceRegistrar.php:4
+61) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/ServiceRegistrar.php:4
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 4 @@
 
  namespace Fuzzy\Services;
 
@@ -2552,7 +2674,7 @@ Applied rules:
  use Fuzzy\Cache\LaravelCacheStore;
  use Fuzzy\Commands\ClearCacheCommand;
  use Fuzzy\Commands\ClearIndexCommand;
-@@ @@
+@@ Line 74 @@
      {
          $helpersPath = __DIR__ . '/../helpers.php';
          if (!file_exists($helpersPath)) {
@@ -2563,7 +2685,7 @@ Applied rules:
          require_once $helpersPath;
      }
 
-@@ @@
+@@ Line 83 @@
      {
          $this->mergeConfigFrom(__DIR__ . '/../../config/fuzzy.php', 'fuzzy');
 
@@ -2584,7 +2706,7 @@ Applied rules:
      }
 
      private function registerContracts(): void
-@@ @@
+@@ Line 119 @@
 
      private function registerCoreServices(): void
      {
@@ -2627,7 +2749,7 @@ Applied rules:
              $calculator = new SimilarityCalculator($app->make(SimilarityCalculatorConfig::class));
 
              $calculator->addAlgorithm(new LongestCommonSubstringAlgorithm($app->make(LongestCommonSubstringConfig::class)));
-@@ @@
+@@ Line 155 @@
              return $calculator;
          });
 
@@ -2641,7 +2763,7 @@ Applied rules:
              $stageClasses = $this->stageManager->getMergedStages();
              $stages = $this->stageManager->createStageInstances($stageClasses);
 
-@@ @@
+@@ Line 169 @@
              );
          });
 
@@ -2650,7 +2772,7 @@ Applied rules:
              pipeline: $app->make(Pipeline::class),
              normalizer: $app->make(StringNormalizer::class),
              similarityCalculator: $app->make(SimilarityCalculator::class),
-@@ @@
+@@ Line 179 @@
              resultFilter: $app->make(ResultFilterInterface::class)
          ));
 
@@ -2659,7 +2781,7 @@ Applied rules:
              cacheManager: $app->make(CacheManagerInterface::class),
              modelDiscovery: $app->make(ModelDiscoveryInterface::class),
              indexManager: $app->make(IndexManagerInterface::class),
-@@ @@
+@@ Line 192 @@
 
      private function registerAlgorithms(): void
      {
@@ -2668,7 +2790,7 @@ Applied rules:
              normalizer: $app->make(StringNormalizer::class),
              config: $app->make(WordSimilarityComparatorConfig::class)
          ));
-@@ @@
+@@ Line 200 @@
 
      private function registerScoring(): void
      {
@@ -2677,7 +2799,7 @@ Applied rules:
              $calculator = $app->make(AdvancedScoringCalculator::class);
 
              return new ScoringEngine(
-@@ @@
+@@ Line 250 @@
 
          $migrationFiles = glob($sourceMigrationsPath . '/*.php');
 
@@ -2695,10 +2817,10 @@ Applied rules:
  * ClosureReturnTypeRector
 
 
-55) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/SimilarityCalculator.php:4
+62) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/SimilarityCalculator.php:4
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 4 @@
 
  namespace Fuzzy\Services;
 
@@ -2708,7 +2830,7 @@ Applied rules:
  use Fuzzy\Contracts\SimilarityAlgorithmInterface;
  use Fuzzy\Config\SimilarityCalculatorConfig;
 
-@@ @@
+@@ Line 14 @@
  {
      /** @var array<int, SimilarityAlgorithmInterface> */
      private array $algorithms = [];
@@ -2716,7 +2838,7 @@ Applied rules:
      private SimilarityCalculatorConfig $config;
 
      public function __construct(?SimilarityCalculatorConfig $config = null)
-@@ @@
+@@ Line 62 @@
 
      private function calculateCompositeWordSimilarity(string $firstWord, string $secondWord): float
      {
@@ -2725,7 +2847,7 @@ Applied rules:
              return FUZZY_SCORE_NONE;
          }
 
-@@ @@
+@@ Line 124 @@
          $firstWords = $this->splitIntoWords($normalizedFirstString);
          $secondWords = $this->splitIntoWords($normalizedSecondString);
 
@@ -2740,10 +2862,10 @@ Applied rules:
  * NewlineBetweenClassLikeStmtsRector
 
 
-56) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/StringNormalizer.php:19
+63) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Services/StringNormalizer.php:19
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 19 @@
  class StringNormalizer implements ContextualNormalizerInterface
  {
      private const STOP_WORD_REMOVAL_THRESHOLD = 3;
@@ -2765,7 +2887,7 @@ Applied rules:
      private const ZERO_STRING = '0';
 
      /**
-@@ @@
+@@ Line 45 @@
 
      /**
       * Current field being processed (for contextual normalization).
@@ -2774,7 +2896,7 @@ Applied rules:
       */
      private ?string $currentField = null;
 
-@@ @@
+@@ Line 63 @@
 
      /**
       * Load stop words from internal language files based on application locale.
@@ -2783,7 +2905,7 @@ Applied rules:
       */
      private function loadStopWords(): void
      {
-@@ @@
+@@ Line 92 @@
          if (function_exists('app') && method_exists(app(), 'getLocale')) {
              return app()->getLocale();
          }
@@ -2791,7 +2913,7 @@ Applied rules:
          return $_ENV['APP_LOCALE'] ?? 'en';
      }
 
-@@ @@
+@@ Line 244 @@
          if ($this->shouldRemoveStopWords()) {
              $filteredWords = array_filter(
                  $words,
@@ -2810,10 +2932,10 @@ Applied rules:
  * AddArrayFunctionClosureParamTypeRector
 
 
-57) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Stages/MatchDiscoveryStage/IndexOptimizer.php:13
+64) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Stages/MatchDiscoveryStage/IndexOptimizer.php:13
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 13 @@
  class IndexOptimizer
  {
      private array $cachedOptimizedIndexes = [];
@@ -2823,7 +2945,7 @@ Applied rules:
      private MatchDiscoveryConfig $config;
 
      public function __construct(?MatchDiscoveryConfig $config = null)
-@@ @@
+@@ Line 45 @@
 
      /**
       * Build optimized index structures.
@@ -2831,7 +2953,7 @@ Applied rules:
       */
      private function buildOptimizedIndexes(array $wordIndex): array
      {
-@@ @@
+@@ Line 63 @@
              if (!isset($byLength[$wordLength])) {
                  $byLength[$wordLength] = [];
              }
@@ -2839,7 +2961,7 @@ Applied rules:
              $byLength[$wordLength][$wordString] = $matches;
 
              $firstChar = $wordString[0];
-@@ @@
+@@ Line 69 @@
              if (!isset($byFirstChar[$firstChar])) {
                  $byFirstChar[$firstChar] = [];
              }
@@ -2847,7 +2969,7 @@ Applied rules:
              $byFirstChar[$firstChar][$wordString] = $matches;
 
              if ($wordLength >= $this->config->getMinTrigramLength()) {
-@@ @@
+@@ Line 85 @@
 
      /**
       * Add word to trigram index.
@@ -2855,7 +2977,7 @@ Applied rules:
       */
      private function addToTrigramIndex(string $word, array $matches, array &$trigramIndex): void
      {
-@@ @@
+@@ Line 94 @@
              if (!isset($trigramIndex[$trigram])) {
                  $trigramIndex[$trigram] = [];
              }
@@ -2872,10 +2994,10 @@ Applied rules:
  * DocblockReturnArrayFromDirectArrayInstanceRector
 
 
-58) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Stages/MatchDiscoveryStage/MatchFinder.php:13
+65) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Stages/MatchDiscoveryStage/MatchFinder.php:13
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 13 @@
  class MatchFinder
  {
      private MatchDiscoveryConfig $config;
@@ -2883,7 +3005,7 @@ Applied rules:
      private IndexOptimizer $optimizer;
 
      public function __construct(?MatchDiscoveryConfig $config = null)
-@@ @@
+@@ Line 109 @@
 
      /**
       * Simple fuzzy match discovery for small indexes.
@@ -2891,7 +3013,7 @@ Applied rules:
       */
      private function discoverFuzzyMatchesSimple(SearchContextInterface $context, array $wordIndex): void
      {
-@@ @@
+@@ Line 144 @@
 
      /**
       * Find words containing the query word.
@@ -2899,7 +3021,7 @@ Applied rules:
       */
      private function findContainedMatches(
          string $queryWord,
-@@ @@
+@@ Line 385 @@
          }
 
          return $queryWord[0] === $indexedWord[0];
@@ -2923,10 +3045,10 @@ Applied rules:
  * AddParamArrayDocblockFromDimFetchAccessRector
 
 
-59) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Stages/RelevanceScoringStage.php:83
+66) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Stages/RelevanceScoringStage.php:83
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 83 @@
      private function calculateRelevanceScores(SearchContextInterface $context): Collection
      {
          return collect($context->results)
@@ -2935,7 +3057,7 @@ Applied rules:
                  $relevance = $this->calculateRelevanceForResult($result, $context);
                  $result->relevance = $relevance;
                  return $result;
-@@ @@
+@@ Line 135 @@
              ->take($maxResults)
              ->values()
              ->all();
@@ -2990,341 +3112,10 @@ Applied rules:
  * ClosureReturnTypeRector
 
 
-60) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Stages/ScoringStage.php:4
+67) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Commands/ClearIndexCommandTest.php:78
 
     ---------- begin diff ----------
-@@ @@
-
- namespace Fuzzy\Stages;
-
-+use InvalidArgumentException;
- use Fuzzy\Contracts\SearchContextInterface;
- use Fuzzy\Contracts\StageInterface;
- use Fuzzy\Enums\StageType;
-@@ @@
-      *
-      * @param array<int, array> $matches Array of matches with field and value information
-      * @return array{indexable_type: string, field: string, original_value: string} Match details
--     * @throws \InvalidArgumentException If matches array is empty
-+     * @throws InvalidArgumentException If matches array is empty
-      */
-     private function extractBestMatchDetails(array $matches): array
-     {
-         if ($matches === []) {
--            throw new \InvalidArgumentException('Matches array cannot be empty');
-+            throw new InvalidArgumentException('Matches array cannot be empty');
-         }
-
-         return $matches[0];
-    ----------- end diff -----------
-
-Applied rules:
-
-
-61) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Traits/CommandHelpers.php:20
-
-    ---------- begin diff ----------
-@@ @@
- {
-     /**
-      * Get the fuzzy search service from the container.
--     *
--     * @return FuzzySearchService
-      */
-     protected function getSearchService(): FuzzySearchService
-     {
-@@ @@
-      * Display a success message with a checkmark prefix.
-      *
-      * @param string $message The success message to display
--     * @return void
-      */
-     protected function showSuccess(string $message): void
-     {
--        $this->info("✓ {$message}");
-+        $this->info('✓ ' . $message);
-     }
-
-     /**
-@@ @@
-      * Display a warning message.
-      *
-      * @param string $message The warning message to display
--     * @return void
-      */
-     protected function showWarning(string $message): void
-     {
-@@ @@
-      * Display an error message.
-      *
-      * @param string $message The error message to display
--     * @return void
-      */
-     protected function showError(string $message): void
-     {
-@@ @@
-      * Display an info message.
-      *
-      * @param string $message The info message to display
--     * @return void
-      */
-     protected function showInfo(string $message): void
-     {
-@@ @@
-      * Display a section header with equals signs.
-      *
-      * @param string $title The section title
--     * @return void
-      */
-     protected function showHeader(string $title): void
-     {
--        $this->info("=== {$title} ===");
-+        $this->info(sprintf('=== %s ===', $title));
-     }
-
-     /**
-      * Display a blank line.
--     *
--     * @return void
-      */
-     protected function showNewLine(): void
-     {
-    ----------- end diff -----------
-
-Applied rules:
- * EncapsedStringsToSprintfRector
- * RemoveUselessReturnTagRector
-
-
-62) /home/andy-kani/pro/sites/packages/laravel-fuzzy/src/Traits/FuzzySearchable.php:4
-
-    ---------- begin diff ----------
-@@ @@
-
- namespace Fuzzy\Traits;
-
-+use Fuzzy\Contracts\MustFuzzySearch;
- use Fuzzy\Enums\IndexationLevel;
- use Illuminate\Support\Collection;
- use Fuzzy\Services\FuzzySearchService;
-@@ @@
-      * Registers model event listeners to automatically manage search index
-      * during create, update, and delete operations. The events that are
-      * actually registered depend on the model's getIndexationLevel() method.
--     *
--     * @return void
-      */
-     protected static function bootFuzzySearchable(): void
-     {
-@@ @@
-         }
-
-         if ($indexationLevel->hasEvent('delete')) {
--            static::deleted(static function ($model): void {
-+            static::deleted(static function (MustFuzzySearch $model): void {
-                 app(FuzzySearchService::class)->getIndexManager()->removeModel($model);
-             });
-         }
-    ----------- end diff -----------
-
-Applied rules:
- * RemoveUselessReturnTagRector
- * ParamTypeByMethodCallTypeRector
-
-
-63) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Fixtures/User.php:53
-
-    ---------- begin diff ----------
-@@ @@
-
-     /**
-      * Determine if the model should be indexed for search.
--     *
--     * @return bool
-      */
-     public function shouldBeIndexed(): bool
-     {
-    ----------- end diff -----------
-
-Applied rules:
- * RemoveUselessReturnTagRector
-
-
-64) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Fixtures/UserSearchData.php:19
-
-    ---------- begin diff ----------
-@@ @@
-      * Create a search data instance from a User model.
-      *
-      * @param Model $user The User model instance
--     * @return self
-      */
-     public static function fromModel(Model $user): self
-     {
-    ----------- end diff -----------
-
-Applied rules:
- * RemoveUselessReturnTagRector
-
-
-65) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/TestCase.php:4
-
-    ---------- begin diff ----------
-@@ @@
-
- namespace Fuzzy\Tests;
-
--use Fuzzy\Tests\Fixtures\User;
--use Fuzzy\Tests\Fixtures\Product;
- use Illuminate\Foundation\Application;
- use Illuminate\Support\Facades\Config;
- use Orchestra\Testbench\TestCase as Orchestra;
-    ----------- end diff -----------
-
-Applied rules:
-
-
-66) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Cache/LaravelCacheStoreTest.php:113
-
-    ---------- begin diff ----------
-@@ @@
-         $executed = false;
-
-         // Act: Remember value (cache miss)
--        $value = $this->cacheStore->remember('miss_key', 60, function () use (&$executed) {
-+        $value = $this->cacheStore->remember('miss_key', 60, function () use (&$executed): string {
-             $executed = true;
-             return 'computed_value';
-         });
-@@ @@
-         $executed = false;
-
-         // Act: Remember value (cache hit)
--        $value = $this->cacheStore->remember('hit_key', 60, function () use (&$executed) {
-+        $value = $this->cacheStore->remember('hit_key', 60, function () use (&$executed): string {
-             $executed = true;
-             return 'computed_value';
-         });
-@@ @@
-         $newValue = $this->cacheStore->increment('counter', 5);
-
-         // Assert: Should return new value
--        $this->assertEquals(15, $newValue);
-+        $this->assertSame(15, $newValue);
-         $this->assertEquals(15, $this->cacheStore->get('counter'));
-     }
-
-@@ @@
-         $newValue = $this->cacheStore->increment('new_counter', 5);
-
-         // Assert: Should create and increment from 0
--        $this->assertEquals(5, $newValue);
-+        $this->assertSame(5, $newValue);
-         $this->assertEquals(5, $this->cacheStore->get('new_counter'));
-     }
-
-@@ @@
-         $newValue = $this->cacheStore->decrement('counter', 7);
-
-         // Assert: Should return new value
--        $this->assertEquals(13, $newValue);
-+        $this->assertSame(13, $newValue);
-         $this->assertEquals(13, $this->cacheStore->get('counter'));
-     }
-
-@@ @@
-         $newValue = $this->cacheStore->decrement('new_counter', 5);
-
-         // Assert: Should create and decrement from 0
--        $this->assertEquals(-5, $newValue);
-+        $this->assertSame(-5, $newValue);
-         $this->assertEquals(-5, $this->cacheStore->get('new_counter'));
-     }
-
-@@ @@
-     public function test_remember_with_zero_ttl_works(): void
-     {
-         // Act: Remember with TTL 0
--        $value = $this->cacheStore->remember('zero_ttl_key', 0, function () {
-+        $value = $this->cacheStore->remember('zero_ttl_key', 0, function (): string {
-             return 'zero_ttl_value';
-         });
-    ----------- end diff -----------
-
-Applied rules:
- * AssertEqualsToSameRector
- * ClosureReturnTypeRector
-
-
-67) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Commands/ClearCacheCommandTest.php:4
-
-    ---------- begin diff ----------
-@@ @@
-
- namespace Fuzzy\Tests\Unit\Commands;
-
--use Fuzzy\Commands\ClearCacheCommand;
-+use Fuzzy\Tests\Fixtures\User;
- use Fuzzy\Contracts\CacheManagerInterface;
- use Fuzzy\Contracts\SearchServiceInterface;
- use Fuzzy\Tests\TestCase;
-@@ @@
-
- final class ClearCacheCommandTest extends TestCase
- {
--    private $searchService;
-     private $cacheManager;
-
-     protected function setUp(): void
-@@ @@
-         parent::setUp();
-
-         $this->cacheManager = Mockery::mock(CacheManagerInterface::class);
--        $this->searchService = Mockery::mock(SearchServiceInterface::class);
-+        $searchService = Mockery::mock(SearchServiceInterface::class);
-
-         // Configure le mock pour retourner le cacheManager via getCacheManager()
--        $this->searchService->shouldReceive('getCacheManager')
-+        $searchService->shouldReceive('getCacheManager')
-             ->zeroOrMoreTimes()
-             ->andReturn($this->cacheManager);
-
-         // Bind the search service in the container
--        $this->app->instance(SearchServiceInterface::class, $this->searchService);
-+        $this->app->instance(SearchServiceInterface::class, $searchService);
-
-         config(['fuzzy.cache.prefix' => 'fuzzy_test:']);
-     }
-@@ @@
-
-     public function test_clear_cache_for_specific_model(): void
-     {
--        $modelClass = 'Fuzzy\\Tests\\Fixtures\\User';
-+        $modelClass = User::class;
-
-         $this->cacheManager->shouldReceive('invalidateForModel')
-             ->once()
-@@ @@
-         $output = Artisan::output();
-
-         $this->assertEquals(0, $exitCode);
--        $this->assertStringContainsString("Cache cleared for model: {$modelClass}", $output);
-+        $this->assertStringContainsString('Cache cleared for model: ' . $modelClass, $output);
-     }
-
-     public function test_clear_stats_cache_only(): void
-    ----------- end diff -----------
-
-Applied rules:
- * EncapsedStringsToSprintfRector
- * NarrowUnusedSetUpDefinedPropertyRector
- * StringClassNameToClassConstantRector
-
-
-68) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Commands/ClearIndexCommandTest.php:78
-
-    ---------- begin diff ----------
-@@ @@
+@@ Line 78 @@
 
          // Act: Execute command with force flag
          $this->artisan('fuzzy:clear', ['--force' => true])
@@ -3333,7 +3124,7 @@ Applied rules:
              ->assertExitCode(0);
 
          // Assert: All indexes should be removed
-@@ @@
+@@ Line 107 @@
 
          // Assert: Command should succeed and display correct message
          $this->assertEquals(0, $exitCode);
@@ -3342,7 +3133,7 @@ Applied rules:
 
          // Assert: Database should be empty after clearing
          $finalCount = FuzzyIndex::count();
-@@ @@
+@@ Line 140 @@
 
          // Assert: Command should succeed and display correct model-specific message
          $this->assertEquals(0, $exitCode);
@@ -3351,7 +3142,7 @@ Applied rules:
 
          // Assert: User entries should be removed, Product entries should remain
          $userEntries = FuzzyIndex::where('indexable_type', User::class)->count();
-@@ @@
+@@ Line 185 @@
              'model' => User::class,
              '--force' => true,
          ])
@@ -3360,7 +3151,7 @@ Applied rules:
              ->assertExitCode(0);
 
          // Assert: User entries should be removed
-@@ @@
+@@ Line 225 @@
          // Act: Execute command and accept confirmation
          $this->artisan('fuzzy:clear')
              ->expectsConfirmation('Clear ALL search indexes?', 'yes')
@@ -3369,7 +3160,7 @@ Applied rules:
              ->assertExitCode(0);
 
          // Assert: All indexes should be removed
-@@ @@
+@@ Line 282 @@
          $reflection = new ReflectionClass($command);
          $signatureProperty = $reflection->getProperty('signature');
          $signatureProperty->setAccessible(true);
@@ -3384,7 +3175,7 @@ Applied rules:
      }
 
      /**
-@@ @@
+@@ Line 301 @@
          $reflection = new ReflectionClass($command);
          $descriptionProperty = $reflection->getProperty('description');
          $descriptionProperty->setAccessible(true);
@@ -3398,7 +3189,7 @@ Applied rules:
      }
 
      /**
-@@ @@
+@@ Line 355 @@
 
          // Assert: Command should report the correct total number of entries
          $this->assertEquals(0, $exitCode);
@@ -3414,10 +3205,10 @@ Applied rules:
  * StringCastAssertStringContainsStringRector
 
 
-69) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Commands/IndexSearchCommandTest.php:4
+68) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Commands/IndexSearchCommandTest.php:4
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 4 @@
 
  namespace Fuzzy\Tests\Unit\Commands;
 
@@ -3425,7 +3216,7 @@ Applied rules:
  use Fuzzy\Commands\IndexSearchCommand;
  use Fuzzy\Models\FuzzyIndex;
  use Fuzzy\Tests\Fixtures\NoneUser;
-@@ @@
+@@ Line 12 @@
  use Fuzzy\Tests\Fixtures\User;
  use Fuzzy\Tests\TestCase;
  use Illuminate\Support\Facades\Artisan;
@@ -3433,7 +3224,7 @@ Applied rules:
  use ReflectionClass;
 
  /**
-@@ @@
+@@ Line 61 @@
      public function test_incremental_indexing_does_not_clear_existing_indexes(): void
      {
          // Arrange: Create initial user and index it
@@ -3442,7 +3233,7 @@ Applied rules:
          Artisan::call('fuzzy:index');
 
          $initialCount = FuzzyIndex::count();
-@@ @@
+@@ Line 120 @@
      public function test_incremental_indexing_for_specific_model_does_not_clear(): void
      {
          // Arrange: Create user and index it
@@ -3451,7 +3242,7 @@ Applied rules:
          Artisan::call('fuzzy:index', ['model' => User::class]);
 
          $initialCount = FuzzyIndex::where('indexable_type', User::class)->count();
-@@ @@
+@@ Line 149 @@
      {
          // Arrange: Create user and product, index both
          $user = User::create(['name' => 'User Name', 'email' => 'user@example.com', 'type' => 'user']);
@@ -3460,7 +3251,7 @@ Applied rules:
          Artisan::call('fuzzy:index');
 
          // Modify user
-@@ @@
+@@ Line 187 @@
      public function test_incremental_indexing_adds_new_records_only(): void
      {
          // Arrange: Create and index initial user
@@ -3469,7 +3260,7 @@ Applied rules:
          Artisan::call('fuzzy:index', ['model' => User::class]);
 
          $initialCount = FuzzyIndex::where('indexable_type', User::class)->count();
-@@ @@
+@@ Line 194 @@
          $this->assertEquals(2, $initialCount);
 
          // Create a second user
@@ -3483,7 +3274,7 @@ Applied rules:
 
          // Assert: Only the new user should be indexed (no reindex of existing)
          $this->assertEquals(0, $exitCode);
-@@ @@
+@@ Line 234 @@
          // Arrange: Create test data without auto-indexing
          FuzzyIndex::query()->truncate();
 
@@ -3497,7 +3288,7 @@ Applied rules:
              return Product::create(['name' => 'Product One', 'description' => 'Test', 'price' => 100]);
          });
 
-@@ @@
+@@ Line 269 @@
      public function test_index_command_with_custom_chunk_size(): void
      {
          // Arrange: Create 150 users to test chunking
@@ -3508,7 +3299,7 @@ Applied rules:
          }
 
          // Act: Index with chunk size of 50 (should process in 3 batches)
-@@ @@
+@@ Line 335 @@
      public function test_index_command_displays_statistics_correctly(): void
      {
          // Arrange: Create 5 indexable users
@@ -3519,7 +3310,7 @@ Applied rules:
          }
 
          // Act: Index the User model
-@@ @@
+@@ Line 358 @@
          FuzzyIndex::query()->truncate();
 
          // Create indexable users (type='user')
@@ -3537,7 +3328,7 @@ Applied rules:
          }
 
          // Act: Index the User model
-@@ @@
+@@ Line 398 @@
          $this->assertStringContainsString('No records found', $output);
 
          // Check that the total entries is 0
@@ -3546,7 +3337,7 @@ Applied rules:
          $this->assertEquals(0, $stats['total_entries']);
      }
 
-@@ @@
+@@ Line 431 @@
          $reflection = new ReflectionClass($command);
          $signatureProperty = $reflection->getProperty('signature');
          $signatureProperty->setAccessible(true);
@@ -3565,7 +3356,7 @@ Applied rules:
      }
 
      /**
-@@ @@
+@@ Line 452 @@
          $reflection = new ReflectionClass($command);
          $descriptionProperty = $reflection->getProperty('description');
          $descriptionProperty->setAccessible(true);
@@ -3579,7 +3370,7 @@ Applied rules:
      }
 
      /**
-@@ @@
+@@ Line 508 @@
      public function test_index_command_uses_auto_discovery(): void
      {
          // Arrange: Create test data
@@ -3588,7 +3379,7 @@ Applied rules:
 
          // Act: Execute index command (no configuration, uses auto-discovery)
          $exitCode = Artisan::call('fuzzy:index');
-@@ @@
+@@ Line 634 @@
      public function test_index_command_ignores_indexation_level(): void
      {
          // Arrange: Create a model with NONE indexation level (no auto-indexing)
@@ -3597,7 +3388,7 @@ Applied rules:
              'name' => 'None User',
              'email' => 'none@example.com',
              'type' => 'user',
-@@ @@
+@@ Line 641 @@
          ]);
 
          // Verify no auto-indexing occurred on create (NONE level respects events)
@@ -3606,7 +3397,7 @@ Applied rules:
          $this->assertArrayNotHasKey(NoneUser::class, $statsBefore['models']);
 
          // Act: Run the index command (manual indexing)
-@@ @@
+@@ Line 651 @@
          // because the command uses direct manual calls, not events
          $this->assertEquals(0, $exitCode);
 
@@ -3625,10 +3416,10 @@ Applied rules:
  * StringCastAssertStringContainsStringRector
 
 
-70) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Commands/StatsIndexCommandTest.php:103
+69) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Commands/StatsIndexCommandTest.php:103
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 103 @@
 
          // Assert: Total entries should match the database count
          $this->assertEquals(0, $exitCode);
@@ -3637,7 +3428,7 @@ Applied rules:
      }
 
      /**
-@@ @@
+@@ Line 198 @@
      public function test_stats_command_with_multiple_entries_per_field(): void
      {
          // Arrange: Create 5 users with searchable fields
@@ -3650,7 +3441,7 @@ Applied rules:
          Artisan::call('fuzzy:index');
 
          // Act: Execute stats command
-@@ @@
+@@ Line 246 @@
          $reflection = new ReflectionClass($command);
          $signatureProperty = $reflection->getProperty('signature');
          $signatureProperty->setAccessible(true);
@@ -3658,7 +3449,7 @@ Applied rules:
          $signature = $signatureProperty->getValue($command);
 
          // Assert: Signature should be 'fuzzy:stats'
-@@ @@
+@@ Line 264 @@
          $reflection = new ReflectionClass($command);
          $descriptionProperty = $reflection->getProperty('description');
          $descriptionProperty->setAccessible(true);
@@ -3672,7 +3463,7 @@ Applied rules:
      }
 
      /**
-@@ @@
+@@ Line 337 @@
      public function test_stats_command_with_large_number_of_models(): void
      {
          // Arrange: Create 50 users (50 × 2 fields = 100 index entries)
@@ -3695,10 +3486,10 @@ Applied rules:
  * StringCastAssertStringContainsStringRector
 
 
-71) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/FuzzySearchServiceProviderTest.php:4
+70) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/FuzzySearchServiceProviderTest.php:4
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 4 @@
 
  namespace Fuzzy\Tests\Unit;
 
@@ -3716,7 +3507,7 @@ Applied rules:
  use Fuzzy\FuzzySearchServiceProvider;
  use Fuzzy\Services\FuzzySearchService;
  use Fuzzy\Tests\TestCase;
-@@ @@
+@@ Line 58 @@
          $providedServices = $this->provider->provides();
 
          $expectedServices = [
@@ -3743,7 +3534,7 @@ Applied rules:
              FuzzySearchService::class,
              'laravel-fuzzy.search',
          ];
-@@ @@
+@@ Line 133 @@
          $this->provider->register();
 
          // Assert: Custom values should be preserved (not overwritten by defaults)
@@ -3752,7 +3543,7 @@ Applied rules:
          $this->assertEquals(100, config('fuzzy.default_options.max_results'));
          $this->assertFalse(config('fuzzy.default_options.fuzzy'));
          $this->assertFalse(config('fuzzy.cache.enabled'));
-@@ @@
+@@ Line 165 @@
          }
 
          try {
@@ -3767,10 +3558,10 @@ Applied rules:
  * AssertEqualsOrAssertSameFloatParameterToSpecificMethodsTypeRector
 
 
-72) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/FuzzySearchServiceTest.php:4
+71) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/FuzzySearchServiceTest.php:4
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 4 @@
 
  namespace Fuzzy\Tests\Unit\Services;
 
@@ -3778,7 +3569,7 @@ Applied rules:
  use Fuzzy\Contracts\CacheManagerInterface;
  use Fuzzy\Contracts\IndexManagerInterface;
  use Fuzzy\Contracts\ModelDiscoveryInterface;
-@@ @@
+@@ Line 25 @@
  final class FuzzySearchServiceTest extends TestCase
  {
      private FuzzySearchService $service;
@@ -3792,7 +3583,7 @@ Applied rules:
      private SearchProcessorInterface&MockInterface $searchProcessor;
 
      protected function setUp(): void
-@@ @@
+@@ Line 93 @@
          $this->cacheManager
              ->shouldReceive('remember')
              ->once()
@@ -3801,7 +3592,7 @@ Applied rules:
                  return $callback();
              });
 
-@@ @@
+@@ Line 114 @@
          // Assert: Verify exact match results
          $this->assertInstanceOf(Collection::class, $results);
          $this->assertGreaterThan(0, $results->count());
@@ -3810,7 +3601,7 @@ Applied rules:
      }
 
      /**
-@@ @@
+@@ Line 133 @@
          $this->cacheManager
              ->shouldReceive('remember')
              ->once()
@@ -3819,7 +3610,7 @@ Applied rules:
                  return $callback();
              });
 
-@@ @@
+@@ Line 210 @@
          $this->cacheManager
              ->shouldReceive('remember')
              ->once()
@@ -3828,7 +3619,7 @@ Applied rules:
                  return $callback();
              });
 
-@@ @@
+@@ Line 253 @@
          $this->cacheManager
              ->shouldReceive('remember')
              ->once()
@@ -3837,7 +3628,7 @@ Applied rules:
                  return $callback();
              });
 
-@@ @@
+@@ Line 291 @@
          $this->cacheManager
              ->shouldReceive('remember')
              ->once()
@@ -3846,7 +3637,7 @@ Applied rules:
                  return $callback();
              });
 
-@@ @@
+@@ Line 428 @@
      public function test_index_model_via_index_manager(): void
      {
          // Arrange: Create mock model and expect index call
@@ -3855,7 +3646,7 @@ Applied rules:
 
          $this->indexManager
              ->shouldReceive('indexModel')
-@@ @@
+@@ Line 448 @@
      public function test_remove_model_via_index_manager(): void
      {
          // Arrange: Create mock model and expect removal call
@@ -3864,7 +3655,7 @@ Applied rules:
 
          $this->indexManager
              ->shouldReceive('removeModel')
-@@ @@
+@@ Line 468 @@
      public function test_update_model_index_via_index_manager(): void
      {
          // Arrange: Create mock model and expect update call
@@ -3873,7 +3664,7 @@ Applied rules:
 
          $this->indexManager
              ->shouldReceive('updateModelIndex')
-@@ @@
+@@ Line 536 @@
          $stats = $this->service->getIndexManager()->getStats();
 
          // Assert: Verify statistics are returned correctly
@@ -3882,7 +3673,7 @@ Applied rules:
      }
 
      /**
-@@ @@
+@@ Line 558 @@
          $stats = $this->service->getIndexManager()->getPreciseModelStats($modelClass);
 
          // Assert: Verify model statistics are returned correctly
@@ -3891,7 +3682,7 @@ Applied rules:
      }
 
      /**
-@@ @@
+@@ Line 632 @@
          $models = $this->service->getModelDiscovery()->getSearchableModels();
 
          // Assert: Verify searchable models are returned correctly
@@ -3908,10 +3699,10 @@ Applied rules:
  * AssertEqualsToSameRector
 
 
-73) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Models/FuzzyIndexTest.php:350
+72) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Models/FuzzyIndexTest.php:350
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 350 @@
       * Helper method to create a FuzzyIndex entry with given data.
       *
       * @param array<string, mixed> $data
@@ -3925,10 +3716,10 @@ Applied rules:
  * RemoveUselessReturnTagRector
 
 
-74) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Repositories/IndexRepositoryTest.php:4
+73) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Repositories/IndexRepositoryTest.php:4
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 4 @@
 
  namespace Fuzzy\Tests\Unit\Repositories;
 
@@ -3936,7 +3727,7 @@ Applied rules:
  use Fuzzy\Data\SearchOptionsData;
  use Fuzzy\Models\FuzzyIndex;
  use Fuzzy\Repositories\IndexRepository;
-@@ @@
+@@ Line 15 @@
  use Fuzzy\Tests\Fixtures\Product;
  use Fuzzy\Tests\Fixtures\User;
  use Fuzzy\Tests\TestCase;
@@ -3944,7 +3735,7 @@ Applied rules:
  use Fuzzy\ValueObjects\SearchQuery;
  use Illuminate\Support\Collection;
 
-@@ @@
+@@ Line 36 @@
          $this->repository = new IndexRepository();
      }
 
@@ -3955,7 +3746,7 @@ Applied rules:
      public function test_returns_empty_index_data_for_model_with_empty_database(): void
      {
          // Arrange : Prepare repository with empty database
-@@ @@
+@@ Line 57 @@
          $this->assertEmpty($data['modelIndex']);
      }
 
@@ -3966,7 +3757,7 @@ Applied rules:
      public function test_returns_index_data_for_model_with_existing_data(): void
      {
          // Arrange : Create a user and its index entries
-@@ @@
+@@ Line 99 @@
          $this->assertArrayHasKey($userKey, $data['modelIndex']);
      }
 
@@ -3977,7 +3768,7 @@ Applied rules:
      public function test_filters_index_data_by_specific_model_ids(): void
      {
          // Arrange : Create two users with index entries
-@@ @@
+@@ Line 135 @@
          $this->assertArrayNotHasKey($user2Key, $data['itemMap']);
      }
 
@@ -3988,7 +3779,7 @@ Applied rules:
      public function test_skips_short_words_when_building_index(): void
      {
          // Arrange : Create a user with short words in name field
-@@ @@
+@@ Line 174 @@
          $this->assertArrayHasKey('ef', $data['wordIndex']);
      }
 
@@ -3999,7 +3790,7 @@ Applied rules:
      public function test_returns_empty_collection_for_empty_ids_batch(): void
      {
          // Arrange : Prepare repository with empty ID list
-@@ @@
+@@ Line 189 @@
          $this->assertTrue($models->isEmpty());
      }
 
@@ -4010,7 +3801,7 @@ Applied rules:
      public function test_returns_specific_models_for_given_ids_batch(): void
      {
          // Arrange : Create three users in database
-@@ @@
+@@ Line 207 @@
          $this->assertEquals([$user1->id, $user2->id], $models->pluck('id')->sort()->values()->toArray());
      }
 
@@ -4021,7 +3812,7 @@ Applied rules:
      public function test_preloads_models_into_context_cache(): void
      {
          // Arrange : Create two users with index entries and prepare search context
-@@ @@
+@@ Line 251 @@
          $this->assertInstanceOf(User::class, $modelsMap[$user2Key]);
      }
 
@@ -4032,7 +3823,7 @@ Applied rules:
      public function test_handles_preload_with_empty_search_context(): void
      {
          // Arrange : Create search context with empty index data
-@@ @@
+@@ Line 267 @@
          $this->assertEmpty($modelsMap);
      }
 
@@ -4043,7 +3834,7 @@ Applied rules:
      public function test_returns_empty_statistics_with_no_data(): void
      {
          // Arrange : Prepare empty database
-@@ @@
+@@ Line 282 @@
          $this->assertEmpty($stats['models']);
      }
 
@@ -4054,7 +3845,7 @@ Applied rules:
      public function test_returns_statistics_with_indexed_data(): void
      {
          // Arrange : Create users and products with multiple index entries
-@@ @@
+@@ Line 338 @@
 
      /**
       * Helper method to create index entries for user fields.
@@ -4062,7 +3853,7 @@ Applied rules:
       */
      private function createIndexEntryForUserField(int $userId, string $field, string $originalValue, string $normalizedValue, array $words): void
      {
-@@ @@
+@@ Line 363 @@
 
      /**
       * Helper method to create index entries for product fields.
@@ -4070,7 +3861,7 @@ Applied rules:
       */
      private function createIndexEntryForProductField(int $productId, string $field, string $originalValue, string $normalizedValue, array $words): void
      {
-@@ @@
+@@ Line 383 @@
 
      /**
       * Helper method to create a search context for testing.
@@ -4085,10 +3876,10 @@ Applied rules:
  * ClassMethodArrayDocblockParamFromLocalCallsRector
 
 
-75) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/AdvancedScoringCalculatorTest.php:27
+74) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/AdvancedScoringCalculatorTest.php:27
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 27 @@
  final class AdvancedScoringCalculatorTest extends TestCase
  {
      private AdvancedScoringCalculator $calculator;
@@ -4096,16 +3887,68 @@ Applied rules:
      private SearchContext $context;
 
      protected function setUp(): void
+@@ Line 46 @@
+             options: $options,
+             normalizer: $normalizer,
+             similarityCalculator: $similarityCalculator,
+-            indexBuilder: $this->createMock(IndexBuilder::class),
+-            indexRepository: $this->createMock(IndexRepositoryInterface::class),
+-            scoringEngine: $this->createMock(ScoringEngine::class),
++            indexBuilder: $this->createStub(IndexBuilder::class),
++            indexRepository: $this->createStub(IndexRepositoryInterface::class),
++            scoringEngine: $this->createStub(ScoringEngine::class),
+             indexDataArray: []
+         );
+     }
+@@ Line 193 @@
+             options: new SearchOptionsData(),
+             normalizer: $normalizer,
+             similarityCalculator: new SimilarityCalculator(),
+-            indexBuilder: $this->createMock(IndexBuilder::class),
+-            indexRepository: $this->createMock(IndexRepositoryInterface::class),
+-            scoringEngine: $this->createMock(ScoringEngine::class),
++            indexBuilder: $this->createStub(IndexBuilder::class),
++            indexRepository: $this->createStub(IndexRepositoryInterface::class),
++            scoringEngine: $this->createStub(ScoringEngine::class),
+             indexDataArray: []
+         );
+
+@@ Line 228 @@
+             options: new SearchOptionsData(),
+             normalizer: $normalizer,
+             similarityCalculator: new SimilarityCalculator(),
+-            indexBuilder: $this->createMock(IndexBuilder::class),
+-            indexRepository: $this->createMock(IndexRepositoryInterface::class),
+-            scoringEngine: $this->createMock(ScoringEngine::class),
++            indexBuilder: $this->createStub(IndexBuilder::class),
++            indexRepository: $this->createStub(IndexRepositoryInterface::class),
++            scoringEngine: $this->createStub(ScoringEngine::class),
+             indexDataArray: []
+         );
+
+@@ Line 263 @@
+             options: new SearchOptionsData(),
+             normalizer: $normalizer,
+             similarityCalculator: new SimilarityCalculator(),
+-            indexBuilder: $this->createMock(IndexBuilder::class),
+-            indexRepository: $this->createMock(IndexRepositoryInterface::class),
+-            scoringEngine: $this->createMock(ScoringEngine::class),
++            indexBuilder: $this->createStub(IndexBuilder::class),
++            indexRepository: $this->createStub(IndexRepositoryInterface::class),
++            scoringEngine: $this->createStub(ScoringEngine::class),
+             indexDataArray: []
+         );
     ----------- end diff -----------
 
 Applied rules:
  * NewlineBetweenClassLikeStmtsRector
+ * CreateStubOverCreateMockArgRector
 
 
-76) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/Algorithms/WordSimilarity/LetterDistanceCalculatorTest.php:21
+75) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/Algorithms/WordSimilarity/LetterDistanceCalculatorTest.php:21
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 21 @@
      public function test_calculate_letter_distance_identical_strings(): void
      {
          $distance = $this->calculator->calculateLetterDistance('hello', 'hello');
@@ -4114,7 +3957,7 @@ Applied rules:
      }
 
      public function test_calculate_letter_distance_similar_strings(): void
-@@ @@
+@@ Line 73 @@
          $distanceSame = $this->calculator->calculateLetterDistance('a', 'a');
          $distanceDiff = $this->calculator->calculateLetterDistance('a', 'b');
 
@@ -4123,7 +3966,7 @@ Applied rules:
          $this->assertGreaterThan(0, $distanceDiff);
      }
 
-@@ @@
+@@ Line 99 @@
      public function test_calculate_letter_distance_with_single_character_matching(): void
      {
          $distance = $this->calculator->calculateLetterDistance('a', 'a');
@@ -4139,7 +3982,7 @@ Applied rules:
 
          $distance2 = $this->calculator->calculateLetterDistance('abc', '');
          $this->assertGreaterThan(0, $distance2);
-@@ @@
+@@ Line 120 @@
      public function test_calculate_letter_distance_with_numbers(): void
      {
          $distance = $this->calculator->calculateLetterDistance('123', '123');
@@ -4154,10 +3997,10 @@ Applied rules:
  * AssertEqualsToSameRector
 
 
-77) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/Algorithms/WordSimilarity/WordSimilarityCalculatorTest.php:21
+76) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/Algorithms/WordSimilarity/WordSimilarityCalculatorTest.php:21
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 21 @@
      public function test_calculate_word_similarity_exact_match(): void
      {
          $score = $this->calculator->calculateWordSimilarity('hello', 'hello');
@@ -4166,7 +4009,7 @@ Applied rules:
      }
 
      public function test_calculate_word_similarity_contained_word(): void
-@@ @@
+@@ Line 45 @@
      public function test_calculate_word_real_similarity_identical_letters(): void
      {
          $similarity = $this->calculator->calculateWordRealSimilarity('abc', 'abc');
@@ -4189,7 +4032,7 @@ Applied rules:
      }
 
      public function test_calculate_word_similarity_with_phonetic_similarity(): void
-@@ @@
+@@ Line 77 @@
      {
          $similarity = $this->calculator->calculateWordRealSimilarity('AbC', 'aBc');
          // Après normalisation, les deux deviennent 'abc' -> similarité parfaite
@@ -4212,7 +4055,7 @@ Applied rules:
 
          $score2 = $this->calculator->calculateWordSimilarity('hello', '');
          $this->assertGreaterThan(FUZZY_DISTANCE_IDENTICAL, $score2);
-@@ @@
+@@ Line 98 @@
      public function test_calculate_word_similarity_single_letter(): void
      {
          $score = $this->calculator->calculateWordSimilarity('a', 'a');
@@ -4228,10 +4071,10 @@ Applied rules:
  * AssertEqualsToSameRector
 
 
-78) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/CacheManagerServiceTest.php:5
+77) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/CacheManagerServiceTest.php:5
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 5 @@
  namespace Fuzzy\Tests\Unit\Services;
 
  use Fuzzy\Cache\LaravelCacheStore;
@@ -4239,7 +4082,7 @@ Applied rules:
  use Fuzzy\Services\CacheManagerService;
  use Fuzzy\Tests\Fixtures\Product;
  use Fuzzy\Tests\Fixtures\User;
-@@ @@
+@@ Line 15 @@
  final class CacheManagerServiceTest extends TestCase
  {
      private CacheManagerService $cacheManager;
@@ -4247,7 +4090,7 @@ Applied rules:
      private LaravelCacheStore $cacheStore;
 
      protected function setUp(): void
-@@ @@
+@@ Line 62 @@
          $this->cacheManager = new CacheManagerService($this->cacheStore);
 
          $executed = false;
@@ -4256,7 +4099,7 @@ Applied rules:
              $executed = true;
              return 'callback_result';
          }, []);
-@@ @@
+@@ Line 78 @@
 
          $callbackExecutions = 0;
 
@@ -4279,7 +4122,7 @@ Applied rules:
          $this->assertEquals('cached_value', $result1);
          $this->assertEquals('cached_value', $result2);
      }
-@@ @@
+@@ Line 100 @@
 
          $callbackExecutions = 0;
 
@@ -4302,7 +4145,7 @@ Applied rules:
      }
 
      public function test_invalidate_all_clears_cache(): void
-@@ @@
+@@ Line 118 @@
          config(['fuzzy.cache.enabled' => true]);
          $this->cacheManager = new CacheManagerService($this->cacheStore);
 
@@ -4316,7 +4159,7 @@ Applied rules:
              $callbackExecuted = true;
              return 'new_value';
          }, []);
-@@ @@
+@@ Line 139 @@
          $userParams = [User::class, 'john', []];
          $productParams = [Product::class, 'laptop', []];
 
@@ -4327,7 +4170,7 @@ Applied rules:
 
          // Invalider uniquement le cache User
          $this->cacheManager->invalidateForModel(User::class);
-@@ @@
+@@ Line 149 @@
          $userCallbackExecuted = false;
          $productCallbackExecuted = false;
 
@@ -4342,7 +4185,7 @@ Applied rules:
              $productCallbackExecuted = false;
              return 'product_result';
          }, $productParams);
-@@ @@
+@@ Line 195 @@
          $longString = str_repeat('a', 300);
          $params = [$longString];
 
@@ -4351,7 +4194,7 @@ Applied rules:
 
          // Devrait retourner la valeur, pas la clé
          $this->assertEquals('value', $result);
-@@ @@
+@@ Line 208 @@
 
          // First call should execute callback
          $executed = false;
@@ -4360,7 +4203,7 @@ Applied rules:
              $executed = true;
              return 'stats_value';
          }, []);
-@@ @@
+@@ Line 218 @@
 
          // Second call should use cache
          $executed = false;
@@ -4369,7 +4212,7 @@ Applied rules:
              $executed = true;
              return 'stats_value';
          }, []);
-@@ @@
+@@ Line 231 @@
 
          // Third call should execute callback again
          $executed = false;
@@ -4378,7 +4221,7 @@ Applied rules:
              $executed = true;
              return 'new_stats_value';
          }, []);
-@@ @@
+@@ Line 238 @@
 
          $this->assertTrue($executed);
          $this->assertEquals('new_stats_value', $result3);
@@ -4401,10 +4244,10 @@ Applied rules:
  * ClosureReturnTypeRector
 
 
-79) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/IndexBuilderTest.php:4
+78) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/IndexBuilderTest.php:4
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 4 @@
 
  namespace Fuzzy\Tests\Unit\Services;
 
@@ -4413,7 +4256,7 @@ Applied rules:
  use Fuzzy\Models\FuzzyIndex;
  use Fuzzy\Services\IndexBuilder;
  use Fuzzy\Services\StringNormalizer;
-@@ @@
+@@ Line 15 @@
 
  /**
   * Test suite for the IndexBuilder service.
@@ -4424,7 +4267,7 @@ Applied rules:
  final class IndexBuilderTest extends TestCase
  {
      private IndexBuilder $builder;
-@@ @@
+@@ Line 245 @@
      public function test_update_or_create_existing_entry(): void
      {
          $modelType = User::class;
@@ -4441,10 +4284,10 @@ Applied rules:
  * CoversAnnotationWithValueToAttributeRector
 
 
-80) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/IndexManagerServiceTest.php:32
+79) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/IndexManagerServiceTest.php:32
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 32 @@
      use RefreshDatabase;
 
      private IndexManagerService $indexManager;
@@ -4454,7 +4297,7 @@ Applied rules:
 
      protected function setUp(): void
      {
-@@ @@
+@@ Line 41 @@
          parent::setUp();
 
          // Arrange: Use real implementations from the container
@@ -4475,7 +4318,7 @@ Applied rules:
          );
      }
 
-@@ @@
+@@ Line 287 @@
          // Arrange: Create and index multiple models
          $user1 = User::create(['name' => 'John Doe', 'email' => 'john@example.com', 'type' => 'user']);
          $user2 = User::create(['name' => 'Jane Doe', 'email' => 'jane@example.com', 'type' => 'user']);
@@ -4484,7 +4327,7 @@ Applied rules:
              'name' => 'Admin User',
              'email' => 'admin@example.com',
              'type' => 'admin',
-@@ @@
+@@ Line 366 @@
      public function test_reindex_model_validates_each_model_before_indexing(): void
      {
          // Arrange: Create valid searchable models
@@ -4495,7 +4338,7 @@ Applied rules:
 
          // Act: Reindex all users
          $this->indexManager->reindexModel(User::class);
-@@ @@
+@@ Line 657 @@
      {
          // Assert: NONE returns empty array
          $events = IndexationLevel::NONE->toEventsArray();
@@ -4504,7 +4347,7 @@ Applied rules:
          $this->assertFalse(IndexationLevel::NONE->hasEvent('create'));
          $this->assertFalse(IndexationLevel::NONE->hasEvent('update'));
          $this->assertFalse(IndexationLevel::NONE->hasEvent('delete'));
-@@ @@
+@@ Line 664 @@
 
          // Assert: CREATE_ONLY returns only create event
          $events = IndexationLevel::CREATE_ONLY->toEventsArray();
@@ -4513,7 +4356,7 @@ Applied rules:
          $this->assertTrue(IndexationLevel::CREATE_ONLY->hasEvent('create'));
          $this->assertFalse(IndexationLevel::CREATE_ONLY->hasEvent('update'));
          $this->assertFalse(IndexationLevel::CREATE_ONLY->hasEvent('delete'));
-@@ @@
+@@ Line 671 @@
 
          // Assert: ALL returns all three events
          $events = IndexationLevel::ALL->toEventsArray();
@@ -4522,7 +4365,7 @@ Applied rules:
          $this->assertTrue(IndexationLevel::ALL->hasEvent('create'));
          $this->assertTrue(IndexationLevel::ALL->hasEvent('update'));
          $this->assertTrue(IndexationLevel::ALL->hasEvent('delete'));
-@@ @@
+@@ Line 678 @@
 
          // Assert: CREATE_AND_UPDATE returns create and update
          $events = IndexationLevel::CREATE_AND_UPDATE->toEventsArray();
@@ -4531,7 +4374,7 @@ Applied rules:
          $this->assertTrue(IndexationLevel::CREATE_AND_UPDATE->hasEvent('create'));
          $this->assertTrue(IndexationLevel::CREATE_AND_UPDATE->hasEvent('update'));
          $this->assertFalse(IndexationLevel::CREATE_AND_UPDATE->hasEvent('delete'));
-@@ @@
+@@ Line 685 @@
 
          // Assert: UPDATE_AND_DELETE returns update and delete
          $events = IndexationLevel::UPDATE_AND_DELETE->toEventsArray();
@@ -4545,7 +4388,7 @@ Applied rules:
      }
 
      /**
-@@ @@
+@@ Line 785 @@
          // Manual update should also work
          $user->name = 'Updated Manual';
          $user->save();
@@ -4567,10 +4410,10 @@ Applied rules:
  * AssertEqualsToSameRector
 
 
-81) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/ModelDiscoveryServiceTest.php:4
+80) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/ModelDiscoveryServiceTest.php:4
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 4 @@
 
  namespace Fuzzy\Tests\Unit\Services;
 
@@ -4583,10 +4426,10 @@ Applied rules:
 Applied rules:
 
 
-82) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/PipelineManagerServiceTest.php:4
+81) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/PipelineManagerServiceTest.php:4
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 4 @@
 
  namespace Fuzzy\Tests\Unit\Services;
 
@@ -4595,7 +4438,7 @@ Applied rules:
  use Fuzzy\Contracts\SearchContextInterface;
  use Fuzzy\Contracts\StageInterface;
  use Fuzzy\Services\PipelineManagerService;
-@@ @@
+@@ Line 17 @@
  final class PipelineManagerServiceTest extends TestCase
  {
      private PipelineManagerService $pipelineManager;
@@ -4605,7 +4448,7 @@ Applied rules:
 
      protected function setUp(): void
      {
-@@ @@
+@@ Line 33 @@
          $stage2 = Mockery::mock(StageInterface::class);
          $stage2->shouldReceive('getPriority')->andReturn(60);
 
@@ -4619,7 +4462,7 @@ Applied rules:
          );
      }
 
-@@ @@
+@@ Line 65 @@
 
          $invalidStages = [
              Mockery::mock(StageInterface::class)->shouldReceive('getPriority')->andReturn(50)->getMock(),
@@ -4628,7 +4471,7 @@ Applied rules:
          ];
 
          new PipelineManagerService($this->pipeline, $invalidStages);
-@@ @@
+@@ Line 92 @@
 
          $results = $this->pipelineManager->process($context);
 
@@ -4637,14 +4480,11 @@ Applied rules:
      }
 
      public function test_process_returns_empty_array_when_pipeline_returns_empty(): void
-@@ @@
+@@ Line 121 @@
              {
                  return null;
              }
 +
-+            /**
-+             * @return array{}
-+             */
              public function getAllModelIds(): array
              {
                  return [];
@@ -4655,9 +4495,6 @@ Applied rules:
                  return false;
              }
 +
-+            /**
-+             * @return array{}
-+             */
              public function getQueryWords(): array
              {
                  return [];
@@ -4668,33 +4505,21 @@ Applied rules:
                  return '';
              }
 +
-+            /**
-+             * @return array{}
-+             */
              public function getWordIndex(): array
              {
                  return [];
              }
 +
-+            /**
-+             * @return array{}
-+             */
              public function getItemMap(): array
              {
                  return [];
              }
 +
-+            /**
-+             * @return array{}
-+             */
              public function getModelIndex(): array
              {
                  return [];
              }
 +
-+            /**
-+             * @return array{}
-+             */
              public function getIndexEntriesForModel(string $modelType, string $modelId): array
              {
                  return [];
@@ -4707,17 +4532,11 @@ Applied rules:
 +
              public function addPotentialMatch(array $match): void {}
 +
-+            /**
-+             * @return array{}
-+             */
              public function getPotentialMatchesForModel(string $key): array
              {
                  return [];
              }
 +
-+            /**
-+             * @return array{}
-+             */
              public function getAllPotentialMatches(): array
              {
                  return [];
@@ -4726,7 +4545,7 @@ Applied rules:
              public function hasPotentialMatches(string $key): bool
              {
                  return false;
-@@ @@
+@@ Line 208 @@
          $service->process($mockContext);
 
          // Verify the execution order was set by our mock
@@ -4735,7 +4554,7 @@ Applied rules:
      }
 
      public function test_process_passes_context_through_pipeline(): void
-@@ @@
+@@ Line 215 @@
      {
          // Use a simple anonymous class instead of Mockery for context
          $mockContext = new class implements SearchContextInterface {
@@ -4745,14 +4564,11 @@ Applied rules:
              public array $results = ['final_result'];
 
              public function getModelInstance(string $key): ?object
-@@ @@
+@@ Line 221 @@
              {
                  return null;
              }
 +
-+            /**
-+             * @return array{}
-+             */
              public function getAllModelIds(): array
              {
                  return [];
@@ -4763,9 +4579,6 @@ Applied rules:
                  return false;
              }
 +
-+            /**
-+             * @return array{}
-+             */
              public function getQueryWords(): array
              {
                  return [];
@@ -4776,33 +4589,21 @@ Applied rules:
                  return '';
              }
 +
-+            /**
-+             * @return array{}
-+             */
              public function getWordIndex(): array
              {
                  return [];
              }
 +
-+            /**
-+             * @return array{}
-+             */
              public function getItemMap(): array
              {
                  return [];
              }
 +
-+            /**
-+             * @return array{}
-+             */
              public function getModelIndex(): array
              {
                  return [];
              }
 +
-+            /**
-+             * @return array{}
-+             */
              public function getIndexEntriesForModel(string $modelType, string $modelId): array
              {
                  return [];
@@ -4815,17 +4616,11 @@ Applied rules:
 +
              public function addPotentialMatch(array $match): void {}
 +
-+            /**
-+             * @return array{}
-+             */
              public function getPotentialMatchesForModel(string $key): array
              {
                  return [];
              }
 +
-+            /**
-+             * @return array{}
-+             */
              public function getAllPotentialMatches(): array
              {
                  return [];
@@ -4834,7 +4629,7 @@ Applied rules:
              public function hasPotentialMatches(string $key): bool
              {
                  return false;
-@@ @@
+@@ Line 280 @@
 
          $results = $this->pipelineManager->process($mockContext);
 
@@ -4843,7 +4638,7 @@ Applied rules:
      }
 
      public function test_process_sorts_stages_by_priority_descending(): void
-@@ @@
+@@ Line 297 @@
          $stages = [$mediumPriorityStage, $lowPriorityStage, $highPriorityStage];
 
          // Create a temporary service to check sorting
@@ -4857,14 +4652,13 @@ Applied rules:
  * NewlineBetweenClassLikeStmtsRector
  * NarrowUnusedSetUpDefinedPropertyRector
  * AssertEqualsToSameRector
- * DocblockReturnArrayFromDirectArrayInstanceRector
  * DocblockVarArrayFromPropertyDefaultsRector
 
 
-83) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/PipelineStageManagerTest.php:4
+82) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/PipelineStageManagerTest.php:4
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 4 @@
 
  namespace Fuzzy\Tests\Unit\Services;
 
@@ -4872,7 +4666,7 @@ Applied rules:
  use Fuzzy\Exceptions\DuplicateStageException;
  use Fuzzy\Services\PipelineStageManager;
  use Fuzzy\Stages\MatchDiscoveryStage;
-@@ @@
+@@ Line 45 @@
              SortAndLimitStage::class,
          ];
 
@@ -4887,10 +4681,10 @@ Applied rules:
  * AssertEqualsToSameRector
 
 
-84) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/ResultFilterServiceTest.php:40
+83) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/ResultFilterServiceTest.php:40
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 40 @@
          $filtered = $this->resultFilter->filterAndSort($results, 0.5);
 
          $this->assertCount(2, $filtered);
@@ -4901,7 +4695,7 @@ Applied rules:
      }
 
      public function test_filter_and_sort_sorts_by_score_descending(): void
-@@ @@
+@@ Line 54 @@
 
          $filtered = $this->resultFilter->filterAndSort($results, 0.0);
 
@@ -4914,7 +4708,7 @@ Applied rules:
      }
 
      public function test_filter_and_sort_removes_null_results(): void
-@@ @@
+@@ Line 92 @@
 
          $filtered = $this->resultFilter->filterAndSort($results, 0.0);
 
@@ -4931,10 +4725,10 @@ Applied rules:
  * AssertEqualsToSameRector
 
 
-85) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/ScoringEngineTest.php:21
+84) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/ScoringEngineTest.php:21
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 21 @@
  final class ScoringEngineTest extends TestCase
  {
      private ScoringEngineInterface $scoringEngine;
@@ -4942,7 +4736,18 @@ Applied rules:
      private SearchContext $searchContext;
 
      protected function setUp(): void
-@@ @@
+@@ Line 65 @@
+             options: $options,
+             normalizer: $normalizer,
+             similarityCalculator: $similarityCalculator,
+-            indexBuilder: $this->createMock(IndexBuilder::class),
+-            indexRepository: $this->createMock(IndexRepositoryInterface::class),
++            indexBuilder: $this->createStub(IndexBuilder::class),
++            indexRepository: $this->createStub(IndexRepositoryInterface::class),
+             scoringEngine: $this->scoringEngine,
+             indexDataArray: []
+         );
+@@ Line 74 @@
 
      /**
       * Creates a test index entry.
@@ -4950,7 +4755,29 @@ Applied rules:
       */
      private function createTestIndexEntry(string $field = 'name'): array
      {
-@@ @@
+@@ Line 193 @@
+             options: new SearchOptionsData(),
+             normalizer: $normalizer,
+             similarityCalculator: new SimilarityCalculator(),
+-            indexBuilder: $this->createMock(IndexBuilder::class),
+-            indexRepository: $this->createMock(IndexRepositoryInterface::class),
++            indexBuilder: $this->createStub(IndexBuilder::class),
++            indexRepository: $this->createStub(IndexRepositoryInterface::class),
+             scoringEngine: $this->scoringEngine,
+             indexDataArray: []
+         );
+@@ Line 242 @@
+             options: new SearchOptionsData(),
+             normalizer: $normalizer,
+             similarityCalculator: new SimilarityCalculator(),
+-            indexBuilder: $this->createMock(IndexBuilder::class),
+-            indexRepository: $this->createMock(IndexRepositoryInterface::class),
++            indexBuilder: $this->createStub(IndexBuilder::class),
++            indexRepository: $this->createStub(IndexRepositoryInterface::class),
+             scoringEngine: $this->scoringEngine,
+             indexDataArray: []
+         );
+@@ Line 312 @@
          // Assert: Should return perfect score
          $this->assertEqualsWithDelta(1.0, $score, PHP_FLOAT_EPSILON);
      }
@@ -4962,13 +4789,14 @@ Applied rules:
 
 Applied rules:
  * NewlineBetweenClassLikeStmtsRector
+ * CreateStubOverCreateMockArgRector
  * DocblockReturnArrayFromDirectArrayInstanceRector
 
 
-86) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/SearchProcessorServiceTest.php:19
+85) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/SearchProcessorServiceTest.php:19
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 19 @@
  final class SearchProcessorServiceTest extends TestCase
  {
      private SearchProcessorService $searchProcessor;
@@ -4984,7 +4812,7 @@ Applied rules:
      private $resultFilter;
 
      protected function setUp(): void
-@@ @@
+@@ Line 33 @@
 
          $this->pipeline = Mockery::mock(Pipeline::class);
          $this->normalizer = Mockery::mock(StringNormalizer::class);
@@ -4996,7 +4824,7 @@ Applied rules:
          $this->modelDiscovery = Mockery::mock(ModelDiscoveryInterface::class);
          $this->resultFilter = Mockery::mock(ResultFilterInterface::class);
 
-@@ @@
+@@ Line 42 @@
          $this->searchProcessor = new SearchProcessorService(
              $this->pipeline,
              $this->normalizer,
@@ -5008,7 +4836,7 @@ Applied rules:
              $this->modelDiscovery,
              $this->resultFilter
          );
-@@ @@
+@@ Line 293 @@
 
          $this->resultFilter->shouldReceive('filterAndSort')
              ->once()
@@ -5026,10 +4854,10 @@ Applied rules:
  * ClosureReturnTypeRector
 
 
-87) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/ServiceRegistrarTest.php:4
+86) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/ServiceRegistrarTest.php:4
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 4 @@
 
  namespace Fuzzy\Tests\Unit\Services;
 
@@ -5039,7 +4867,7 @@ Applied rules:
  use Fuzzy\Cache\LaravelCacheStore;
  use Fuzzy\Commands\ClearCacheCommand;
  use Fuzzy\Commands\ClearIndexCommand;
-@@ @@
+@@ Line 37 @@
  use Fuzzy\Services\SimilarityCalculator;
  use Fuzzy\Services\StringNormalizer;
  use Fuzzy\Tests\TestCase;
@@ -5047,7 +4875,7 @@ Applied rules:
  use Illuminate\Support\ServiceProvider;
 
  /**
-@@ @@
+@@ Line 49 @@
  final class ServiceRegistrarTest extends TestCase
  {
      private ServiceRegistrar $registrar;
@@ -5055,7 +4883,7 @@ Applied rules:
      private ServiceProvider $provider;
 
      protected function setUp(): void
-@@ @@
+@@ Line 62 @@
              provider: $this->provider
          );
 
@@ -5064,7 +4892,7 @@ Applied rules:
      }
 
      protected function tearDown(): void
-@@ @@
+@@ Line 268 @@
          $calculator = $this->app->make(SimilarityCalculator::class);
 
          // Assert: Verify algorithms are registered using reflection
@@ -5076,7 +4904,7 @@ Applied rules:
          $algorithms = $algorithmsProperty->getValue($calculator);
 
          $this->assertCount(3, $algorithms);
-@@ @@
+@@ Line 289 @@
          $calculator = $this->app->make(SimilarityCalculator::class);
 
          // Assert: Verify LCS algorithm config is correctly injected
@@ -5113,7 +4941,7 @@ Applied rules:
          $prefixConfig = $prefixConfigProperty->getValue($algorithms[2]);
          $this->assertInstanceOf(PrefixAlgorithmConfig::class, $prefixConfig);
      }
-@@ @@
+@@ Line 369 @@
      public function test_register_all_handles_custom_pipeline_stages(): void
      {
          // Arrange: Set custom pipeline stages configuration
@@ -5122,7 +4950,7 @@ Applied rules:
 
          // Act: Register all services
          $this->registrar->registerAll();
-@@ @@
+@@ Line 394 @@
 
          try {
              // Act & Assert: Expect exception when helpers file is missing
@@ -5131,7 +4959,7 @@ Applied rules:
              $this->expectExceptionMessage('helpers.php not found at');
 
              $registrar = new ServiceRegistrar(
-@@ @@
+@@ Line 435 @@
          $indexBuilder = $this->app->make(IndexBuilder::class);
 
          // Assert: Verify normalizer dependency is properly injected
@@ -5143,7 +4971,7 @@ Applied rules:
          $normalizer = $property->getValue($indexBuilder);
 
          $this->assertInstanceOf(ContextualNormalizerInterface::class, $normalizer);
-@@ @@
+@@ Line 460 @@
      public function test_multiple_register_calls_are_safe(): void
      {
          // Act: Call registerAll multiple times
@@ -5160,10 +4988,10 @@ Applied rules:
  * AddArrowFunctionReturnTypeRector
 
 
-88) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/StringNormalizerTest.php:158
+87) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/StringNormalizerTest.php:158
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 158 @@
          $this->normalizer->setCurrentField('name');
          $result = $this->normalizer->normalizeQuery($input);
 
@@ -5172,7 +5000,7 @@ Applied rules:
 
          $this->normalizer->setCurrentField(null);
          $this->normalizer->setProtectedFields([]);
-@@ @@
+@@ Line 179 @@
          $result = $this->normalizer->normalizeQuery($input);
 
          // 'the', 'and', 'are', 'in' sont supprimés, reste 'cat dog house'
@@ -5181,7 +5009,7 @@ Applied rules:
 
          $this->normalizer->setCurrentField(null);
          $this->normalizer->setProtectedFields([]);
-@@ @@
+@@ Line 196 @@
 
          // Champ protégé : les stop words sont conservés
          $resultProtected = $this->normalizer->normalizeForField($value, 'full_name');
@@ -5195,7 +5023,7 @@ Applied rules:
 
          $this->normalizer->setProtectedFields([]);
      }
-@@ @@
+@@ Line 227 @@
          $email = 'john.doe+test@example.com';
          $result = $this->normalizer->normalize($email);
          // Les caractères spéciaux sont supprimés par normalize()
@@ -5204,7 +5032,7 @@ Applied rules:
      }
 
      public function test_name_with_multiple_stop_words(): void
-@@ @@
+@@ Line 238 @@
          $this->normalizer->setCurrentField('name');
          $result = $this->normalizer->normalizeQuery($name);
 
@@ -5213,7 +5041,7 @@ Applied rules:
 
          $this->normalizer->setCurrentField(null);
          $this->normalizer->setProtectedFields([]);
-@@ @@
+@@ Line 269 @@
      {
          $protectedFields = ['name', 'email', 'username'];
          $this->normalizer->setProtectedFields($protectedFields);
@@ -5228,10 +5056,10 @@ Applied rules:
  * AssertEqualsToSameRector
 
 
-89) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/WordSimilarityComparatorTest.php:14
+88) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Services/WordSimilarityComparatorTest.php:14
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 14 @@
  final class WordSimilarityComparatorTest extends TestCase
  {
      private WordSimilarityComparator $comparator;
@@ -5239,7 +5067,7 @@ Applied rules:
 
      /**
       * Set up test dependencies.
-@@ @@
+@@ Line 22 @@
      protected function setUp(): void
      {
          parent::setUp();
@@ -5251,7 +5079,7 @@ Applied rules:
          );
      }
 
-@@ @@
+@@ Line 46 @@
                  $expectedScore,
                  $score,
                  0.01,
@@ -5260,7 +5088,7 @@ Applied rules:
              );
          }
      }
-@@ @@
+@@ Line 70 @@
              $this->assertLessThanOrEqual(
                  $maxScore,
                  $score,
@@ -5275,7 +5103,7 @@ Applied rules:
              );
          }
      }
-@@ @@
+@@ Line 98 @@
              $this->assertLessThanOrEqual(
                  $maxScore,
                  $score,
@@ -5290,7 +5118,7 @@ Applied rules:
              );
          }
      }
-@@ @@
+@@ Line 125 @@
              $this->assertLessThanOrEqual(
                  $maxScore,
                  $score,
@@ -5305,7 +5133,7 @@ Applied rules:
              );
          }
      }
-@@ @@
+@@ Line 153 @@
              $this->assertGreaterThanOrEqual(
                  $expectedMinPenalty,
                  $score,
@@ -5314,7 +5142,7 @@ Applied rules:
              );
          }
      }
-@@ @@
+@@ Line 173 @@
          $this->assertGreaterThan(
              $scoreSigma1,
              $scoreSigma2,
@@ -5329,7 +5157,7 @@ Applied rules:
          );
      }
 
-@@ @@
+@@ Line 262 @@
              $this->assertLessThanOrEqual(
                  $maxScore,
                  $score,
@@ -5338,7 +5166,7 @@ Applied rules:
              );
          }
      }
-@@ @@
+@@ Line 307 @@
                  0.0,
                  $score,
                  0.01,
@@ -5347,7 +5175,7 @@ Applied rules:
              );
          }
      }
-@@ @@
+@@ Line 330 @@
              $this->assertLessThanOrEqual(
                  $maxScore,
                  $score,
@@ -5356,7 +5184,7 @@ Applied rules:
              );
              $this->assertGreaterThan(0.0, $score);
          }
-@@ @@
+@@ Line 369 @@
          $difference1 = $scoreSigma1 - $scoreSigma05;
          $difference2 = $scoreSigma2 - $scoreSigma1;
 
@@ -5367,7 +5195,7 @@ Applied rules:
      }
 
      /**
-@@ @@
+@@ Line 391 @@
                  0.0,
                  $score,
                  0.01,
@@ -5383,10 +5211,10 @@ Applied rules:
  * NarrowUnusedSetUpDefinedPropertyRector
 
 
-90) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Stages/MatchDiscoveryStage/MatchFinderTest.php:4
+89) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Stages/MatchDiscoveryStage/MatchFinderTest.php:4
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 4 @@
 
  namespace Fuzzy\Tests\Unit\Stages\MatchDiscoveryStage;
 
@@ -5394,7 +5222,7 @@ Applied rules:
  use Fuzzy\Contracts\IndexRepositoryInterface;
  use Fuzzy\Services\Scoring\ScoringEngine;
  use Fuzzy\Stages\MatchDiscoveryStage\MatchFinder;
-@@ @@
+@@ Line 23 @@
  final class MatchFinderTest extends TestCase
  {
      private MatchFinder $finder;
@@ -5404,7 +5232,7 @@ Applied rules:
      private SimilarityCalculator&MockObject $similarityCalculator;
 
      protected function setUp(): void
-@@ @@
+@@ Line 34 @@
          $this->similarityCalculator = $this->createMock(SimilarityCalculator::class);
      }
 
@@ -5414,7 +5242,16 @@ Applied rules:
      private function createContext(
          string $query,
          SearchOptionsData $options,
-@@ @@
+@@ Line 47 @@
+             options: $options,
+             normalizer: $this->normalizer,
+             similarityCalculator: $this->similarityCalculator,
+-            indexBuilder: $this->createMock(IndexBuilder::class),
+-            indexRepository: $this->createMock(IndexRepositoryInterface::class),
+-            scoringEngine: $this->createMock(ScoringEngine::class),
++            indexBuilder: $this->createStub(IndexBuilder::class),
++            indexRepository: $this->createStub(IndexRepositoryInterface::class),
++            scoringEngine: $this->createStub(ScoringEngine::class),
              indexDataArray: []
          );
 
@@ -5423,7 +5260,7 @@ Applied rules:
          $reflection->setAccessible(true);
          $reflection->setValue($context, $indexData);
 
-@@ @@
+@@ Line 193 @@
          ];
 
          $this->similarityCalculator->method('calculateWordSimilarity')
@@ -5436,7 +5273,7 @@ Applied rules:
                  return 0.5;
              });
 
-@@ @@
+@@ Line 213 @@
      {
          // Build a large word index
          $wordIndex = [];
@@ -5457,33 +5294,45 @@ Applied rules:
  * PostIncDecToPreIncDecRector
  * NewlineAfterStatementRector
  * TypeWillReturnCallableArrowFunctionRector
+ * CreateStubOverCreateMockArgRector
  * ClassMethodArrayDocblockParamFromLocalCallsRector
 
 
-91) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Stages/MatchDiscoveryStageTest.php:4
+90) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Stages/MatchDiscoveryStageTest.php:4
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 4 @@
 
  namespace Fuzzy\Tests\Unit\Stages;
 
++use PHPUnit\Framework\MockObject\Stub;
 +use Fuzzy\Enums\StageType;
  use Fuzzy\Contracts\IndexRepositoryInterface;
  use Fuzzy\Services\Scoring\ScoringEngine;
  use ReflectionProperty;
-@@ @@
+@@ Line 26 @@
  final class MatchDiscoveryStageTest extends TestCase
  {
      private MatchDiscoveryStage $stage;
 +
      private StringNormalizer $normalizer;
+-    private SimilarityCalculator&MockObject $similarityCalculator;
 +
-     private SimilarityCalculator&MockObject $similarityCalculator;
++    private SimilarityCalculator&Stub $similarityCalculator;
 +
      private MatchFinder&MockObject $matchFinder;
 
      protected function setUp(): void
-@@ @@
+@@ Line 34 @@
+     {
+         parent::setUp();
+         $this->normalizer = new StringNormalizer();
+-        $this->similarityCalculator = $this->createMock(SimilarityCalculator::class);
++        $this->similarityCalculator = $this->createStub(SimilarityCalculator::class);
+         $this->matchFinder = $this->createMock(MatchFinder::class);
+
+         $this->stage = new MatchDiscoveryStage(
+@@ Line 43 @@
          );
      }
 
@@ -5493,7 +5342,20 @@ Applied rules:
      private function createContext(
          string $query,
          SearchOptionsData $options,
-@@ @@
+@@ Line 56 @@
+             options: $options,
+             normalizer: $this->normalizer,
+             similarityCalculator: $this->similarityCalculator,
+-            indexBuilder: $this->createMock(IndexBuilder::class),
+-            indexRepository: $this->createMock(IndexRepositoryInterface::class),
+-            scoringEngine: $this->createMock(ScoringEngine::class),
++            indexBuilder: $this->createStub(IndexBuilder::class),
++            indexRepository: $this->createStub(IndexRepositoryInterface::class),
++            scoringEngine: $this->createStub(ScoringEngine::class),
+             indexDataArray: []
+         );
+
+@@ Line 126 @@
              ->method('discoverVeryCloseMatches')
              ->with($context, 'test', $wordIndex);
 
@@ -5502,7 +5364,7 @@ Applied rules:
      }
 
      /**
-@@ @@
+@@ Line 158 @@
              ->method('discoverMultiWordMatches')
              ->with($context);
 
@@ -5511,7 +5373,7 @@ Applied rules:
      }
 
      public function test_handle_skips_fuzzy_when_disabled(): void
-@@ @@
+@@ Line 179 @@
          $this->matchFinder->expects($this->once())
              ->method('discoverMultiWordMatches');
 
@@ -5520,7 +5382,7 @@ Applied rules:
      }
 
      public function test_handle_skips_multi_word_when_single_word(): void
-@@ @@
+@@ Line 204 @@
          $this->matchFinder->expects($this->once())
              ->method('discoverVeryCloseMatches');
 
@@ -5538,7 +5400,7 @@ Applied rules:
          }
 
          $context = $this->createContext('test', new SearchOptionsData(fuzzy: true), $wordIndex);
-@@ @@
+@@ Line 227 @@
          $this->matchFinder->expects($this->never())
              ->method('discoverCloseMatchesOptimized');
 
@@ -5556,7 +5418,7 @@ Applied rules:
          }
 
          $context = $this->createContext('test', new SearchOptionsData(fuzzy: true), $wordIndex);
-@@ @@
+@@ Line 250 @@
              ->method('discoverCloseMatchesOptimized')
              ->with($context, 'test');
 
@@ -5565,7 +5427,7 @@ Applied rules:
      }
 
      public function test_handle_calls_next_with_results(): void
-@@ @@
+@@ Line 257 @@
      {
          $context = $this->createContext('test', new SearchOptionsData(), []);
 
@@ -5574,7 +5436,7 @@ Applied rules:
              return 'processed';
          };
 
-@@ @@
+@@ Line 281 @@
 
      public function test_get_priority(): void
      {
@@ -5595,23 +5457,88 @@ Applied rules:
  * EncapsedStringsToSprintfRector
  * PostIncDecToPreIncDecRector
  * AssertEqualsToSameRector
+ * CreateStubOverCreateMockArgRector
+ * PropertyCreateMockToCreateStubRector
  * ClassMethodArrayDocblockParamFromLocalCallsRector
  * AddArrowFunctionReturnTypeRector
  * ClosureReturnTypeRector
 
 
-92) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Stages/RelevanceScoringStageTest.php:5
+91) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Stages/NormalizeQueryStageTest.php:46
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 46 @@
+             options: $options,
+             normalizer: $normalizer,
+             similarityCalculator: new SimilarityCalculator(),
+-            indexBuilder: $this->createMock(IndexBuilder::class),
+-            indexRepository: $this->createMock(IndexRepositoryInterface::class),
+-            scoringEngine: $this->createMock(ScoringEngine::class),
++            indexBuilder: $this->createStub(IndexBuilder::class),
++            indexRepository: $this->createStub(IndexRepositoryInterface::class),
++            scoringEngine: $this->createStub(ScoringEngine::class),
+             indexDataArray: []
+         );
+
+@@ Line 75 @@
+             options: $options,
+             normalizer: $normalizer,
+             similarityCalculator: new SimilarityCalculator(),
+-            indexBuilder: $this->createMock(IndexBuilder::class),
+-            indexRepository: $this->createMock(IndexRepositoryInterface::class),
+-            scoringEngine: $this->createMock(ScoringEngine::class),
++            indexBuilder: $this->createStub(IndexBuilder::class),
++            indexRepository: $this->createStub(IndexRepositoryInterface::class),
++            scoringEngine: $this->createStub(ScoringEngine::class),
+             indexDataArray: []
+         );
+
+@@ Line 110 @@
+             options: $options,
+             normalizer: $normalizer,
+             similarityCalculator: new SimilarityCalculator(),
+-            indexBuilder: $this->createMock(IndexBuilder::class),
+-            indexRepository: $this->createMock(IndexRepositoryInterface::class),
+-            scoringEngine: $this->createMock(ScoringEngine::class),
++            indexBuilder: $this->createStub(IndexBuilder::class),
++            indexRepository: $this->createStub(IndexRepositoryInterface::class),
++            scoringEngine: $this->createStub(ScoringEngine::class),
+             indexDataArray: []
+         );
+
+@@ Line 144 @@
+             options: $options,
+             normalizer: $normalizer,
+             similarityCalculator: new SimilarityCalculator(),
+-            indexBuilder: $this->createMock(IndexBuilder::class),
+-            indexRepository: $this->createMock(IndexRepositoryInterface::class),
+-            scoringEngine: $this->createMock(ScoringEngine::class),
++            indexBuilder: $this->createStub(IndexBuilder::class),
++            indexRepository: $this->createStub(IndexRepositoryInterface::class),
++            scoringEngine: $this->createStub(ScoringEngine::class),
+             indexDataArray: []
+         );
+    ----------- end diff -----------
+
+Applied rules:
+ * CreateStubOverCreateMockArgRector
+
+
+92) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Stages/RelevanceScoringStageTest.php:4
+
+    ---------- begin diff ----------
+@@ Line 4 @@
+
  namespace Fuzzy\Tests\Unit\Stages;
 
++use Illuminate\Support\Collection;
++use stdClass;
  use Fuzzy\Contracts\IndexRepositoryInterface;
 -use Fuzzy\Contracts\SearchContextInterface;
  use Fuzzy\Config\RelevanceScoringConfig;
  use Fuzzy\Data\SearchOptionsData;
  use Fuzzy\Data\SearchResultData;
-@@ @@
+@@ Line 20 @@
  use Fuzzy\ValueObjects\SearchQuery;
  use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
  use ReflectionMethod;
@@ -5626,7 +5553,7 @@ Applied rules:
      private RelevanceScoringConfig $config;
 
      /**
-@@ @@
+@@ Line 37 @@
      {
          parent::setUp();
 
@@ -5644,7 +5571,7 @@ Applied rules:
      }
 
      /**
-@@ @@
+@@ Line 158 @@
      {
          // Arrange: Many results without explicit maxResults
          $results = [];
@@ -5660,7 +5587,7 @@ Applied rules:
          $next = $this->createNextCallback($context);
 
          // Act: Process without explicit limit
-@@ @@
+@@ Line 281 @@
          $this->assertCount(1, $processedResults);
 
          $resultItem = $processedResults[0];
@@ -5669,7 +5596,7 @@ Applied rules:
          $this->assertEquals('User', $resultItem->modelType);
          $this->assertEquals('name', $resultItem->matchedField);
          $this->assertEquals('John Doe', $resultItem->matchedValue);
-@@ @@
+@@ Line 407 @@
                  $expected,
                  $result,
                  0.01,
@@ -5678,7 +5605,7 @@ Applied rules:
              );
          }
      }
-@@ @@
+@@ Line 444 @@
 
          // Verify descending order by combined score
          $sorted = $combinedResults->values()->all();
@@ -5687,7 +5614,7 @@ Applied rules:
              $this->assertGreaterThanOrEqual($sorted[$i + 1]->combinedScore, $sorted[$i]->combinedScore);
          }
      }
-@@ @@
+@@ Line 451 @@
 
      /**
       * Create a search context for testing.
@@ -5695,15 +5622,28 @@ Applied rules:
       */
      private function createSearchContext(
          string $queryString,
-@@ @@
+@@ Line 466 @@
+             options: $options,
+             normalizer: $normalizer,
+             similarityCalculator: new SimilarityCalculator(),
+-            indexBuilder: $this->createMock(IndexBuilder::class),
+-            indexRepository: $this->createMock(IndexRepositoryInterface::class),
+-            scoringEngine: $this->createMock(ScoringEngine::class),
++            indexBuilder: $this->createStub(IndexBuilder::class),
++            indexRepository: $this->createStub(IndexRepositoryInterface::class),
++            scoringEngine: $this->createStub(ScoringEngine::class),
+             indexDataArray: []
+         );
+
+@@ Line 511 @@
 
      /**
       * Invoke a private method on an object.
-+     * @param array<mixed[], mixed> $args
++     * @param SearchResultData[]|SearchContext[]|float[]|Collection<int, (object{score: float, relevance: float} & stdClass)>[] $args
       */
      private function invokePrivateMethod(object $object, string $methodName, array $args = []): mixed
      {
-@@ @@
+@@ Line 518 @@
          $reflection->setAccessible(true);
 
          return $reflection->invokeArgs($object, $args);
@@ -5728,13 +5668,14 @@ Applied rules:
  * RemoveUnusedPrivateMethodRector
  * NarrowUnusedSetUpDefinedPropertyRector
  * AssertEqualsOrAssertSameFloatParameterToSpecificMethodsTypeRector
+ * CreateStubOverCreateMockArgRector
  * ClassMethodArrayDocblockParamFromLocalCallsRector
 
 
 93) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Stages/ScoringStageTest.php:17
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 17 @@
  use Fuzzy\ValueObjects\SearchQuery;
  use InvalidArgumentException;
  use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
@@ -5742,33 +5683,131 @@ Applied rules:
  use ReflectionMethod;
  use ReflectionProperty;
  use stdClass;
+@@ Line 45 @@
+             options: $options,
+             normalizer: $normalizer,
+             similarityCalculator: new SimilarityCalculator(),
+-            indexBuilder: $this->createMock(IndexBuilder::class),
+-            indexRepository: $this->createMock(IndexRepositoryInterface::class),
+-            scoringEngine: $this->createMock(ScoringEngine::class),
++            indexBuilder: $this->createStub(IndexBuilder::class),
++            indexRepository: $this->createStub(IndexRepositoryInterface::class),
++            scoringEngine: $this->createStub(ScoringEngine::class),
+             indexDataArray: []
+         );
+
+@@ Line 86 @@
+             options: $options,
+             normalizer: $normalizer,
+             similarityCalculator: new SimilarityCalculator(),
+-            indexBuilder: $this->createMock(IndexBuilder::class),
+-            indexRepository: $this->createMock(IndexRepositoryInterface::class),
++            indexBuilder: $this->createStub(IndexBuilder::class),
++            indexRepository: $this->createStub(IndexRepositoryInterface::class),
+             scoringEngine: $scoringEngine,
+             indexDataArray: []
+         );
+@@ Line 142 @@
+             options: $options,
+             normalizer: $normalizer,
+             similarityCalculator: new SimilarityCalculator(),
+-            indexBuilder: $this->createMock(IndexBuilder::class),
+-            indexRepository: $this->createMock(IndexRepositoryInterface::class),
++            indexBuilder: $this->createStub(IndexBuilder::class),
++            indexRepository: $this->createStub(IndexRepositoryInterface::class),
+             scoringEngine: $scoringEngine,
+             indexDataArray: []
+         );
+@@ Line 177 @@
+         $query = SearchQuery::create(query: 'test', normalizer: $normalizer);
+         $options = new SearchOptionsData();
+
+-        $scoringEngine = $this->createMock(ScoringEngine::class);
++        $scoringEngine = $this->createStub(ScoringEngine::class);
+
+         $context = new SearchContext(
+             query: $query,
+@@ Line 184 @@
+             options: $options,
+             normalizer: $normalizer,
+             similarityCalculator: new SimilarityCalculator(),
+-            indexBuilder: $this->createMock(IndexBuilder::class),
+-            indexRepository: $this->createMock(IndexRepositoryInterface::class),
++            indexBuilder: $this->createStub(IndexBuilder::class),
++            indexRepository: $this->createStub(IndexRepositoryInterface::class),
+             scoringEngine: $scoringEngine,
+             indexDataArray: []
+         );
+@@ Line 229 @@
+             options: $options,
+             normalizer: $normalizer,
+             similarityCalculator: new SimilarityCalculator(),
+-            indexBuilder: $this->createMock(IndexBuilder::class),
+-            indexRepository: $this->createMock(IndexRepositoryInterface::class),
++            indexBuilder: $this->createStub(IndexBuilder::class),
++            indexRepository: $this->createStub(IndexRepositoryInterface::class),
+             scoringEngine: $scoringEngine,
+             indexDataArray: []
+         );
     ----------- end diff -----------
 
 Applied rules:
+ * CreateStubOverCreateMockArgRector
 
 
-94) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Stages/SortAndLimitStageTest.php:5
+94) /home/andy-kani/pro/sites/packages/laravel-fuzzy/tests/Unit/Stages/SortAndLimitStageTest.php:4
 
     ---------- begin diff ----------
-@@ @@
+@@ Line 4 @@
+
  namespace Fuzzy\Tests\Unit\Stages;
 
++use PHPUnit\Framework\MockObject\MockObject;
  use Fuzzy\Contracts\IndexRepositoryInterface;
 -use Fuzzy\Contracts\SearchContextInterface;
  use Fuzzy\Services\Scoring\ScoringEngine;
  use Fuzzy\Tests\TestCase;
  use Fuzzy\Stages\SortAndLimitStage;
-@@ @@
+@@ Line 42 @@
 
      /**
       * Create a search context for testing.
-+     * @param array<mixed[], mixed> $results
++     * @param SearchResultData[]|null[]|(SearchResultData & MockObject)[] $results
       */
      private function createSearchContext(
          string $queryString,
+@@ Line 61 @@
+             options: $options,
+             normalizer: $normalizer,
+             similarityCalculator: new SimilarityCalculator(),
+-            indexBuilder: $this->createMock(IndexBuilder::class),
+-            indexRepository: $this->createMock(IndexRepositoryInterface::class),
+-            scoringEngine: $this->createMock(ScoringEngine::class),
++            indexBuilder: $this->createStub(IndexBuilder::class),
++            indexRepository: $this->createStub(IndexRepositoryInterface::class),
++            scoringEngine: $this->createStub(ScoringEngine::class),
+             indexDataArray: []
+         );
+
+@@ Line 271 @@
+
+     public function test_handle_maintains_scores_in_original_objects(): void
+     {
+-        $result1 = $this->createMock(SearchResultData::class);
++        $result1 = $this->createStub(SearchResultData::class);
+         $result1->score = 0.7;
+         $result1->matchedField = 'name';
+         $result1->matchedValue = 'John Doe';
+
+-        $result2 = $this->createMock(SearchResultData::class);
++        $result2 = $this->createStub(SearchResultData::class);
+         $result2->score = 0.9;
+         $result2->matchedField = 'email';
+         $result2->matchedValue = 'john@example.com';
     ----------- end diff -----------
 
 Applied rules:
+ * CreateStubOverCreateMockArgRector
  * ClassMethodArrayDocblockParamFromLocalCallsRector
 
 
